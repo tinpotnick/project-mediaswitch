@@ -19,8 +19,11 @@
 
 #include <string>
 
+#include "test.h"
+
 #include "projectsipserver.h"
 #include "projectsippacket.h"
+#include "projectsipregistrar.h"
 
 /*******************************************************************************
 Function: readfile
@@ -46,37 +49,30 @@ This is what is returned.
 
 Updated: 14.12.2018
 *******************************************************************************/
-std::string gettestchunk( std::string &contents, std::string tag)
+stringptr gettestchunk( std::string &contents, std::string tag)
 {
   size_t startpos = contents.find( "==" + tag + "==\r\n" );
   size_t endpos = contents.find( "\r\n==END==", startpos );
 
   if( std::string::npos == startpos || std::string::npos == endpos )
   {
-    return "";
+    return stringptr( new std::string( "" ) );
   }
 
   startpos += 6 + tag.size();
 
   if( startpos > contents.size() )
   {
-    return "";
+    return stringptr( new std::string( "" ) );
   }
 
   if( endpos > contents.size() )
   {
-    return "";
+    return stringptr( new std::string( "" ) );
   }
 
-  return contents.substr( startpos, endpos - startpos );
+  return stringptr( new std::string( contents.substr( startpos, endpos - startpos ) ) );
 }
-
-/*******************************************************************************
-Function: test
-Purpose: Macro to call a funtion and test the result and display accordingly.
-Updated: 13.12.2018
-*******************************************************************************/
-#define test(s, d, e) if( s != d ){ std::cout << __FILE__ << ":" << __LINE__ << " " << e << " '" << s << "' != '" << d << "'" << std::endl; return; }
 
 
 /*******************************************************************************
@@ -93,51 +89,49 @@ void testsippacket( void )
   {
     projectsippacket testpacket( gettestchunk( testdata, "TEST1" ) );
 
-    test( testpacket.getmethod(), projectsippacket::REGISTER , "Invalid method");
+    projecttest( testpacket.getmethod(), projectsippacket::REGISTER , "Invalid method");
 
-    test( testpacket.getheader( projectsippacket::Call_ID ),
+    projecttest( testpacket.getheader( projectsippacket::Call_ID ),
             "843817637684230@998sdasdh09",
             "Wrong Call ID." );
-
-    test( testpacket.getheader( projectsippacket::To ),
+    projecttest( testpacket.getheader( projectsippacket::To ),
             "Bob <sip:bob@biloxi.com>",
             "Wrong To header field." );
 
-    test( testpacket.getrequesturi(),
+    projecttest( testpacket.getrequesturi(),
             "sip:registrar.biloxi.com",
             "Wrong Request URI." );
 
-    test( testpacket.hasheader( projectsippacket::Authorization ),
+    projecttest( testpacket.hasheader( projectsippacket::Authorization ),
             false,
             "We don't have a Authorization header." )
 
-    test( testpacket.hasheader( projectsippacket::From ),
+    projecttest( testpacket.hasheader( projectsippacket::From ),
             true,
             "We should have a From header." )
-
 
   }
 
   {
     projectsippacket testpacket( gettestchunk( testdata, "TEST2" ) );
 
-    test( testpacket.getstatuscode(), 180, "Expecting 180." );
+    projecttest( testpacket.getstatuscode(), 180, "Expecting 180." );
 
-    test( testpacket.getheader( projectsippacket::Contact ),
+    projecttest( testpacket.getheader( projectsippacket::Contact ),
             "<sip:bob@192.0.2.4>",
             "Wrong Contact field." );
 
-    test( testpacket.getheader( projectsippacket::Call_ID ),
+    projecttest( testpacket.getheader( projectsippacket::Call_ID ),
             "a84b4c76e66710",
             "Wrong Call ID." );
 
-    test( testpacket.getheader( projectsippacket::Content_Type ),
+    projecttest( testpacket.getheader( projectsippacket::Content_Type ),
             "multipart/signed;\r\n "
             "protocol=\"application/pkcs7-signature\";\r\n "
             "micalg=sha1; boundary=boundary42",
             "Wrong Content Type." );
 
-    test( testpacket.getheader( projectsippacket::Via ),
+    projecttest( testpacket.getheader( projectsippacket::Via ),
             "SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1\r\n "
             ";received=192.0.2.3",
             "Wrong Content Type." );
@@ -156,133 +150,134 @@ Updated: 17.12.2018
 void testurl( void )
 {
   {
-    std::string u( "http://myhost/my/big/path?myquerystring" );
+    stringptr u( new std::string( "http://myhost/my/big/path?myquerystring" ) );
     httpuri s( u );
 
-    test( s.protocol.substr( u ), "http", "Bad protocol." );
-    test( s.host.substr( u ), "myhost", "Bad host." );
-    test( s.path.substr( u ), "/my/big/path", "Bad path." );
-    test( s.query.substr( u ), "myquerystring", "Bad query." );
+    projecttest( s.protocol.substr(), "http", "Bad protocol." );
+    projecttest( s.host.substr(), "myhost", "Bad host." );
+    projecttest( s.path.substr(), "/my/big/path", "Bad path." );
+    projecttest( s.query.substr(), "myquerystring", "Bad query." );
   }
 
   {
-    std::string u( "\"Bob\" <sips:bob@biloxi.com> ;tag=a48s" );
+    stringptr u( new std::string( "\"Bob\" <sips:bob@biloxi.com> ;tag=a48s" ) );
     sipuri s( u );
 
-    test( s.displayname.substr( u ), "Bob", "Bad Display name." );
-    test( s.protocol.substr( u ), "sips", "Bad proto." );
-    test( s.user.substr( u ), "bob", "Bad user." );
-    test( s.host.substr( u ), "biloxi.com", "Bad host." );
-    test( s.parameters.substr( u ), "tag=a48s", "Bad params." );
+    projecttest( s.displayname.substr(), "Bob", "Bad Display name." );
+    projecttest( s.protocol.substr(), "sips", "Bad proto." );
+    projecttest( s.user.substr(), "bob", "Bad user." );
+    projecttest( s.host.substr(), "biloxi.com", "Bad host." );
+    projecttest( s.parameters.substr(), "tag=a48s", "Bad params." );
   }
 
   {
-    std::string u( "Anonymous <sip:c8oqz84zk7z@privacy.org>;tag=hyh8" );
+    stringptr u( new std::string( "Anonymous <sip:c8oqz84zk7z@privacy.org>;tag=hyh8" ) );
     sipuri s( u );
 
-    test( s.displayname.substr( u ), "Anonymous", "Bad Display name." );
-    test( s.protocol.substr( u ), "sip", "Bad proto." );
-    test( s.user.substr( u ), "c8oqz84zk7z", "Bad user." );
-    test( s.host.substr( u ), "privacy.org", "Bad host." );
-    test( s.parameters.substr( u ), "tag=hyh8", "Bad params." );
+    projecttest( s.displayname.substr(), "Anonymous", "Bad Display name." );
+    projecttest( s.protocol.substr(), "sip", "Bad proto." );
+    projecttest( s.user.substr(), "c8oqz84zk7z", "Bad user." );
+    projecttest( s.host.substr(), "privacy.org", "Bad host." );
+    projecttest( s.parameters.substr(), "tag=hyh8", "Bad params." );
   }
 
   {
-    std::string u( "sip:+12125551212@phone2net.com;tag=887s" );
+    stringptr u( new std::string( "sip:+12125551212@phone2net.com;tag=887s" ) );
     sipuri s( u );
 
-    test( s.displayname.substr( u ), "", "Bad Display name." );
-    test( s.protocol.substr( u ), "sip", "Bad proto." );
-    test( s.user.substr( u ), "+12125551212", "Bad user." );
-    test( s.host.substr( u ), "phone2net.com", "Bad host." );
-    test( s.parameters.substr( u ), "tag=887s", "Bad params." );
-    test( s.getparameter( u, "tag" ).substr( u ), "887s", "Bad tag param." );
+    projecttest( s.displayname.substr(), "", "Bad Display name." );
+    projecttest( s.protocol.substr(), "sip", "Bad proto." );
+    projecttest( s.user.substr(), "+12125551212", "Bad user." );
+    projecttest( s.host.substr(), "phone2net.com", "Bad host." );
+    projecttest( s.parameters.substr(), "tag=887s", "Bad params." );
+    projecttest( s.getparameter( "tag" ).substr(), "887s", "Bad tag param." );
   }
 
   {
-    std::string u( "<sip:+12125551212@phone2net.com>;tag=887s;blah=5566654gt" );
+    stringptr u( new std::string( "<sip:+12125551212@phone2net.com>;tag=887s;blah=5566654gt" ) );
     sipuri s( u );
 
-    test( s.displayname.substr( u ), "", "Bad Display name." );
-    test( s.protocol.substr( u ), "sip", "Bad proto." );
-    test( s.user.substr( u ), "+12125551212", "Bad user." );
-    test( s.host.substr( u ), "phone2net.com", "Bad host." );
-    test( s.parameters.substr( u ), "tag=887s;blah=5566654gt", "Bad params." );
-    test( s.getparameter( u, "tag" ).substr( u ), "887s", "Bad tag param." );
-    test( s.getparameter( u, "blah" ).substr( u ), "5566654gt", "Bad blah param." );
+    projecttest( s.displayname.substr(), "", "Bad Display name." );
+    projecttest( s.protocol.substr(), "sip", "Bad proto." );
+    projecttest( s.user.substr(), "+12125551212", "Bad user." );
+    projecttest( s.host.substr(), "phone2net.com", "Bad host." );
+    projecttest( s.parameters.substr(), "tag=887s;blah=5566654gt", "Bad params." );
+    projecttest( s.getparameter( "tag" ).substr(), "887s", "Bad tag param." );
+    projecttest( s.getparameter( "blah" ).substr(), "5566654gt", "Bad blah param." );
   }
 
   /*
     Examples from RFC 3261.
   */
   {
-    std::string u( "sip:alice@atlanta.com" );
+    stringptr u( new std::string( "sip:alice@atlanta.com" ) );
     sipuri s( u );
-    test( s.protocol.substr( u ), "sip", "Bad proto." );
-    test( s.user.substr( u ), "alice", "Bad user." );
-    test( s.host.substr( u ), "atlanta.com", "Bad host." );
+    projecttest( s.protocol.substr(), "sip", "Bad proto." );
+    projecttest( s.user.substr(), "alice", std::string( "Bad user: " ) + *u );
+    projecttest( s.host.substr(), "atlanta.com", "Bad host." );
   }
 
   {
-    std::string u( "sip:alice:secretword@atlanta.com;transport=tcp" );
+    stringptr u( new std::string( "sip:alice:secretword@atlanta.com;transport=tcp" ) );
     sipuri s( u );
-    test( s.protocol.substr( u ), "sip", "Bad proto." );
-    test( s.user.substr( u ), "alice", "Bad user." );
-    test( s.secret.substr( u ), "secretword", "Bad secret." );
-    test( s.host.substr( u ), "atlanta.com", "Bad host." );
-    test( s.parameters.substr( u ), "transport=tcp", "Bad params." );
-    test( s.getparameter( u, "transport" ).substr( u ), "tcp", "Bad transport param." );
+    projecttest( s.protocol.substr(), "sip", "Bad proto." );
+    projecttest( s.user.substr(), "alice", "Bad user." );
+    projecttest( s.secret.substr(), "secretword", "Bad secret." );
+    projecttest( s.host.substr(), "atlanta.com", "Bad host." );
+    projecttest( s.parameters.substr(), "transport=tcp", "Bad params." );
+    projecttest( s.getparameter( "transport" ).substr(), "tcp", "Bad transport param." );
   }
 
   {
-    // TODO getting header
-    std::string u( "sips:alice@atlanta.com?subject=project%20x&priority=urgent" );
+    stringptr u( new std::string( "sips:alice@atlanta.com?subject=project%20x&priority=urgent" ) );
     sipuri s( u );
-    test( s.protocol.substr( u ), "sips", "Bad proto." );
-    test( s.user.substr( u ), "alice", "Bad user." );
-    test( s.host.substr( u ), "atlanta.com", "Bad host." );
-    test( urldecode( s.headers.substr( u ) ), "subject=project x&priority=urgent", "Bad headers." );
+    projecttest( s.protocol.substr(), "sips", "Bad proto." );
+    projecttest( s.user.substr(), "alice", "Bad user." );
+    projecttest( s.host.substr(), "atlanta.com", "Bad host." );
+    projecttest( urldecode( s.headers.substr() ), "subject=project x&priority=urgent", "Bad headers." );
+    projecttest( urldecode( s.getheader( "subject" ).substr() ), "project x", "Bad header." );
+    projecttest( urldecode( s.getheader( "priority" ).substr() ), "urgent", "Bad header." );
   }
 
   {
-    std::string u( "sip:+1-212-555-1212:1234@gateway.com;user=phone" );
+    stringptr u( new std::string( "sip:+1-212-555-1212:1234@gateway.com;user=phone" ) );
     sipuri s( u );
-    test( s.protocol.substr( u ), "sip", "Bad proto." );
-    test( s.user.substr( u ), "+1-212-555-1212", "Bad user." );
-    test( s.secret.substr( u ), "1234", "Bad secret." );
-    test( s.host.substr( u ), "gateway.com", "Bad host." );
-    test( s.parameters.substr( u ), "user=phone", "Bad params." );
-    test( s.getparameter( u, "user" ).substr( u ), "phone", "Bad transport param." );
+    projecttest( s.protocol.substr(), "sip", "Bad proto." );
+    projecttest( s.user.substr(), "+1-212-555-1212", "Bad user." );
+    projecttest( s.secret.substr(), "1234", "Bad secret." );
+    projecttest( s.host.substr(), "gateway.com", "Bad host." );
+    projecttest( s.parameters.substr(), "user=phone", "Bad params." );
+    projecttest( s.getparameter( "user" ).substr(), "phone", "Bad transport param." );
   }
 
   {
-    std::string u( "sips:1212@gateway.com" );
+    stringptr u( new std::string( "sips:1212@gateway.com" ) );
     sipuri s( u );
-    test( s.protocol.substr( u ), "sips", "Bad proto." );
-    test( s.user.substr( u ), "1212", "Bad user." );
-    test( s.host.substr( u ), "gateway.com", "Bad host." );
+    projecttest( s.protocol.substr(), "sips", "Bad proto." );
+    projecttest( s.user.substr(), "1212", "Bad user." );
+    projecttest( s.host.substr(), "gateway.com", "Bad host." );
   }
 
   {
-    std::string u( "sip:alice@192.0.2.4" );
+    stringptr u( new std::string( "sip:alice@192.0.2.4" ) );
     sipuri s( u );
-    test( s.protocol.substr( u ), "sip", "Bad proto." );
-    test( s.user.substr( u ), "alice", "Bad user." );
-    test( s.host.substr( u ), "192.0.2.4", "Bad host." );
+    projecttest( s.protocol.substr(), "sip", "Bad proto." );
+    projecttest( s.user.substr(), "alice", "Bad user." );
+    projecttest( s.host.substr(), "192.0.2.4", "Bad host." );
   }
 
   {
-    std::string u( "sip:atlanta.com;method=REGISTER?to=alice%40atlanta.com" );
+    stringptr u( new std::string( "sip:atlanta.com;method=REGISTER?to=alice%40atlanta.com" ) );
     sipuri s( u );
-    test( s.protocol.substr( u ), "sip", "Bad proto." );
-    test( s.host.substr( u ), "atlanta.com", "Bad host." );
-    test( s.parameters.substr( u ), "method=REGISTER", "Bad params." );
-    test( s.headers.substr( u ), "to=alice%40atlanta.com", "Bad headers." );
+    projecttest( s.protocol.substr(), "sip", "Bad proto." );
+    projecttest( s.host.substr(), "atlanta.com", "Bad host." );
+    projecttest( s.parameters.substr(), "method=REGISTER", "Bad params." );
+    projecttest( s.headers.substr(), "to=alice%40atlanta.com", "Bad headers." );
   }
 
   {
-    std::string u( "param=the cat,the dog+" );
-    test( urlencode( u ), "param%3dthe+cat%2cthe+dog%2b", "Url encode failed." );
+    stringptr u( new std::string( "param=the cat,the dog+" ) );
+    projecttest( urlencode( u ), "param%3dthe+cat%2cthe+dog%2b", "Url encode failed." );
   }
 
   std::cout << "All url class tests passed, looking good" << std::endl;
@@ -297,6 +292,7 @@ int main( int argc, const char* argv[] )
 {
   testurl();
   testsippacket();
+  testregs();
 
   return 0;
 }

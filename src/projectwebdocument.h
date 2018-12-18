@@ -12,23 +12,28 @@
 
 #include <array>
 #include <string>
+#include <boost/shared_ptr.hpp>
+
+//#include <stringstream>
+
+typedef boost::shared_ptr< std::string > stringptr;
 
 /*******************************************************************************
 Function: moveonbyn
 Purpose: Little helper function - safely move on n chars in a string.
 Updated: 12.12.2018
 *******************************************************************************/
-inline std::string::iterator moveonbyn(std::string &s, size_t n)
+inline std::string::iterator moveonbyn( stringptr s, size_t n )
 {
-  return s.length() <= n ? s.end() : s.begin() + n;
+  return s->length() <= n ? s->end() : s->begin() + n;
 }
 
-inline void moveonbyn(std::string &str, std::string::iterator &s, size_t n)
+inline void moveonbyn( stringptr str, std::string::iterator &s, size_t n )
 {
   for( size_t i = 0; i < n; i++ )
   {
     s++;
-    if( str.end() == s )
+    if( str->end() == s )
     {
       return;
     }
@@ -50,29 +55,49 @@ public:
     this->endpos = 0;
   }
 
-  inline substring( size_t start, size_t end )
+  inline substring( char * s )
   {
+    this->s = stringptr( new std::string( s ) );
+    this->startpos = 0;
+    this->endpos = this->s->length();
+  }
+
+  inline substring( stringptr s )
+  {
+    this->s = s;
+    this->startpos = 0;
+    this->endpos = s->length();
+  }
+
+  inline substring( stringptr s, size_t start, size_t end )
+  {
+    this->s = s;
     this->startpos = start;
     this->endpos = end;
   }
 
-  inline std::string substr( std::string &ref )
+  inline stringptr substr()
   {
+    if ( !this->s )
+    {
+      return stringptr( new std::string( "" ) );
+    }
+    
     if( 0 == this->endpos )
     {
-      return "";
+      return stringptr( new std::string( "" ) );
     }
 
-    if( this->startpos > ref.size() )
+    if( this->startpos > s->size() )
     {
-      return "";
+      return stringptr( new std::string( "" ) );
     }
 
-    if( this->endpos > ref.size() )
+    if( this->endpos > s->size() )
     {
-      return "";
+      return stringptr( new std::string( "" ) );
     }
-    return ref.substr( this->startpos, this->endpos - this->startpos );
+    return stringptr( new std::string( s->substr( this->startpos, this->endpos - this->startpos ) ) );
   }
 
   inline size_t end()
@@ -113,10 +138,29 @@ public:
 private:
   size_t startpos;
   size_t endpos;
+  stringptr s;
 };
 
-std::string urldecode( std::string str );
-std::string urlencode( std::string str );
+inline bool operator != ( const substring& lhs, const char *rhs ){ return false; }
+inline bool operator == ( const substring& lhs, const char *rhs ){ return false; }
+
+#ifdef TESTCODE
+/*******************************************************************************
+Function: operator << ostream, substring
+Purpose: For use with our tests, out put the result of a comparison. Not for live.
+Updated: 30.12.2018
+*******************************************************************************/
+inline std::ostream & operator << ( std::ostream& os, substring obj ) 
+{
+  os << *( obj.substr() );
+  return os;
+}
+#endif /* TESTCODE */
+
+typedef boost::shared_ptr< substring > substringptr;
+
+stringptr urldecode( stringptr str );
+stringptr urlencode( stringptr str );
 
 /*******************************************************************************
 Class: httpuri
@@ -127,12 +171,13 @@ Updated: 17.12.2018
 class httpuri
 {
 public:
-  inline httpuri( std::string &s )
+  inline httpuri( stringptr s )
   {
-    size_t protopos = s.find( "://" );
+    this->s = s;
+    size_t protopos = s->find( "://" );
     if( std::string::npos != protopos )
     {
-      this->protocol = substring( 0, protopos );
+      this->protocol = substring( s, 0, protopos );
     }
 
     size_t hostpos = this->protocol.end();
@@ -141,30 +186,31 @@ public:
       hostpos += 3;
     }
 
-    hostpos = s.find( '/', hostpos );
+    hostpos = s->find( '/', hostpos );
     if( std::string::npos == hostpos )
     {
-      hostpos = s.size();
+      hostpos = s->size();
     }
-    this->host = substring( this->protocol.end() + 3, hostpos );
-    if( this->host.end() == s.size() )
+    this->host = substring( s, this->protocol.end() + 3, hostpos );
+    if( this->host.end() == s->size() )
     {
       return;
     }
 
-    size_t querypos = s.find( '?', this->host.end() );
+    size_t querypos = s->find( '?', this->host.end() );
     if( std::string::npos != querypos )
     {
-      this->query = substring( querypos + 1, s.size() );
+      this->query = substring( s, querypos + 1, s->size() );
       /* The path is inbetween the host and query */
-      this->path = substring( this->host.end(), querypos );
+      this->path = substring( s, this->host.end(), querypos );
       return;
     }
 
-    this->path = substring( this->host.end(), s.size() );
+    this->path = substring( s, this->host.end(), s->size() );
 
   }
 
+  stringptr s;
   substring protocol;
   substring host;
   substring path;
@@ -181,14 +227,14 @@ Updated: 16.12.2018
 class projectwebdocument
 {
 public:
-  projectwebdocument( std::string doc );
-  std::string getheader( int header );
+  projectwebdocument( stringptr doc );
+  substring getheader( int header );
   bool hasheader( int header );
   int getmethod( void );
   int getstatuscode( void );
-  std::string getreasonphrase( void );
-  std::string getrequesturi( void );
-  std::string getbody();
+  stringptr getreasonphrase( void );
+  stringptr getrequesturi( void );
+  stringptr getbody();
 
 protected:
 
@@ -198,16 +244,13 @@ protected:
   void parseheaders( void );
   substring getheadervalue( substring header );
 
-  std::string document;
-  bool headersparsed;
-
   substring headers[ MAX_HEADERS * MAX_DUPLICATEHEADERS ];
+  stringptr document;
   substring body;
-
+  bool headersparsed;
   int method;
-  substring methodstr;
-
   int statuscode;
+  substring methodstr;
   substring statuscodestr;
   substring reasonphrase;
 

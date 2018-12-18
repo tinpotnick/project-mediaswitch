@@ -13,12 +13,16 @@ Function: projectwebdocument
 Purpose: Constructor
 Updated: 12.12.2018
 *******************************************************************************/
-projectwebdocument::projectwebdocument( std::string doc )
+projectwebdocument::projectwebdocument( stringptr doc ) :
+  document( doc ),
+  body( doc ),
+  headersparsed( false ),
+  method( METHODUNKNOWN ),
+  statuscode( STATUSUNKNOWN ),
+  methodstr( doc ),
+  statuscodestr( doc ),
+  reasonphrase( doc )
 {
-  this->document = doc;
-  this->headersparsed = false;
-  this->method = METHODUNKNOWN;
-  this->statuscode = STATUSUNKNOWN;
 }
 
 
@@ -27,14 +31,14 @@ Function: getstatus
 Purpose: Gets the response code if a response packet.
 Updated: 13.12.2018
 *******************************************************************************/
-std::string projectwebdocument::getreasonphrase( void )
+stringptr projectwebdocument::getreasonphrase( void )
 {
   if( METHODUNKNOWN == this->method )
   {
     this->parsemethod();
   }
 
-  return this->reasonphrase.substr( this->document );
+  return this->reasonphrase.substr();
 }
 
 /*******************************************************************************
@@ -42,14 +46,14 @@ Function: getstatus
 Purpose: Gets the request URI.
 Updated: 13.12.2018
 *******************************************************************************/
-std::string projectwebdocument::getrequesturi( void )
+stringptr projectwebdocument::getrequesturi( void )
 {
   if( METHODUNKNOWN == this->method )
   {
     this->parsemethod();
   }
 
-  return this->statuscodestr.substr( this->document );
+  return this->statuscodestr.substr();
 }
 
 /*******************************************************************************
@@ -57,7 +61,7 @@ Function: projectsippacket
 Purpose: Get the body of the packet
 Updated: 13.12.2018
 *******************************************************************************/
-std::string projectwebdocument::getbody( void )
+stringptr projectwebdocument::getbody( void )
 {
   if( METHODUNKNOWN == this->method )
   {
@@ -69,7 +73,7 @@ std::string projectwebdocument::getbody( void )
     this->parseheaders();
   }
 
-  return this->body.substr( this->document );
+  return this->body.substr();
 }
 
 /*******************************************************************************
@@ -117,7 +121,7 @@ Function: getheader
 Purpose: get the header
 Updated: 12.12.2018
 *******************************************************************************/
-std::string projectwebdocument::getheader( int header )
+substring projectwebdocument::getheader( int header )
 {
   if( METHODUNKNOWN == this->method )
   {
@@ -131,10 +135,10 @@ std::string projectwebdocument::getheader( int header )
 
   if( header >= 0 && header <= MAX_HEADERS )
   {
-    return this->headers[ header ].substr( this->document );
+    return this->headers[ header ].substr();
   }
 
-  return "";
+  return stringptr( new std::string( "" ) );
 }
 
 /*******************************************************************************
@@ -146,9 +150,9 @@ substring projectwebdocument::getheadervalue( substring header )
 {
   std::string::iterator it;
 
-  substring value( header.end(), header.end() );
+  substring value( this->document, header.end(), header.end() );
 
-  for( it = moveonbyn( this->document, value.start() ); it != this->document.end(); it++ )
+  for( it = moveonbyn( this->document, value.start() ); it != this->document->end(); it++ )
   {
     switch( *it )
     {
@@ -163,16 +167,16 @@ substring projectwebdocument::getheadervalue( substring header )
     break;
   }
 
-  for( ; it != this->document.end(); it++ )
+  for( ; it != this->document->end(); it++ )
   {
     if( '\r' == *it )
     {
       it++;
-      if( it == this->document.end() ) goto exit_loop;
+      if( it == this->document->end() ) goto exit_loop;
       if( '\n' == *it )
       {
         it++;
-        if( it == this->document.end() ) goto exit_loop;
+        if( it == this->document->end() ) goto exit_loop;
         switch( *it )
         {
           case ' ':
@@ -226,13 +230,13 @@ void projectwebdocument::parseheaders( void )
 {
   this->headersparsed = true;
   std::string::iterator it;
-  substring headername( this->methodstr.end() + 2, this->methodstr.end() + 2 );
+  substring headername( this->document, this->methodstr.end() + 2, this->methodstr.end() + 2 );
 
   boost::crc_32_type crccheck;
   substring hval;
 
   for( it = moveonbyn( this->document, headername.end() );
-        it != this->document.end();
+        it != this->document->end();
         it++ )
   {
     *it = std::tolower( *it );
@@ -252,13 +256,13 @@ void projectwebdocument::parseheaders( void )
 
     if( ':' == *it )
     {
-      if( headername.start() + headername.length() > this->document.size() )
+      if( headername.start() + headername.length() > this->document->size() )
       {
         goto exit_loop;
       }
 
       crccheck.process_bytes(
-        this->document.c_str() + headername.start(),
+        this->document->c_str() + headername.start(),
         headername.length()
         );
 
@@ -273,7 +277,7 @@ void projectwebdocument::parseheaders( void )
       std::string::iterator itcar = moveonbyn( this->document, hval.end() + 2 );
       std::string::iterator itline = moveonbyn( this->document, hval.end() + 3 );
 
-      if ( itcar == this->document.end() || itline == this->document.end() )
+      if ( itcar == this->document->end() || itline == this->document->end() )
       {
         goto exit_loop;
       }
@@ -283,14 +287,14 @@ void projectwebdocument::parseheaders( void )
         goto exit_loop;
       }
 
-      headername = substring( hval.end() + 2, hval.end() + 2 );
+      headername = substring( this->document, hval.end() + 2, hval.end() + 2 );
       crccheck.reset();
     }
   }
 
   exit_loop:
 
-  size_t docsize = this->document.size();
+  size_t docsize = this->document->size();
   size_t bodystartpos = hval.end() + 4;
   if( bodystartpos > docsize )
   {
@@ -327,29 +331,29 @@ Function: urlencode
 Purpose: Returns a url-encoded version of str.
 Updated: 18.12.2018
 *******************************************************************************/
-std::string urlencode( std::string str )
+stringptr urlencode( stringptr str )
 {
-  std::string encoded;
-  encoded.reserve( ( str.size() * 3 ) + 1);
+  stringptr encoded( new std::string() );
+  encoded->reserve( ( str->size() * 3 ) + 1);
 
-  std::string::iterator it = str.begin();
+  std::string::iterator it = str->begin();
 
-  while( it != str.end() )
+  while( it != str->end() )
   {
     char c = *it;
     if ( isalnum( c ) || c == '-' || c == '_' || c == '.' || c == '~' )
     {
-      encoded += c;
+      *encoded += c;
     }
     else if ( ' ' == c )
     {
-      encoded += '+';
+      *encoded += '+';
     }
     else
     {
-      encoded += '%';
-      encoded += to_hex( c >> 4 );
-      encoded += to_hex( c & 15 );
+      *encoded += '%';
+      *encoded += to_hex( c >> 4 );
+      *encoded += to_hex( c & 15 );
     }
 
     it++;
@@ -362,25 +366,25 @@ Function: urldecode
 Purpose: Returns a url-decoded version of str.
 Updated: 18.12.2018
 *******************************************************************************/
-std::string urldecode( std::string str)
+stringptr urldecode( stringptr str )
 {
-  std::string decoded;
-  decoded.reserve( str.size() + 1 );
+  stringptr decoded( new std::string() );
+  decoded->reserve( str->size() + 1 );
 
-  std::string::iterator it = str.begin();
+  std::string::iterator it = str->begin();
 
-  while( it != str.end() )
+  while( it != str->end() )
   {
     if( '%' == *it )
     {
       std::string::iterator digit1 = it + 1;
-      if( digit1 != str.end() )
+      if( digit1 != str->end() )
       {
         std::string::iterator digit2 = digit1 + 1;
 
-        if( digit1 != str.end() )
+        if( digit1 != str->end() )
         {
-          decoded += from_hex( *digit1 ) << 4 | from_hex( *digit2 );
+          *decoded += from_hex( *digit1 ) << 4 | from_hex( *digit2 );
           moveonbyn( str, it, 3 );
           continue;
         }
@@ -388,11 +392,11 @@ std::string urldecode( std::string str)
     }
     else if ( '+' == *it )
     {
-      decoded += ' ';
+      *decoded += ' ';
     }
     else
     {
-      decoded += *it;
+      *decoded += *it;
     }
     it++;
   }

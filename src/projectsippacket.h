@@ -31,33 +31,35 @@ Updated: 17.12.2018
 class sipuri
 {
 public:
-  inline sipuri( std::string &s )
+  inline sipuri( stringptr s )
   {
+    this->s = s;
+
     /* Find display name */
-    size_t dispstart = s.find( '"' );
+    size_t dispstart = s->find( '"' );
     if( std::string::npos != dispstart )
     {
-      size_t dispend = s.find( '"', dispstart + 1 );
+      size_t dispend = s->find( '"', dispstart + 1 );
       if( std::string::npos != dispstart )
       {
-        this->displayname = substring( dispstart + 1, dispend );
+        this->displayname = substring( s, dispstart + 1, dispend );
       }
     }
 
-    size_t sipstart = s.find( "sip:" );
+    size_t sipstart = s->find( "sip:" );
     if( std::string::npos == sipstart )
     {
-      sipstart = s.find( "sips:" );
+      sipstart = s->find( "sips:" );
       if( std::string::npos == sipstart )
       {
         /* Nothing more we can do */
         return;
       }
-      this->protocol = substring( sipstart, sipstart + 4 );
+      this->protocol = substring( s, sipstart, sipstart + 4 );
     }
     else
     {
-      this->protocol = substring( sipstart, sipstart + 3 );
+      this->protocol = substring( s, sipstart, sipstart + 3 );
     }
 
     /* We return to the display name where no quotes are used */
@@ -65,7 +67,7 @@ public:
     {
       if( sipstart > 0 )
       {
-        const char *start = s.c_str();
+        const char *start = s->c_str();
         char *end = (char *)start + sipstart;
         char *ptr = (char *)start;
         int startpos = 0;
@@ -87,14 +89,14 @@ public:
           }
           endpos--;
         }
-        this->displayname = substring( startpos, endpos );
+        this->displayname = substring( s, startpos, endpos );
       }
     }
 
     size_t starthost =  this->protocol.end() + 1; /* +1 = : */
     size_t offset = starthost;
-    char *hoststart = (char *)s.c_str() + offset;
-    char *endstr = (char *)s.c_str() + s.size();
+    char *hoststart = (char *)s->c_str() + offset;
+    char *endstr = (char *)s->c_str() + s->size();
     for( ; hoststart < endstr; hoststart++ )
     {
       switch( *hoststart )
@@ -103,7 +105,7 @@ public:
         {
           if( 0 == this->user.end() )
           {
-            this->user = substring( starthost, offset );
+            this->user = substring( s, starthost, offset );
           }
           else
           {
@@ -116,26 +118,26 @@ public:
         {
           if( 0 == this->user.end() )
           {
-            this->user = substring( starthost, offset );
+            this->user = substring( s, starthost, offset );
           }
-          this->secret = substring( offset + 1, offset );
+          this->secret = substring( s, offset + 1, offset );
           starthost = offset + 1;
           break;
         }
         case '>':
         {
-          this->host = substring( starthost, offset );
+          this->host = substring( s, starthost, offset );
           break;
         }
         case ';':
         {
           if( 0 == this->host.end() )
           {
-            this->host = substring( starthost, offset );
+            this->host = substring( s, starthost, offset );
           }
           if( 0 == this->parameters.start() )
           {
-            this->parameters = substring( offset + 1, s.size() );
+            this->parameters = substring( s, offset + 1, s->size() );
           }
 
           break;
@@ -144,14 +146,14 @@ public:
         {
           if( 0 == this->host.end() )
           {
-            this->host = substring( starthost, offset );
+            this->host = substring( s, starthost, offset );
           }
 
           if( 0 != this->parameters.end() )
           {
             this->parameters.end( offset );
           }
-          this->headers = substring( offset + 1, s.size() );
+          this->headers = substring( s, offset + 1, s->size() );
           break;
         }
       }
@@ -161,41 +163,74 @@ public:
 
     if( 0 == this->host.end() )
     {
-      this->host = substring( starthost, s.size() );
+      this->host = substring( s, starthost, s->size() );
     }
   }
 
   /*****************************************************************************
-  Funtion: getparameter
+  Function: getparameter
   Purpose: Returns the substring index into s for the given param name.
   std::string s = From: sip:+12125551212@server.phone2net.com;tag=887s
   getparameter( s, "tag" );
   Will return a substring index to '887s'.
   Updated: 18.12.2018
   *****************************************************************************/
-  inline substring getparameter( std::string &s, std::string name )
+  inline substring getparameter( std::string name )
   {
     if( 0 == this->parameters.end() )
     {
       return this->parameters;
     }
 
-    size_t startpos = s.find( name + '=', this->parameters.start() );
+    size_t startpos = this->s->find( name + '=', this->parameters.start() );
 
     if( std::string::npos == startpos )
     {
-      return substring( 0, 0 );
+      return substring();
     }
 
-    size_t endpos = s.find( ';', startpos + name.size() + 1 );
+    size_t endpos = this->s->find( ';', startpos + name.size() + 1 );
 
     if( std::string::npos == endpos )
     {
-      return substring( startpos + name.size() + 1, s.size() );
+      endpos = this->s->find( '?', startpos + name.size() + 1 );
+      if( std::string::npos == endpos )
+      {
+        return substring( this->s, startpos + name.size() + 1, this->s->size() );
+      }
     }
-    return substring( startpos + name.size() + 1, endpos );
+    return substring( this->s, startpos + name.size() + 1, endpos );
   }
 
+  /*****************************************************************************
+  Function: getparameter
+  Purpose: Similar to get parameter but for headers. In a SIP URI anything after
+  the ? is considered a header. Name value pairs.
+  Updated: 18.12.2018
+  *****************************************************************************/
+  inline substring getheader( std::string name )
+  {
+    if( 0 == this->headers.end() )
+    {
+      return this->headers;
+    }
+
+    size_t startpos = this->s->find( name + '=', this->headers.start() );
+
+    if( std::string::npos == startpos )
+    {
+      return substring();
+    }
+    size_t endpos = this->s->find( '&', startpos + name.size() + 1 );
+
+    if( std::string::npos == endpos )
+    {
+      return substring( this->s, startpos + name.size() + 1, this->s->size() );
+    }
+    return substring( this->s, startpos + name.size() + 1, endpos );
+  }
+
+  stringptr s;
   substring displayname;
   substring protocol;
   substring user;
@@ -218,7 +253,7 @@ class projectsippacket : public projectwebdocument
 {
 
 public:
-  projectsippacket( std::string packet );
+  projectsippacket( stringptr packet );
   ~projectsippacket();
 
 

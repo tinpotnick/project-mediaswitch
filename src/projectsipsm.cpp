@@ -61,13 +61,13 @@ void projectsipsm::handleregister( projectsippacket &pk )
     return;
   }
 
-  std::string uri = pk.getrequesturi();
-  if( uri.size() < 4 )
+  stringptr uri = pk.getrequesturi();
+  if( !uri || uri->size() < 4 )
   {
     return;
   }
-  
-  if( std::npos != uri.find( '@' ) )
+
+  if( std::string::npos != uri->find( '@' ) )
   {
     return;
   }

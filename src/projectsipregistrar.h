@@ -17,6 +17,8 @@
 #include <boost/unordered_map.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include <boost/shared_ptr.hpp>
+
 /*******************************************************************************
 Class: projectsipregistration
 Purpose: Class to hold details about a specific registration.
@@ -28,12 +30,20 @@ public:
   projectsipregistration( std::string u, int expires /*seconds */ );
 
   std::string user; /* fully qualified user@domain */
-
   boost::posix_time::ptime expires; /* when we exipre the registration */
   boost::posix_time::ptime nextping; /* when is the next options (ping) due */
-
   int outstandingping; /* how many pings we have sent without a response. */
+
+  /* our state functions */
+  void regstart( void );
+  void regrequestauth( void );
+
+  typedef void (projectsipregistration::*regstate)( void );
+  regstate lastreg;
+  regstate nextreg;
 };
+
+typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;
 
 /*******************************************************************************
 Class: projectsipregistrations
@@ -42,7 +52,7 @@ Purpose: Boost multi index set to store our registrations. Indexed by user
 Updated: 18.12.2018
 *******************************************************************************/
 typedef boost::multi_index::multi_index_container<
-  projectsipregistration,
+  projectsipregistrationptr,
   boost::multi_index::indexed_by
   <
     boost::multi_index::hashed_unique
@@ -50,7 +60,7 @@ typedef boost::multi_index::multi_index_container<
       boost::multi_index::member
       <
         projectsipregistration,
-        std::string ,
+        std::string,
         &projectsipregistration::user
       >
     >,
@@ -77,6 +87,8 @@ typedef boost::multi_index::multi_index_container<
 
 
 #ifdef TESTCODE
+
+void testregs( void );
 
 #endif /* TESTCODE */
 

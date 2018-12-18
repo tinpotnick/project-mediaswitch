@@ -14,7 +14,7 @@ Function: projectsippacket constructor
 Purpose:
 Updated: 12.12.2018
 *******************************************************************************/
-projectsippacket::projectsippacket( std::string pk )
+projectsippacket::projectsippacket( stringptr pk )
   : projectwebdocument( pk )
 {
 
@@ -39,15 +39,15 @@ void projectsippacket::parsemethod( void )
   std::string::iterator it;
   int counter = 0;
 
-  if( this->document.size() < 9 )
+  if( this->document->size() < 9 )
   {
     this->method = METHODBADFORMAT;
     return;
   }
 
-  it = this->document.begin();
+  it = this->document->begin();
 
-  switch( std::tolower( this->document[ 0 ] ) )
+  switch( std::tolower( (*this->document)[ 0 ] ) )
   {
     case 'r':
     {
@@ -101,7 +101,7 @@ void projectsippacket::parsemethod( void )
   }
 
   int spacesfound = 0;
-  for ( ; it != this->document.end(); it++ )
+  for ( ; it != this->document->end(); it++ )
   {
     counter++;
     switch( *it )
@@ -109,7 +109,7 @@ void projectsippacket::parsemethod( void )
       case '\r':
       {
         std::string::iterator itline = it + 1;
-        if( this->document.end() == itline )
+        if( this->document->end() == itline )
         {
           goto exit_loop;
         }
@@ -149,7 +149,7 @@ void projectsippacket::parsemethod( void )
   {
     try
     {
-      this->statuscode = boost::lexical_cast<int>( this->statuscodestr.substr( this->document ) );
+      this->statuscode = boost::lexical_cast<int>( *( this->statuscodestr.substr() ) );
     }
     catch( const boost::bad_lexical_cast& )
     {
@@ -157,7 +157,7 @@ void projectsippacket::parsemethod( void )
     }
   }
 
-  this->methodstr = substring( 0, counter - 1 );
+  this->methodstr = substring( this->document, 0, counter - 1 );
 }
 
 /*******************************************************************************
