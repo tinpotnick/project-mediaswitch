@@ -243,7 +243,7 @@ public:
 /*******************************************************************************
 Class: projectsippacket
 Purpose: Unpacks data following the standard: https://www.ietf.org/rfc/rfc3261.txt.
-Our purpose is to be effieicent (fast), we are not checking for perfect syntax
+Our purpose is to be efficient (fast), we are not checking for perfect syntax
 this object should still work even with inperfect SIP packets. Keep memory
 allocation to a minimum. Work off just the main packet string and keep indexes
 into that packet.

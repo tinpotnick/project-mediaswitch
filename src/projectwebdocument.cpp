@@ -406,3 +406,81 @@ stringptr urldecode( stringptr str )
 
 
 
+/*******************************************************************************
+Function: operator != substring const char *
+Purpose: compare a substring with a const char*
+Updated: 30.12.2018
+*******************************************************************************/
+bool operator!=( const substring& lhs, const char *rhs )
+{ 
+  const char *c = rhs;
+  size_t index = lhs.startpos;
+
+  for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
+        it != lhs.s->end();
+        it ++ )
+  {
+    if( index == lhs.endpos )
+    {
+      break;
+    }
+
+    if( 0 == *c )
+    {
+      /* Found the end too soon */
+      return true;
+    }
+
+    if( *it != *c )
+    {
+      return false;
+    }
+
+    index++;
+    c++;
+  }
+
+  if( 0 == *c )
+  {
+    return false;
+  }
+
+  return true;
+}
+
+/*******************************************************************************
+Function: operator == substring const char *
+Purpose: compare a substring with a const char*
+Updated: 30.12.2018
+*******************************************************************************/
+bool operator==( const substring& lhs, const char *rhs )
+{
+  const char *c = rhs;
+  size_t index = lhs.startpos;
+
+  for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
+        it != lhs.s->end();
+        it ++ )
+  {
+    if( index == lhs.endpos )
+    {
+      break;
+    }
+
+    if( *it != *c )
+    {
+      return false;
+    }
+
+    index++;
+    c++;
+  }
+
+  if( 0 != *c )
+  {
+    return false;
+  }
+
+  return true;
+}
+

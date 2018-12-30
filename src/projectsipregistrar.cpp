@@ -22,16 +22,39 @@ projectsipregistration::projectsipregistration( std::string u, int expires /*sec
 }
 
 
-
 void projectsipregistration::regstart( void )
 {
-  this->nextreg = &projectsipregistration::regrequestauth;
+  this->nextreg = &projectsipregistration::regwaitauth;
 }
 
-void projectsipregistration::regrequestauth( void )
+void projectsipregistration::regwaitauth( void )
 {
 
 }
+
+
+void processsippacket( projectsippacket &pk )
+{
+    switch( pk.getmethod() )
+  {
+    case processsippacket::REGISTER:
+    {
+      break;
+    }
+    default:
+    {
+      return; // ?
+      break;
+    }
+  }
+
+  if( !pk.hasheader( projectsippacket::Via ) )
+  {
+    /* Bad = ignore */
+    return;
+  }
+}
+
 
 #ifdef TESTCODE
 /*******************************************************************************
@@ -50,19 +73,19 @@ void testregs( void )
 
   projecttest( regs.size(), 2, "We should have 2 registrations." );
 
-  projectsipregistrations::nth_index< 0 >::type::iterator it = regs.get< 0 >().find( r1->user );
+  projectsipregistrations::index< regindexuser >::type::iterator it = regs.get< regindexuser >().find( r1->user );
   projecttest( ( *it )->user, "1000@bling.babblevoice.com", "Bad user." );
 
-  it = regs.get< 0 >().find( "1005@bling.babblevoice.com" );
-  projecttestp( it, regs.get< 0 >().end(), "Should not be there." );
+  it = regs.get< regindexuser >().find( "1005@bling.babblevoice.com" );
+  projecttestp( it, regs.get< regindexuser >().end(), "Should not be there." );
 
   /* Our first entry should be the first item */
   it = regs.begin();
   projecttestp( ( *it )->user, "1000@bling.babblevoice.com", "Should be 1000@bling.babblevoice.com." );
 
-  projectsipregistrations::nth_index< 1 >::type::iterator expiresit;
-  expiresit = regs.get< 1 >().begin();
-  if( expiresit != regs.get< 1 >().end() )
+  projectsipregistrations::index< regindexexpires >::type::iterator expiresit;
+  expiresit = regs.get< regindexexpires >().begin();
+  if( expiresit != regs.get< regindexexpires >().end() )
   {
     projectsipregistrationptr ptr = *expiresit;
     ptr->expires = boost::posix_time::second_clock::local_time() + boost::posix_time::seconds( 10 );

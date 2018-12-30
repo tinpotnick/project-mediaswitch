@@ -14,7 +14,9 @@
 #include <string>
 #include <boost/shared_ptr.hpp>
 
-//#include <stringstream>
+// Please remove
+#include <iostream>
+#include <stdio.h>
 
 typedef boost::shared_ptr< std::string > stringptr;
 
@@ -135,14 +137,17 @@ public:
     return this->endpos - this->startpos;
   }
 
+  friend bool operator != ( const substring& lhs, const char *rhs );
+  friend bool operator == ( const substring& lhs, const char *rhs );
+
 private:
   size_t startpos;
   size_t endpos;
   stringptr s;
 };
 
-inline bool operator != ( const substring& lhs, const char *rhs ){ return false; }
-inline bool operator == ( const substring& lhs, const char *rhs ){ return false; }
+bool operator==( const substring& lhs, const char *rhs );
+bool operator!=( const substring& lhs, const char *rhs );
 
 #ifdef TESTCODE
 /*******************************************************************************

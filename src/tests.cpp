@@ -1,4 +1,10 @@
-
+/*******************************************************************************
+File: test.cpp
+Purpose: Test framework. run "make clean; make test" to build this test file.
+../Debug/test can then be run to functionaliy test parts of the program. 
+To test for memory leakage use "valgrind ../Debug/test --leak-check=yes"
+Updated: 30.12.2018
+*******************************************************************************/
 
 #include <iostream>
 #include <stdio.h>
@@ -267,12 +273,13 @@ void testurl( void )
   }
 
   {
+    /* We can now just use the substring compare - this saves on a an allocation of a new string */
     stringptr u( new std::string( "sip:atlanta.com;method=REGISTER?to=alice%40atlanta.com" ) );
     sipuri s( u );
-    projecttest( s.protocol.substr(), "sip", "Bad proto." );
-    projecttest( s.host.substr(), "atlanta.com", "Bad host." );
-    projecttest( s.parameters.substr(), "method=REGISTER", "Bad params." );
-    projecttest( s.headers.substr(), "to=alice%40atlanta.com", "Bad headers." );
+    projecttest( s.protocol, "sip", "Bad proto." );
+    projecttest( s.host, "atlanta.com", "Bad host." );
+    projecttest( s.parameters, "method=REGISTER", "Bad params." );
+    projecttest( s.headers, "to=alice%40atlanta.com", "Bad headers." );
   }
 
   {
@@ -283,6 +290,69 @@ void testurl( void )
   std::cout << "All url class tests passed, looking good" << std::endl;
 }
 
+
+/*******************************************************************************
+Function: stringtest
+Purpose: Test some of our string classes. We have our own substring class
+so we can maintain one string with indexes into it to save on both memory and 
+allocations.
+Updated: 30.12.2018
+*******************************************************************************/
+void stringtest( void )
+{
+  {
+    /* These will test the != operator */
+    stringptr u( new std::string( "12345hello6789" ) );
+    substring t( u, 5, 10 );
+    substring t2( u, 0, 5 );
+
+    // std::cout << *t.substr() << std::endl;
+    // std::cout << *t2.substr() << std::endl;
+
+    projecttest( t, "hello", "Uh oh, I was expecting hello" );
+    projecttest( t2, "12345", "Uh oh, I was expecting 12345" );
+
+    if( !( t != "hello678" ) )
+    {
+      std::cout << __FILE__ << ":" << __LINE__ << ": I was expecting to get false for hello678" << std::endl;
+      return;
+    }
+
+        if( !( t != "hell" ) )
+    {
+      std::cout << __FILE__ << ":" << __LINE__ << ": I was expecting to get false for hell" << std::endl;
+      return;
+    }
+
+    /* Now test the == operator */
+    if( ! ( t == "hello" ) )
+    {
+      std::cout << __FILE__ << ":" << __LINE__ << ": I was expecting to get true for hello" << std::endl;
+      return;
+    }
+
+    if( ! ( t2 == "12345" ) )
+    {
+      std::cout << __FILE__ << ":" << __LINE__ << ": I was expecting to get true for 12345" << std::endl;
+      return;
+    }
+
+    if( t == "hello678" )
+    {
+      std::cout << __FILE__ << ":" << __LINE__ << ": t should be shorter than hello678" << std::endl;
+      return;
+    }
+
+    if( t == "hell" )
+    {
+      std::cout << __FILE__ << ":" << __LINE__ << ": t should be longer than hell" << std::endl;
+      return;
+    }
+  }
+
+  std::cout << "All string tests passed, looking good" << std::endl;
+}
+
 /*******************************************************************************
 Function: main
 Purpose: Run our tests
@@ -290,6 +360,7 @@ Updated: 12.12.2018
 *******************************************************************************/
 int main( int argc, const char* argv[] )
 {
+  stringtest();
   testurl();
   testsippacket();
   testregs();

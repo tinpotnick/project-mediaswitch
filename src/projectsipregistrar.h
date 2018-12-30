@@ -19,6 +19,8 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include "projectsippacket.h"
+
 /*******************************************************************************
 Class: projectsipregistration
 Purpose: Class to hold details about a specific registration.
@@ -36,14 +38,20 @@ public:
 
   /* our state functions */
   void regstart( void );
-  void regrequestauth( void );
+  void regwaitauth( void );
 
   typedef void (projectsipregistration::*regstate)( void );
   regstate lastreg;
   regstate nextreg;
+
 };
 
 typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;
+
+/* tags for multi index */
+struct regindexuser{};
+struct regindexexpires{};
+struct regindexnextping{};
 
 /*******************************************************************************
 Class: projectsipregistrations
@@ -57,6 +65,7 @@ typedef boost::multi_index::multi_index_container<
   <
     boost::multi_index::hashed_unique
     <
+      boost::multi_index::tag< regindexuser >,
       boost::multi_index::member
       <
         projectsipregistration,
@@ -66,6 +75,7 @@ typedef boost::multi_index::multi_index_container<
     >,
     boost::multi_index::ordered_non_unique
     <
+      boost::multi_index::tag< regindexexpires >,
       boost::multi_index::member
       <
         projectsipregistration,
@@ -75,6 +85,7 @@ typedef boost::multi_index::multi_index_container<
     >,
     boost::multi_index::ordered_non_unique
     <
+      boost::multi_index::tag< regindexnextping >,
       boost::multi_index::member
       <
         projectsipregistration,
@@ -85,6 +96,8 @@ typedef boost::multi_index::multi_index_container<
   >
 > projectsipregistrations;
 
+/* Public functions */
+void processsippacket( projectsippacket &pk );
 
 #ifdef TESTCODE
 
