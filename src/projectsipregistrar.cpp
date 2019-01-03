@@ -37,7 +37,7 @@ void processsippacket( projectsippacket &pk )
 {
     switch( pk.getmethod() )
   {
-    case processsippacket::REGISTER:
+    case projectsippacket::REGISTER:
     {
       break;
     }

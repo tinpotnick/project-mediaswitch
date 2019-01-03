@@ -20,6 +20,12 @@ projectsippacket::projectsippacket( stringptr pk )
 
 }
 
+projectsippacket::projectsippacket()
+  : projectwebdocument()
+{
+
+}
+
 /*******************************************************************************
 Function: projectsippacket destructor
 Purpose:
@@ -30,135 +36,79 @@ projectsippacket::~projectsippacket()
 }
 
 /*******************************************************************************
-Function: parsemethod
-Purpose: Parse the SIP packet for the method
-Updated: 13.12.2018
+Function: projectsippacket destructor
+Purpose:
+Updated: 16.12.2018
 *******************************************************************************/
-void projectsippacket::parsemethod( void )
+const char* projectsippacket::getversion( void )
 {
-  std::string::iterator it;
-  int counter = 0;
-
-  if( this->document->size() < 9 )
-  {
-    this->method = METHODBADFORMAT;
-    return;
-  }
-
-  it = this->document->begin();
-
-  switch( std::tolower( (*this->document)[ 0 ] ) )
-  {
-    case 'r':
-    {
-      this->method = REGISTER;
-      it += 8;
-      counter += 8;
-      break;
-    }
-    case 'i':
-    {
-      this->method = INVITE;
-      it += 6;
-      counter += 6;
-      break;
-    }
-    case 'a':
-    {
-      this->method = ACK;
-      it += 3;
-      counter += 3;
-      break;
-    }
-    case 'o':
-    {
-      this->method = OPTIONS;
-      it += 7;
-      counter += 7;
-      break;
-    }
-    case 'c':
-    {
-      this->method = CANCEL;
-      it += 6;
-      counter += 6;
-      break;
-    }
-    case 'b':
-    {
-      this->method = BYE;
-      it += 3;
-      counter += 3;
-      break;
-    }
-    case 's':
-    {
-      this->method = RESPONCE;
-      it += 7;
-      counter += 7;
-      break;
-    }
-  }
-
-  int spacesfound = 0;
-  for ( ; it != this->document->end(); it++ )
-  {
-    counter++;
-    switch( *it )
-    {
-      case '\r':
-      {
-        std::string::iterator itline = it + 1;
-        if( this->document->end() == itline )
-        {
-          goto exit_loop;
-        }
-        if( '\n' == * itline )
-        {
-          goto exit_loop;
-        }
-        break;
-      }
-      case ' ':
-      {
-        spacesfound++;
-        switch( spacesfound )
-        {
-          case 1:
-          {
-            this->statuscodestr.start( counter );
-            break;
-          }
-          case 2:
-          {
-            this->reasonphrase.start( counter );
-            this->statuscodestr.end( counter - 1 );
-            break;
-          }
-        }
-
-        break;
-      }
-    }
-  }
-  exit_loop:
-
-  this->reasonphrase.end( counter - 1 );
-
-  if( RESPONCE == this->method )
-  {
-    try
-    {
-      this->statuscode = boost::lexical_cast<int>( *( this->statuscodestr.substr() ) );
-    }
-    catch( const boost::bad_lexical_cast& )
-    {
-      this->method = METHODBADFORMAT;
-    }
-  }
-
-  this->methodstr = substring( this->document, 0, counter - 1 );
+  return "SIP/2.0";
 }
+
+/*******************************************************************************
+Function: getmethodfromcrc
+Purpose: Converts crc to header value. Switch statement comes from
+gensipheadercrc.py. We only store references to the supported headers.
+Updated: 12.12.2018
+*******************************************************************************/
+int projectsippacket::getmethodfromcrc( int crc )
+{
+  switch( crc )
+  {
+    case 0x5ff94014:   /* register */
+    {
+      return REGISTER;
+    }
+    case 0xc7e210d7:   /* invite */
+    {
+      return INVITE;
+    }
+    case 0x22e4f8b1:   /* ack */
+    {
+      return ACK;
+    }
+    case 0xd035fa87:   /* options */
+    {
+      return OPTIONS;
+    }
+    case 0x5616c572:   /* cancel */
+    {
+      return CANCEL;
+    }
+    case 0x77379134:   /* bye */
+    {
+      return BYE;
+    }
+  }
+  return -1;
+}
+
+/*******************************************************************************
+Function: projectsippacket getheaderstr
+Purpose: Convert a header id to a string.
+Updated: 02.01.2019
+*******************************************************************************/
+const char *projectsippacket::getmethodstr( int method )
+{
+  switch( method )
+  {
+    case REGISTER:
+      return "REGISTER";
+    case INVITE:
+      return "INVITE";
+    case ACK:
+      return "ACK";
+    case OPTIONS:
+      return "OPTIONS";
+    case CANCEL:
+      return "CANCEL";
+    case BYE:
+      return "BYE";
+    default:
+      return "";
+  }
+}
+
 
 /*******************************************************************************
 Function: getheaderfromcrc
@@ -254,9 +204,54 @@ int projectsippacket::getheaderfromcrc( int crc )
   return -1;
 }
 
-
-
-
-
-
-
+/*******************************************************************************
+Function: projectsippacket getheaderstr
+Purpose: Convert a header id to a string.
+Updated: 02.01.2019
+*******************************************************************************/
+const char *projectsippacket::getheaderstr( int header )
+{
+  switch( header )
+  {
+    case Authorization:
+      return "Authorization";
+    case Call_ID:
+      return "Call-ID";
+    case Content_Length:
+      return "Content-Length";
+    case CSeq:
+      return "CSeq";
+    case Contact:
+      return "Contact";
+    case Content_Type:
+      return "Content-Type";
+    case Expires:
+      return "Expires";
+    case From:
+      return "From";
+    case Max_Forwards:
+      return "Max-Forwards";
+    case Proxy_Authenticate:
+      return "Proxy-Authenticate";
+    case Proxy_Authorization:
+      return "Proxy-Authorization";
+    case Record_Route:
+      return "Record-Route";
+    case Route:
+      return "Route";
+    case Retry_After:
+      return "Retry-After";
+    case Supported:
+      return "Supported";
+    case To:
+      return "To";
+    case Via:
+      return "Via";
+    case User_Agent:
+      return "User-Agent";
+    case WWW_Authenticate:
+      return "WWW-Authenticate";
+    default:
+      return "";
+  }
+}

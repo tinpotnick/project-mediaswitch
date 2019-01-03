@@ -9,6 +9,7 @@
 #define METHODUNKNOWN -1
 #define METHODBADFORMAT -2
 #define STATUSUNKNOWN -1
+#define DEFAULTHEADERLINELENGTH 200
 
 #include <array>
 #include <string>
@@ -84,7 +85,7 @@ public:
     {
       return stringptr( new std::string( "" ) );
     }
-    
+
     if( 0 == this->endpos )
     {
       return stringptr( new std::string( "" ) );
@@ -155,7 +156,7 @@ Function: operator << ostream, substring
 Purpose: For use with our tests, out put the result of a comparison. Not for live.
 Updated: 30.12.2018
 *******************************************************************************/
-inline std::ostream & operator << ( std::ostream& os, substring obj ) 
+inline std::ostream & operator << ( std::ostream& os, substring obj )
 {
   os << *( obj.substr() );
   return os;
@@ -225,27 +226,54 @@ public:
 /*******************************************************************************
 Class: projectwebdocument
 Purpose: Base class with common function to parse web documents. For example
-SIP packets of HTTP requests - who both have a header line followed by headers
+SIP packets or HTTP requests - who both have a header line followed by headers
 and values.
 Updated: 16.12.2018
 *******************************************************************************/
 class projectwebdocument
 {
 public:
+  projectwebdocument();
   projectwebdocument( stringptr doc );
-  substring getheader( int header );
-  bool hasheader( int header );
+  virtual ~projectwebdocument();
+
+  virtual const char* getversion( void );
+  
+  /*
+    Get functions.
+  */
   int getmethod( void );
   int getstatuscode( void );
   stringptr getreasonphrase( void );
   stringptr getrequesturi( void );
+  substring getheader( int header );
   stringptr getbody();
+  bool hasheader( int header );  
+
+  /*
+    Set functions.
+  */
+  void setstatusline( int code, std::string reason );
+  void setrequestline( int method, std::string uri );
+  void addheader( int header, std::string value );
+  void setbody( stringptr body );
+
+
+  /* To be overridden by the (udp/tcp/test etc) server */
+  virtual void respond( stringptr doc ) {};
+
+  /* By default return our underlying document, however can be
+  ovveridden to generate protocol specific document from headers etc */
+  virtual stringptr strptr() { return this->document; };
 
 protected:
-
+#warning Finish off the default HTTP versions
   virtual int getheaderfromcrc( int crc ) = 0;
-  virtual void parsemethod( void ) = 0;
+  virtual int getmethodfromcrc( int crc ) = 0;
+  virtual const char *getheaderstr( int header ) = 0;
+  virtual const char *getmethodstr( int method ) = 0;
 
+  void parsersline( void );
   void parseheaders( void );
   substring getheadervalue( substring header );
 
@@ -255,16 +283,16 @@ protected:
   bool headersparsed;
   int method;
   int statuscode;
+
   substring methodstr;
   substring statuscodestr;
   substring reasonphrase;
+  substring uri;
+  substring rsline;
 
 private:
   void storeheader( int headerindex, substring hval );
 };
-
-
-
 
 
 

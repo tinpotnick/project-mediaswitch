@@ -62,19 +62,19 @@ stringptr gettestchunk( std::string &contents, std::string tag)
 
   if( std::string::npos == startpos || std::string::npos == endpos )
   {
-    return stringptr( new std::string( "" ) );
+    return stringptr( new std::string() );
   }
 
   startpos += 6 + tag.size();
 
   if( startpos > contents.size() )
   {
-    return stringptr( new std::string( "" ) );
+    return stringptr( new std::string() );
   }
 
   if( endpos > contents.size() )
   {
-    return stringptr( new std::string( "" ) );
+    return stringptr( new std::string() );
   }
 
   return stringptr( new std::string( contents.substr( startpos, endpos - startpos ) ) );
@@ -142,6 +142,31 @@ void testsippacket( void )
             ";received=192.0.2.3",
             "Wrong Content Type." );
 
+  }
+
+  // Test sip packet creation
+  {
+    projectsippacket testpacket;
+    //testpacket.setrequestline( projectsippacket::REGISTER, "sip:registrar.biloxi.com" );
+
+    testpacket.setstatusline( 180, "Ringing" );
+    testpacket.addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
+    testpacket.addheader( projectsippacket::CSeq, "314159 INVITE" );
+
+    std::cout << ( *testpacket.strptr() ) << std::endl;
+  }
+
+  {
+    projectsippacket testpacket;
+    testpacket.setrequestline( projectsippacket::REGISTER, "sip:registrar.biloxi.com" );
+
+    testpacket.addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
+    testpacket.addheader( projectsippacket::CSeq, "314159 INVITE" );
+
+    testpacket.getmethod();
+    //projecttest( testpacket.getheader( projectsippacket::From ), "Alice <sip:alice@atlanta.com>;tag=1928301774", "Header does not match." );
+
+    std::cout << ( *testpacket.strptr() ) << std::endl;
   }
 
   std::cout << "All sippacket tests passed, looking good" << std::endl;

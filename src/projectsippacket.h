@@ -7,6 +7,7 @@
 
 #include "projectwebdocument.h"
 
+#define MASSIPPACKETLENGTH 1500
 
 /*******************************************************************************
 Class: sipuri
@@ -253,16 +254,16 @@ class projectsippacket : public projectwebdocument
 {
 
 public:
+  projectsippacket();
   projectsippacket( stringptr packet );
-  ~projectsippacket();
-
+  virtual ~projectsippacket();
 
   /*
     Request-Line  =  Method SP Request-URI SP SIP-Version CRLF
-    RESPONCE indicates it found a status code - so is a responce
+    RESPONSE indicates it found a status code - so is a response
     not a request.
   */
-  enum { REGISTER, INVITE, ACK, CANCEL, BYE, OPTIONS, RESPONCE };
+  enum { REGISTER, INVITE, ACK, CANCEL, BYE, OPTIONS, RESPONSE };
 
   enum { Authorization,
         Call_ID,
@@ -286,15 +287,16 @@ public:
 
 private:
 
-  virtual void parsemethod( void );
   virtual int getheaderfromcrc( int crc );
+  virtual const char* getversion( void );
+  virtual int getmethodfromcrc( int crc );
+
   substring getheadervalue( substring header );
 
-  substring headers[ WWW_Authenticate + 1 ];
-  substring body;
-
+  virtual const char *getheaderstr( int header );
+  virtual const char *getmethodstr( int method );
+  
 };
 
 
 #endif /* PROJECTSIPPACKET_H */
-

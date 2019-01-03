@@ -6,7 +6,8 @@
 import zlib
 import string
 
-headers = [ "Authorization",
+headers = [ # SIP Headers
+          "Authorization",
           "Call-ID",
           "Content-Length",
           "CSeq",
@@ -24,7 +25,14 @@ headers = [ "Authorization",
           "To",
           "Via",
           "User-Agent",
-          "WWW-Authenticate" ]
+          "WWW-Authenticate",
+          # SIP Verbs
+          "REGISTER",
+          "INVITE",
+          "ACK",
+          "OPTIONS",
+          "CANCEL",
+          "BYE", ]
 
 
 crcvalues = []
@@ -42,5 +50,4 @@ for header in headers:
     print "Error duplicate found - need a different CRC"
 
   crcvalues.append( c )
-
 

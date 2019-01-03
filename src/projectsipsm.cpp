@@ -37,7 +37,7 @@ void projectsipsm::handlesippacket( projectsippacket &pk )
     {
       break;
     }
-    case projectsippacket::RESPONCE:
+    case projectsippacket::RESPONSE:
     {
       break;
     }
