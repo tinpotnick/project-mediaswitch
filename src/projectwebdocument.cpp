@@ -19,6 +19,7 @@ projectwebdocument::projectwebdocument() :
   document( stringptr( new std::string() ) ),
   body( document ),
   headersparsed( false ),
+  headercount( 0 ),
   method( METHODUNKNOWN ),
   statuscode( STATUSUNKNOWN ),
   methodstr( document ),
@@ -36,6 +37,7 @@ projectwebdocument::projectwebdocument( stringptr doc ) :
   document( doc ),
   body( doc ),
   headersparsed( false ),
+  headercount( 0 ),
   method( METHODUNKNOWN ),
   statuscode( STATUSUNKNOWN ),
   methodstr( doc ),
@@ -61,6 +63,346 @@ Updated: 02.01.2019
 const char* projectwebdocument::getversion( void ) 
 {
   return "HTTP/1.1";
+}
+
+/*******************************************************************************
+Function: projectsippacket getmethodstr
+Purpose: Convert a header id to a string.
+Updated: 03.01.2019
+*******************************************************************************/
+const char *projectwebdocument::getheaderstr( int header )
+{
+  switch( header )
+  {
+    /* Request */
+    case Accept:
+      return "Accept";
+    case Accept_Charset:
+      return "Accept-Charset";
+    case Accept_Encoding:
+      return "Accept-Encoding";
+    case Accept_Language:
+      return "Accept-Language";
+    case Authorization:
+      return "Authorization";
+    case Expect:
+      return "Expect";
+    case From:
+      return "From";
+    case Host:
+      return "Host";
+    case If_Match:
+      return "If-Match";
+    case If_Modified_Since:
+      return "If-Modified-Since";
+    case If_None_Match:
+      return "If-None-Match";
+    case If_Range:
+      return "If-Range";
+    case If_Unmodified_Since:
+      return "If-Unmodified-Since";
+    case Max_Forwards:
+      return "Max-Forwards";
+    case Proxy_Authorization:
+      return "Proxy-Authorization";
+    case Range:
+      return "Range";
+    case Referer:
+      return "Referer";
+    case TE:
+      return "TE";
+    case User_Agent:
+      return "User-Agent";
+
+    /* Response */
+    case Accept_Ranges:
+      return "Accept-Ranges";
+    case Age:
+      return "Age";
+    case ETag:
+      return "ETag";
+    case Location:
+      return "Location";
+    case Proxy_Authenticate:
+      return "Proxy-Authenticate";
+    case Retry_After:
+      return "Retry-After";
+    case Server:
+      return "Server";
+    case Vary:
+      return "Vary";
+    case WWW_Authenticate:
+      return "WWW-Authenticate";
+
+    /* Entity */
+    case Allow:
+      return "Allow";
+    case Content_Encoding:
+      return "Content-Encoding";
+    case Content_Language:
+      return "Content-Language";
+    case Content_Length:
+      return "Content-Length";
+    case Content_Location:
+      return "Content-Location";
+    case Content_MD5:
+      return "Content-MD5";
+    case Content_Range:
+      return "Content-Range";
+    case Content_Type:
+      return "Content-Type";
+    case Expires:
+      return "Expires";
+    case Last_Modified:
+      return "Last-Modified";
+    
+    default:
+      return "";
+  }
+}
+
+/*******************************************************************************
+Function: projectsippacket getmethodstr
+Purpose: Convert a method id to a string.
+Updated: 03.01.2019
+*******************************************************************************/
+const char *projectwebdocument::getmethodstr( int method )
+{
+  switch( method )
+  {
+    case OPTIONS:
+      return "OPTIONS";
+    case GET:
+      return "GET";
+    case HEAD:
+      return "HEAD";
+    case POST:
+      return "POST";
+    case PUT:
+      return "PUT";
+    case DELETE:
+      return "DELETE";
+    case TRACE:
+      return "TRACE";
+    case CONNECT:
+      return "CONNECT";
+    default:
+      return "";
+  }
+}
+
+/*******************************************************************************
+Function: getmethodfromcrc
+Purpose: Converts crc to method value. Switch statement comes from
+gensipheadercrc.py. We only store references to the supported headers.
+Updated: 03.01.2019
+*******************************************************************************/
+int projectwebdocument::getmethodfromcrc( int crc )
+{
+  switch( crc )
+  {
+    case 0xd035fa87:   /* options */
+    {
+      return OPTIONS;
+    }
+    case 0xfd3b2e70:   /* get */
+    {
+      return GET;
+    }
+    case 0xa7f3f69c:   /* head */
+    {
+      return HEAD;
+    }
+    case 0x5a8a6c8d:   /* post */
+    {
+      return POST;
+    }
+    case 0xae9089d4:   /* put */
+    {
+      return PUT;
+    }
+    case 0x3a127c87:   /* delete */
+    {
+      return DELETE;
+    }
+    case 0x315bd5a1:   /* trace */
+    {
+      return TRACE;
+    }
+    case 0x74cff91f:   /* connect */
+    {
+      return CONNECT;
+    }
+    default:
+      return -1;
+  }
+}
+
+/*******************************************************************************
+Function: getheaderfromcrc
+Purpose: Converts crc to header value. Switch statement comes from
+gensipheadercrc.py. We only store references to the supported headers.
+Updated: 03.01.2019
+*******************************************************************************/
+int projectwebdocument::getheaderfromcrc( int crc )
+{
+  switch( crc )
+  {
+    case 0xb320ed34:   /* accept */
+    {
+      return Accept;
+    }
+    case 0x16a25427:   /* accept-charset */
+    {
+      return Accept_Charset;
+    }
+    case 0xa036ae55:   /* accept-encoding */
+    {
+      return Accept_Encoding;
+    }
+    case 0x1ca526af:   /* accept-language */
+    {
+      return Accept_Language;
+    }
+    case 0x7a6d8bef:   /* authorization */
+    {
+      return Authorization;
+    }
+    case 0x1cc2b052:   /* expect */
+    {
+      return Expect;
+    }
+    case 0xb91aa170:   /* from */
+    {
+      return From;
+    }
+    case 0xcf2713fd:   /* host */
+    {
+      return Host;
+    }
+    case 0x45ab39d6:   /* if-match */
+    {
+      return If_Match;
+    }
+    case 0x6e2a7f4a:   /* if-modified-since */
+    {
+      return If_Modified_Since;
+    }
+    case 0x5b251281:   /* if-none-match */
+    {
+      return If_None_Match;
+    }
+    case 0xac77a69a:   /* if-range */
+    {
+      return If_Range;
+    }
+    case 0x1b92edff:   /* if-unmodified-since */
+    {
+      return If_Unmodified_Since;
+    }
+    case 0xb042e5b1:   /* max-forwards */
+    {
+      return Max_Forwards;
+    }
+    case 0x8c1d732:   /* proxy-authorization */
+    {
+      return Proxy_Authorization;
+    }
+    case 0x93875a49:   /* range */
+    {
+      return Range;
+    }
+    case 0x55dc3685:   /* referer */
+    {
+      return Referer;
+    }
+    case 0x37523bda:   /* te */
+    {
+      return TE;
+    }
+    case 0x82a3cb0f:   /* user-agent */
+    {
+      return User_Agent;
+    }
+    case 0xaea9d089:   /* accept-ranges */
+    {
+      return Accept_Ranges;
+    }
+    case 0xa13010b2:   /* age */
+    {
+      return Age;
+    }
+    case 0xd174b6bc:   /* etag */
+    {
+      return ETag;
+    }
+    case 0x5e9e89cb:   /* location */
+    {
+      return Location;
+    }
+    case 0xa56b5572:   /* proxy-authenticate */
+    {
+      return Proxy_Authenticate;
+    }
+    case 0x3499ab92:   /* retry-after */
+    {
+      return Retry_After;
+    }
+    case 0x5a6dd5f6:   /* server */
+    {
+      return Server;
+    }
+    case 0x12d553a7:   /* vary */
+    {
+      return Vary;
+    }
+    case 0x5d0c2c5a:   /* www-authenticate */
+    {
+      return WWW_Authenticate;
+    }
+    case 0x7e4940e8:   /* allow */
+    {
+      return Allow;
+    }
+    case 0xe4aaf8f3:   /* content-encoding */
+    {
+      return Content_Encoding;
+    }
+    case 0x58397009:   /* content-language */
+    {
+      return Content_Language;
+    }
+    case 0x12bc2f1c:   /* content-length */
+    {
+      return Content_Length;
+    }
+    case 0xd27c8877:   /* content-location */
+    {
+      return Content_Location;
+    }
+    case 0x9cb1d503:   /* content-md5 */
+    {
+      return Content_MD5;
+    }
+    case 0x3eaea251:   /* content-range */
+    {
+      return Content_Range;
+    }
+    case 0xc2ae0943:   /* content-type */
+    {
+      return Content_Type;
+    }
+    case 0x9a9c688c:   /* expires */
+    {
+      return Expires;
+    }
+    case 0xf95fc261:   /* last-modified */
+    {
+      return Last_Modified;
+    }
+    default:
+      return -1;
+  }
 }
 
 
@@ -338,6 +680,8 @@ Updated: 12.12.2018
 void projectwebdocument::parseheaders( void )
 {
   this->headersparsed = true;
+  this->headercount = 0;
+
   std::string::iterator it;
   substring headername( this->document, this->rsline.end() + 2, this->rsline.end() + 2 );
 
@@ -381,6 +725,7 @@ void projectwebdocument::parseheaders( void )
 
         headername = substring( this->document, hval.end() + 2, hval.end() + 2 );
         crccheck.reset();
+        this->headercount++;
         break;
       }
       default:
@@ -512,32 +857,42 @@ Updated: 02.01.2019
 *******************************************************************************/
 void projectwebdocument::addheader( int header, std::string value )
 {
-  std::string newheader;
-  newheader.reserve( DEFAULTHEADERLINELENGTH );
-
   std::string completeheader;
   completeheader.reserve( DEFAULTHEADERLINELENGTH );
   completeheader = this->getheaderstr( header );
-  completeheader += ": " + value;
+  completeheader += ": " + value + "\r\n";
 
   if( 0 == this->body.end() )
   {
+    if( this->headercount > 0 )
+    {
+      this->document->erase( this->document->size() - 2, 2 );
+    }
+
     /* We can just append */
     size_t headerstart = this->document->size();
     *this->document += completeheader;
-    this->storeheader( header, substring( this->document, headerstart, this->document->size() ) );
+    this->storeheader( header, substring( this->document, headerstart, this->document->size() - 2 ) );
+    *this->document += "\r\n";
   }
   else
   {
-    this->document->insert( this->body.start(), completeheader );
-    this->storeheader( header, substring( this->document, this->body.start(), this->body.start() + completeheader.size() ) );
+    if( 0 == this->headercount )
+    {
+      this->document->insert( this->body.start(), completeheader + "\r\n" );
+    }
+    else
+    {
+      this->document->insert( this->body.start() - 2, completeheader );
+    }
+
+    this->storeheader( header, substring( this->document, this->body.start(), this->body.start() + completeheader.size() - 2 ) );
 
     this->body = substring( this->document, 
                             this->body.start() + completeheader.size(), 
                             this->body.end() + completeheader.size() );
   }
-
-  *this->document += "\r\n";
+  this->headercount++;
 }
 
 /*******************************************************************************
@@ -545,16 +900,16 @@ Function: setbody
 Purpose: Adds the body of a message.
 Updated: 02.01.2019
 *******************************************************************************/
-void projectwebdocument::setbody( stringptr body )
+void projectwebdocument::setbody( const char *body )
 {
-  if( 0 == this->body.end() )
+  if( 0 != this->body.end() )
   {
     this->document->erase( this->body.start(), this->body.end() - this->body.start() );
   }
 
-  size_t currentend = this->document->size();
-  this->body = substring( this->document, currentend, currentend + body->size() );
-  (*this->document) += (*body);
+  this->body.start( this->document->size() );
+  ( *this->document ) += body;
+  this->body.end( this->document->size() );
   return;
 }
 

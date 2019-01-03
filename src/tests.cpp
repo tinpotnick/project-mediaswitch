@@ -147,13 +147,33 @@ void testsippacket( void )
   // Test sip packet creation
   {
     projectsippacket testpacket;
-    //testpacket.setrequestline( projectsippacket::REGISTER, "sip:registrar.biloxi.com" );
 
     testpacket.setstatusline( 180, "Ringing" );
     testpacket.addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
     testpacket.addheader( projectsippacket::CSeq, "314159 INVITE" );
 
-    std::cout << ( *testpacket.strptr() ) << std::endl;
+    projecttest( *testpacket.strptr(), 
+                  "SIP/2.0 180 Ringing\r\n"
+                  "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
+                  "CSeq: 314159 INVITE\r\n"
+                  "\r\n",
+                  "Unexpected SIP packet."
+                  );
+
+
+    testpacket.setbody( "Some SDP?" );
+    testpacket.addheader( projectsippacket::Via, "SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1" );
+
+    projecttest( *testpacket.strptr(), 
+                  "SIP/2.0 180 Ringing\r\n"
+                  "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
+                  "CSeq: 314159 INVITE\r\n"
+                  "Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1\r\n"
+                  "\r\n"
+                  "Some SDP?",
+                  "Unexpected SIP packet."
+                  );
+
   }
 
   {
@@ -164,9 +184,19 @@ void testsippacket( void )
     testpacket.addheader( projectsippacket::CSeq, "314159 INVITE" );
 
     testpacket.getmethod();
-    //projecttest( testpacket.getheader( projectsippacket::From ), "Alice <sip:alice@atlanta.com>;tag=1928301774", "Header does not match." );
+    projecttest( testpacket.getheader( projectsippacket::From ), "Alice <sip:alice@atlanta.com>;tag=1928301774", "Header does not match." );
 
-    std::cout << ( *testpacket.strptr() ) << std::endl;
+    testpacket.setbody( "Some SDP" );
+
+    projecttest( *testpacket.strptr(), 
+                  "REGISTER sip:registrar.biloxi.com SIP/2.0\r\n"
+                  "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
+                  "CSeq: 314159 INVITE\r\n"
+                  "\r\n"
+                  "Some SDP",
+                  "Unexpected SIP packet."
+                  );
+
   }
 
   std::cout << "All sippacket tests passed, looking good" << std::endl;

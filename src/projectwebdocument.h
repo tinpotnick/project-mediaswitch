@@ -227,12 +227,59 @@ public:
 Class: projectwebdocument
 Purpose: Base class with common function to parse web documents. For example
 SIP packets or HTTP requests - who both have a header line followed by headers
-and values.
+and values. This class will handle HTTP.
 Updated: 16.12.2018
 *******************************************************************************/
 class projectwebdocument
 {
 public:
+
+  /* Methods */
+  enum { OPTIONS, GET, HEAD, POST, PUT, DELETE, TRACE, CONNECT };
+
+  enum { /* Request */
+          Accept,
+          Accept_Charset,
+          Accept_Encoding,
+          Accept_Language,
+          Authorization,
+          Expect,
+          From,
+          Host,
+          If_Match,
+          If_Modified_Since,
+          If_None_Match,
+          If_Range,
+          If_Unmodified_Since,
+          Max_Forwards,
+          Proxy_Authorization,
+          Range,
+          Referer,
+          TE,
+          User_Agent,
+          /* Response */
+          Accept_Ranges,
+          Age,
+          ETag,
+          Location,
+          Proxy_Authenticate,
+          Retry_After,
+          Server,
+          Vary,
+          WWW_Authenticate,
+          /* Entity */
+          Allow,
+          Content_Encoding,
+          Content_Language,
+          Content_Length,
+          Content_Location,
+          Content_MD5,
+          Content_Range,
+          Content_Type,
+          Expires,
+          Last_Modified
+        };
+
   projectwebdocument();
   projectwebdocument( stringptr doc );
   virtual ~projectwebdocument();
@@ -256,7 +303,7 @@ public:
   void setstatusline( int code, std::string reason );
   void setrequestline( int method, std::string uri );
   void addheader( int header, std::string value );
-  void setbody( stringptr body );
+  void setbody( const char *body );
 
 
   /* To be overridden by the (udp/tcp/test etc) server */
@@ -267,11 +314,10 @@ public:
   virtual stringptr strptr() { return this->document; };
 
 protected:
-#warning Finish off the default HTTP versions
-  virtual int getheaderfromcrc( int crc ) = 0;
-  virtual int getmethodfromcrc( int crc ) = 0;
-  virtual const char *getheaderstr( int header ) = 0;
-  virtual const char *getmethodstr( int method ) = 0;
+  virtual int getheaderfromcrc( int crc );
+  virtual int getmethodfromcrc( int crc );
+  virtual const char *getheaderstr( int header );
+  virtual const char *getmethodstr( int method );
 
   void parsersline( void );
   void parseheaders( void );
@@ -281,6 +327,7 @@ protected:
   stringptr document;
   substring body;
   bool headersparsed;
+  int headercount;
   int method;
   int statuscode;
 

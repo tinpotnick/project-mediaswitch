@@ -6,7 +6,7 @@
 import zlib
 import string
 
-headers = [ # SIP Headers
+sipheaders = [ # SIP Headers
           "Authorization",
           "Call-ID",
           "Content-Length",
@@ -32,11 +32,13 @@ headers = [ # SIP Headers
           "ACK",
           "OPTIONS",
           "CANCEL",
-          "BYE", ]
+          "BYE"
+        ]
+
 
 
 crcvalues = []
-for header in headers:
+for header in sipheaders:
 
   lowerheader = header.lower()
   c = hex(zlib.crc32(lowerheader) & 0xffffffff )
@@ -51,3 +53,75 @@ for header in headers:
 
   crcvalues.append( c )
 
+
+httpheaders = [
+            # HTTP Verbs
+          "OPTIONS",
+          "GET",
+          "HEAD",
+          "POST",
+          "PUT",
+          "DELETE",
+          "TRACE",
+          "CONNECT",
+          # HTTP headers
+          # Request
+          "Accept",
+          "Accept-Charset",
+          "Accept-Encoding",
+          "Accept-Language",
+          "Authorization",
+          "Expect",
+          "From",
+          "Host",
+          "If-Match",
+          "If-Modified-Since",
+          "If-None-Match",
+          "If-Range",
+          "If-Unmodified-Since",
+          "Max-Forwards",
+          "Proxy-Authorization",
+          "Range",
+          "Referer",
+          "TE",
+          "User-Agent",
+          # Response
+          "Accept-Ranges",
+          "Age",
+          "ETag",
+          "Location",
+          "Proxy-Authenticate",
+          "Retry-After",
+          "Server",
+          "Vary",
+          "WWW-Authenticate",
+          # Entity
+          "Allow",
+          "Content-Encoding",
+          "Content-Language",
+          "Content-Length",
+          "Content-Location",
+          "Content-MD5",
+          "Content-Range",
+          "Content-Type",
+          "Expires",
+          "Last-Modified"
+        ]
+
+print "HTTP"
+print "================================================================"
+crcvalues = []
+for header in httpheaders:
+
+  lowerheader = header.lower()
+  c = hex(zlib.crc32(lowerheader) & 0xffffffff )
+
+  print "    case " + c + ":   /* " + lowerheader + " */"
+  print "    {"
+  print "      return " + string.replace( header, '-', '_') + ";"
+  print "    }"
+
+  if c in crcvalues:
+    print "Error duplicate found - need a different CRC"
+
+  crcvalues.append( c )
