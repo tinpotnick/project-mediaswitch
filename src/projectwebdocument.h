@@ -6,7 +6,6 @@
 
 #define MAX_HEADERS 20
 #define MAX_DUPLICATEHEADERS 3
-#define METHODUNKNOWN -1
 #define METHODBADFORMAT -2
 #define STATUSUNKNOWN -1
 #define DEFAULTHEADERLINELENGTH 200
@@ -52,91 +51,27 @@ Updated: 12.12.2018
 class substring
 {
 public:
-  inline substring()
-  {
-    this->startpos = 0;
-    this->endpos = 0;
-  }
+  substring();
+  substring( char * s );
+  substring( stringptr s );
+  substring( stringptr s, size_t start, size_t end );
+  stringptr substr();
 
-  inline substring( char * s )
-  {
-    this->s = stringptr( new std::string( s ) );
-    this->startpos = 0;
-    this->endpos = this->s->length();
-  }
+  size_t end();
+  size_t end( size_t end );
+  size_t start();
+  size_t start( size_t start );
 
-  inline substring( stringptr s )
-  {
-    this->s = s;
-    this->startpos = 0;
-    this->endpos = s->length();
-  }
+  substring rfind( const char * );
+  substring find( const char * );
+  substring rfind( const char );
+  substring find( const char );
 
-  inline substring( stringptr s, size_t start, size_t end )
-  {
-    this->s = s;
-    this->startpos = start;
-    this->endpos = end;
-  }
+  size_t operator++( int );
 
-  inline stringptr substr()
-  {
-    if ( !this->s )
-    {
-      return stringptr( new std::string( "" ) );
-    }
-
-    if( 0 == this->endpos )
-    {
-      return stringptr( new std::string( "" ) );
-    }
-
-    if( this->startpos > s->size() )
-    {
-      return stringptr( new std::string( "" ) );
-    }
-
-    if( this->endpos > s->size() )
-    {
-      return stringptr( new std::string( "" ) );
-    }
-    return stringptr( new std::string( s->substr( this->startpos, this->endpos - this->startpos ) ) );
-  }
-
-  inline size_t end()
-  {
-    return this->endpos;
-  }
-  inline size_t start()
-  {
-    return this->startpos;
-  }
-
-  inline size_t end( size_t end )
-  {
-    this->endpos = end;
-    return this->endpos;
-  }
-  inline size_t start( size_t start )
-  {
-    this->startpos = start;
-    return this->startpos;
-  }
-
-  inline size_t operator++( int )
-  {
-    return this->endpos ++;
-  }
-
-  inline size_t operator--( int )
-  {
-    return this->endpos --;
-  }
-
-  inline size_t length( void )
-  {
-    return this->endpos - this->startpos;
-  }
+  size_t operator--( int );
+  size_t length( void );
+  int toint();
 
   friend bool operator != ( const substring& lhs, const char *rhs );
   friend bool operator == ( const substring& lhs, const char *rhs );
@@ -235,7 +170,7 @@ class projectwebdocument
 public:
 
   /* Methods */
-  enum { OPTIONS, GET, HEAD, POST, PUT, DELETE, TRACE, CONNECT };
+  enum { OPTIONS, GET, HEAD, POST, PUT, DELETE, TRACE, CONNECT, RESPONSE, METHODUNKNOWN };
 
   enum { /* Request */
           Accept,
@@ -295,7 +230,7 @@ public:
   stringptr getrequesturi( void );
   substring getheader( int header );
   stringptr getbody();
-  bool hasheader( int header );  
+  bool hasheader( int header );
 
   /*
     Set functions.
@@ -303,6 +238,9 @@ public:
   void setstatusline( int code, std::string reason );
   void setrequestline( int method, std::string uri );
   void addheader( int header, std::string value );
+  void addheader( int header, substring value );
+  void addheader( int header, const char * value );
+  void addheader( int header, int value );
   void setbody( const char *body );
 
 

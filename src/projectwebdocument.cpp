@@ -433,7 +433,7 @@ stringptr projectwebdocument::getrequesturi( void )
     this->parsersline();
   }
 
-  return this->statuscodestr.substr();
+  return this->uri.substr();
 }
 
 /*******************************************************************************
@@ -493,6 +493,16 @@ Updated: 17.12.2018
 *******************************************************************************/
 bool projectwebdocument::hasheader( int header )
 {
+  if( METHODUNKNOWN == this->method )
+  {
+    this->parsersline();
+  }
+
+  if( false == this->headersparsed )
+  {
+    this->parseheaders();
+  }
+
   return this->headers[ header ].end() != 0;
 }
 
@@ -515,10 +525,13 @@ substring projectwebdocument::getheader( int header )
 
   if( header >= 0 && header <= MAX_HEADERS )
   {
-    return this->headers[ header ].substr();
+    return this->headers[ header ];
   }
 
-  return stringptr( new std::string() );
+  substring s( this->document );
+  s.end( 0 );
+
+  return s;
 }
 
 /*******************************************************************************
@@ -637,6 +650,7 @@ void projectwebdocument::parsersline( void )
 
   if( 0 == verpos )
   {
+    this->method = RESPONSE;
     this->statuscodestr = substring( this->document, sp1 + 1, sp2 );
     this->reasonphrase = substring( this->document, sp2, endline );
 
@@ -666,7 +680,7 @@ void projectwebdocument::parsersline( void )
     }
 
     this->method = this->getmethodfromcrc( crccheck.checksum() );
-    this->uri = substring( this->document, sp1, sp2 );
+    this->uri = substring( this->document, sp1 + 1, sp2 );
   }
 }
 
@@ -852,6 +866,51 @@ void projectwebdocument::setrequestline( int method, std::string uri )
 
 /*******************************************************************************
 Function: addheader
+Purpose: Adds a header to the message - convert from a substr. Maybe some work
+for the future - remove the extra std sring creation.
+Updated: 02.01.2019
+*******************************************************************************/
+void projectwebdocument::addheader( int header, int value )
+{
+  std::string strvalue;
+
+  try
+  {
+    strvalue = boost::lexical_cast< std::string >( value );
+  }
+  catch( boost::bad_lexical_cast &e )
+  {
+
+  }
+
+  this->addheader( header, strvalue );
+}
+
+/*******************************************************************************
+Function: addheader
+Purpose: Adds a header to the message - convert from a substr. Maybe some work
+for the future - remove the extra std sring creation.
+Updated: 02.01.2019
+*******************************************************************************/
+void projectwebdocument::addheader( int header, const char * value )
+{
+  std::string strvalue( value );
+  this->addheader( header, strvalue );
+}
+
+/*******************************************************************************
+Function: addheader
+Purpose: Adds a header to the message - convert from a substr.
+Updated: 02.01.2019
+*******************************************************************************/
+void projectwebdocument::addheader( int header, substring value )
+{
+  std::string strvalue( *value.substr() );
+  this->addheader( header, strvalue );
+}
+
+/*******************************************************************************
+Function: addheader
 Purpose: Adds a header to the message.
 Updated: 02.01.2019
 *******************************************************************************/
@@ -860,6 +919,7 @@ void projectwebdocument::addheader( int header, std::string value )
   std::string completeheader;
   completeheader.reserve( DEFAULTHEADERLINELENGTH );
   completeheader = this->getheaderstr( header );
+  size_t headernamelength = completeheader.length();
   completeheader += ": " + value + "\r\n";
 
   if( 0 == this->body.end() )
@@ -870,7 +930,7 @@ void projectwebdocument::addheader( int header, std::string value )
     }
 
     /* We can just append */
-    size_t headerstart = this->document->size();
+    size_t headerstart = this->document->size() + headernamelength + 2;
     *this->document += completeheader;
     this->storeheader( header, substring( this->document, headerstart, this->document->size() - 2 ) );
     *this->document += "\r\n";
@@ -1043,19 +1103,19 @@ bool operator!=( const substring& lhs, const char *rhs )
 
     if( *it != *c )
     {
-      return false;
+      return true;
     }
 
     index++;
     c++;
   }
 
-  if( 0 == *c )
+  if( 0 != *c )
   {
-    return false;
+    return true;
   }
 
-  return true;
+  return false;
 }
 
 /*******************************************************************************
@@ -1092,6 +1152,271 @@ bool operator==( const substring& lhs, const char *rhs )
   }
 
   return true;
+}
+
+
+/*******************************************************************************
+Class: substring
+Purpose: Class to maintain pointers in a string for a substring without copying
+the underlying string.
+Updated: 08.01.2019
+*******************************************************************************/
+
+/*******************************************************************************
+Function: substring constructor
+Purpose: As it say.
+Updated: 08.01.2019
+*******************************************************************************/
+substring::substring()
+{
+  this->startpos = 0;
+  this->endpos = 0;
+}
+
+/*******************************************************************************
+Function: substring constructor
+Purpose: As it say.
+Updated: 08.01.2019
+*******************************************************************************/
+substring::substring( char * s )
+{
+  this->s = stringptr( new std::string( s ) );
+  this->startpos = 0;
+  this->endpos = this->s->length();
+}
+
+/*******************************************************************************
+Function: substring constructor
+Purpose: As it say.
+Updated: 08.01.2019
+*******************************************************************************/
+substring::substring( stringptr s )
+{
+  this->s = s;
+  this->startpos = 0;
+  this->endpos = s->length();
+}
+
+/*******************************************************************************
+Function: substring constructor
+Purpose: As it say.
+Updated: 08.01.2019
+*******************************************************************************/
+substring::substring( stringptr s, size_t start, size_t end )
+{
+  this->s = s;
+  this->startpos = start;
+  this->endpos = end;
+}
+
+/*******************************************************************************
+Function: substr
+Purpose: Return a new stringptr (copy string).
+Updated: 08.01.2019
+*******************************************************************************/
+stringptr substring::substr()
+{
+  if ( !this->s )
+  {
+    return stringptr( new std::string( "" ) );
+  }
+
+  if( 0 == this->endpos )
+  {
+    return stringptr( new std::string( "" ) );
+  }
+
+  if( this->startpos > s->size() )
+  {
+    return stringptr( new std::string( "" ) );
+  }
+
+  if( this->endpos > s->size() )
+  {
+    return stringptr( new std::string( "" ) );
+  }
+  return stringptr( new std::string( s->substr( this->startpos, this->endpos - this->startpos ) ) );
+}
+
+/*******************************************************************************
+Function: end
+Purpose: Returns the index of the end pointer.
+Updated: 08.01.2019
+*******************************************************************************/
+size_t substring::end()
+{
+  return this->endpos;
+}
+
+/*******************************************************************************
+Function: end
+Purpose: Sets and returns the index of the end pointer.
+Updated: 08.01.2019
+*******************************************************************************/
+size_t substring::end( size_t end )
+{
+  this->endpos = end;
+  return this->endpos;
+}
+
+/*******************************************************************************
+Function: start
+Purpose: Returns the index of the start pointer.
+Updated: 08.01.2019
+*******************************************************************************/
+size_t substring::start()
+{
+  return this->startpos;
+}
+
+/*******************************************************************************
+Function: start
+Purpose: Sets and returns the index of the start pointer.
+Updated: 08.01.2019
+*******************************************************************************/
+size_t substring::start( size_t start )
+{
+  this->startpos = start;
+  return this->startpos;
+}
+
+/*******************************************************************************
+Function: operator++
+Purpose: Moves on the end pointer.
+Updated: 08.01.2019
+*******************************************************************************/
+size_t substring::operator++( int )
+{
+  return this->endpos ++;
+}
+
+
+/*******************************************************************************
+Function: operator--
+Purpose: Moves back the end pointer.
+Updated: 08.01.2019
+*******************************************************************************/
+size_t substring::operator--( int )
+{
+  return this->endpos --;
+}
+
+/*******************************************************************************
+Function: length
+Purpose: Returns the length of the substring
+Updated: 08.01.2019
+*******************************************************************************/
+size_t substring::length( void ) 
+{ 
+  return this->endpos - this->startpos; 
+}
+
+/*******************************************************************************
+Function: toint
+Purpose: Converts the substring to an int and returns it.
+Updated: 08.01.2019
+*******************************************************************************/
+int substring::toint( void )
+{
+  char b[ 200 ];
+  int retval = -1;
+  size_t l = this->length();
+  char *stptr = ( char * ) this->s->c_str() + this->startpos;
+
+  if( l > 200 )
+  {
+    return -1;
+  }
+
+  memcpy( b, stptr, l );
+  b[ l ] = 0;
+
+  try
+  {
+    retval = boost::lexical_cast< int >( ( char * ) &b[ 0 ] );
+  }
+  catch( boost::bad_lexical_cast &e )
+  {
+
+  }
+
+  return retval;
+}
+
+/*******************************************************************************
+Function: rfind
+Purpose: Equivalent to std::string rfind - but within our substring. Returns
+a substring (rather than a size_t).
+Updated: 08.01.2019
+*******************************************************************************/
+substring substring::rfind( const char *s )
+{
+  size_t l = strlen( s );
+  size_t rfindpos = this->s->rfind( s, this->endpos - l );
+
+  if( std::string::npos == rfindpos ||
+        rfindpos < this->startpos )
+  {
+    return substring( this->s, 0, 0 );
+  }
+
+  return substring( this->s, rfindpos, rfindpos + l );
+}
+
+/*******************************************************************************
+Function: rfind
+Purpose: See above
+Updated: 08.01.2019
+*******************************************************************************/
+substring substring::rfind( const char s )
+{
+  size_t rfindpos = this->s->rfind( s, this->endpos - 1 );
+
+  if( std::string::npos == rfindpos ||
+        rfindpos < this->startpos )
+  {
+    return substring( this->s, 0, 0 );
+  }
+
+  return substring( this->s, rfindpos, rfindpos + 1 );
+}
+
+/*******************************************************************************
+Function: find
+Purpose: Equivalent to std::string find - but within our substring. Returns
+a substring (rather than a size_t).
+Updated: 08.01.2019
+*******************************************************************************/
+substring substring::find( const char *s )
+{
+  size_t rfindpos = this->s->find( s, this->startpos );
+
+  if( std::string::npos == rfindpos ||
+        rfindpos > this->endpos )
+  {
+    return substring( this->s, 0, 0 );
+  }
+
+  size_t l = strlen( s );
+  return substring( this->s, rfindpos, rfindpos + l );
+}
+
+/*******************************************************************************
+Function: find
+Purpose: See above
+Updated: 08.01.2019
+*******************************************************************************/
+substring substring::find( const char s )
+{
+  size_t rfindpos = this->s->find( s, this->startpos );
+
+  if( std::string::npos == rfindpos ||
+        rfindpos > this->endpos )
+  {
+    return substring( this->s, 0, 0 );
+  }
+
+  return substring( this->s, rfindpos, rfindpos + 1 );
 }
 
 

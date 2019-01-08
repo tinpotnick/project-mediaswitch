@@ -4,6 +4,7 @@
 #define PROJECTSIPPACKET_H
 
 #include <string>
+#include <boost/shared_ptr.hpp>
 
 #include "projectwebdocument.h"
 
@@ -32,204 +33,9 @@ Updated: 17.12.2018
 class sipuri
 {
 public:
-  inline sipuri( stringptr s )
-  {
-    this->s = s;
-
-    /* Find display name */
-    size_t dispstart = s->find( '"' );
-    if( std::string::npos != dispstart )
-    {
-      size_t dispend = s->find( '"', dispstart + 1 );
-      if( std::string::npos != dispstart )
-      {
-        this->displayname = substring( s, dispstart + 1, dispend );
-      }
-    }
-
-    size_t sipstart = s->find( "sip:" );
-    if( std::string::npos == sipstart )
-    {
-      sipstart = s->find( "sips:" );
-      if( std::string::npos == sipstart )
-      {
-        /* Nothing more we can do */
-        return;
-      }
-      this->protocol = substring( s, sipstart, sipstart + 4 );
-    }
-    else
-    {
-      this->protocol = substring( s, sipstart, sipstart + 3 );
-    }
-
-    /* We return to the display name where no quotes are used */
-    if( 0 == this->displayname.end() )
-    {
-      if( sipstart > 0 )
-      {
-        const char *start = s->c_str();
-        char *end = (char *)start + sipstart;
-        char *ptr = (char *)start;
-        int startpos = 0;
-        int endpos = sipstart;
-        for(  ; ptr < end; ptr++ )
-        {
-          if( ' ' != *ptr )
-          {
-            break;
-          }
-          startpos++;
-        }
-
-        for( ptr = end; ptr > start; ptr-- )
-        {
-          if( ' ' == *ptr )
-          {
-            break;
-          }
-          endpos--;
-        }
-        this->displayname = substring( s, startpos, endpos );
-      }
-    }
-
-    size_t starthost =  this->protocol.end() + 1; /* +1 = : */
-    size_t offset = starthost;
-    char *hoststart = (char *)s->c_str() + offset;
-    char *endstr = (char *)s->c_str() + s->size();
-    for( ; hoststart < endstr; hoststart++ )
-    {
-      switch( *hoststart )
-      {
-        case '@':
-        {
-          if( 0 == this->user.end() )
-          {
-            this->user = substring( s, starthost, offset );
-          }
-          else
-          {
-            this->secret.end( offset );
-          }
-          starthost = offset + 1;
-          break;
-        }
-        case ':':
-        {
-          if( 0 == this->user.end() )
-          {
-            this->user = substring( s, starthost, offset );
-          }
-          this->secret = substring( s, offset + 1, offset );
-          starthost = offset + 1;
-          break;
-        }
-        case '>':
-        {
-          this->host = substring( s, starthost, offset );
-          break;
-        }
-        case ';':
-        {
-          if( 0 == this->host.end() )
-          {
-            this->host = substring( s, starthost, offset );
-          }
-          if( 0 == this->parameters.start() )
-          {
-            this->parameters = substring( s, offset + 1, s->size() );
-          }
-
-          break;
-        }
-        case '?':
-        {
-          if( 0 == this->host.end() )
-          {
-            this->host = substring( s, starthost, offset );
-          }
-
-          if( 0 != this->parameters.end() )
-          {
-            this->parameters.end( offset );
-          }
-          this->headers = substring( s, offset + 1, s->size() );
-          break;
-        }
-      }
-
-      offset++;
-    }
-
-    if( 0 == this->host.end() )
-    {
-      this->host = substring( s, starthost, s->size() );
-    }
-  }
-
-  /*****************************************************************************
-  Function: getparameter
-  Purpose: Returns the substring index into s for the given param name.
-  std::string s = From: sip:+12125551212@server.phone2net.com;tag=887s
-  getparameter( s, "tag" );
-  Will return a substring index to '887s'.
-  Updated: 18.12.2018
-  *****************************************************************************/
-  inline substring getparameter( std::string name )
-  {
-    if( 0 == this->parameters.end() )
-    {
-      return this->parameters;
-    }
-
-    size_t startpos = this->s->find( name + '=', this->parameters.start() );
-
-    if( std::string::npos == startpos )
-    {
-      return substring();
-    }
-
-    size_t endpos = this->s->find( ';', startpos + name.size() + 1 );
-
-    if( std::string::npos == endpos )
-    {
-      endpos = this->s->find( '?', startpos + name.size() + 1 );
-      if( std::string::npos == endpos )
-      {
-        return substring( this->s, startpos + name.size() + 1, this->s->size() );
-      }
-    }
-    return substring( this->s, startpos + name.size() + 1, endpos );
-  }
-
-  /*****************************************************************************
-  Function: getparameter
-  Purpose: Similar to get parameter but for headers. In a SIP URI anything after
-  the ? is considered a header. Name value pairs.
-  Updated: 18.12.2018
-  *****************************************************************************/
-  inline substring getheader( std::string name )
-  {
-    if( 0 == this->headers.end() )
-    {
-      return this->headers;
-    }
-
-    size_t startpos = this->s->find( name + '=', this->headers.start() );
-
-    if( std::string::npos == startpos )
-    {
-      return substring();
-    }
-    size_t endpos = this->s->find( '&', startpos + name.size() + 1 );
-
-    if( std::string::npos == endpos )
-    {
-      return substring( this->s, startpos + name.size() + 1, this->s->size() );
-    }
-    return substring( this->s, startpos + name.size() + 1, endpos );
-  }
+  sipuri( stringptr s );
+  substring getparameter( std::string name );
+  substring getheader( std::string name );
 
   stringptr s;
   substring displayname;
@@ -258,14 +64,18 @@ public:
   projectsippacket( stringptr packet );
   virtual ~projectsippacket();
 
+  static stringptr branch();
+  substring getheaderparam( int header, const char *param );
+
   /*
     Request-Line  =  Method SP Request-URI SP SIP-Version CRLF
     RESPONSE indicates it found a status code - so is a response
     not a request.
   */
-  enum { REGISTER, INVITE, ACK, CANCEL, BYE, OPTIONS, RESPONSE };
+  enum { REGISTER = projectwebdocument::METHODUNKNOWN + 1, INVITE, ACK, CANCEL, BYE, OPTIONS };
 
   enum { Authorization,
+        Allow,
         Call_ID,
         Content_Length,
         CSeq,
@@ -291,12 +101,12 @@ private:
   virtual const char* getversion( void );
   virtual int getmethodfromcrc( int crc );
 
-  substring getheadervalue( substring header );
-
   virtual const char *getheaderstr( int header );
   virtual const char *getmethodstr( int method );
   
 };
+
+typedef boost::shared_ptr< projectsippacket > projectsippacketptr;
 
 
 #endif /* PROJECTSIPPACKET_H */

@@ -13,11 +13,14 @@ Updated: 17.12.2018
 class projectsipsm
 {
 public:
-
-  void handlesippacket( projectsippacket &pk );
+  projectsipsm();
+  static void handlesippacket( projectsippacketptr pk );
 
 private:
-  void handleregister( projectsippacket &pk );
+  void handleregister( projectsippacketptr pk );
+  void handleoptions( projectsippacketptr pk );
+
+  std::string hostname;
 
 };
 

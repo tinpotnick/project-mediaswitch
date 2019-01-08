@@ -2,9 +2,12 @@
 #include <string>
 #include <algorithm>
 #include <boost/crc.hpp>
-#include <iostream>
+#include <algorithm>
 
 #include <boost/lexical_cast.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/random_generator.hpp>
 
 #include "projectsippacket.h"
 
@@ -33,6 +36,82 @@ Updated: 16.12.2018
 *******************************************************************************/
 projectsippacket::~projectsippacket()
 {
+}
+
+/*******************************************************************************
+Function: branch
+Purpose: Generate a branch parameter.
+Updated: 03.01.2019
+*******************************************************************************/
+stringptr projectsippacket::branch()
+{
+  boost::uuids::basic_random_generator<boost::mt19937> gen;
+  boost::uuids::uuid u = gen();
+
+  stringptr s = stringptr( new std::string() );
+
+  s->reserve( 100 );
+
+  try
+  {
+    *s = "branch=z9hG4bK" + boost::lexical_cast< std::string >( u );
+  }
+  catch( boost::bad_lexical_cast &e )
+  {
+    // This shouldn't happen
+  }
+  
+  return s;
+}
+
+/*******************************************************************************
+Function: getheaderparam
+Purpose: Returns a param from the header, for example:
+Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
+"z9hG4bK4b43c2ff8.1" == getheaderparam( projectsippacket::Via, "branch" )
+Updated: 08.01.2019
+*******************************************************************************/
+substring projectsippacket::getheaderparam( int header, const char *param )
+{
+  substring retval( document );
+  substring h( this->getheader( header ) );
+
+  if( 0 == h.end() )
+  {
+    return h;
+  }
+
+  size_t l = strlen( param );
+
+  char searchfor[ DEFAULTHEADERLINELENGTH ];
+  searchfor[ 0 ] = ';';
+  memcpy( &searchfor[ 1 ], param, l );
+  searchfor[ l + 1 ] = '=';
+  searchfor[ l + 2 ] = 0;
+
+  substring ppos = h.rfind( searchfor );
+
+  if( 0 == ppos.end() )
+  {
+    return h;
+  }
+
+  h.start( ppos.start() + 1 );
+
+  substring sepos = h.find( ';' );
+  substring cepos = h.find( '\r' );
+  sepos.end( std::min( sepos.end(), cepos.end() ) );
+
+  retval.start( ppos.end() );
+
+  if( 0 == sepos.end() )
+  {
+    retval.end( h.end() );
+    return retval;
+  }
+  
+  retval.end( sepos.end() - 1 );
+  return retval;
 }
 
 /*******************************************************************************
@@ -123,6 +202,10 @@ int projectsippacket::getheaderfromcrc( int crc )
     case 0x7a6d8bef:   /* authorization */
     {
       return Authorization;
+    }
+    case 0x7e4940e8:   /* allow */
+    {
+      return Allow;
     }
     case 0x7dd2712:   /* call-id */
     {
@@ -215,6 +298,8 @@ const char *projectsippacket::getheaderstr( int header )
   {
     case Authorization:
       return "Authorization";
+    case Allow:
+      return "Allow";
     case Call_ID:
       return "Call-ID";
     case Content_Length:
@@ -255,3 +340,212 @@ const char *projectsippacket::getheaderstr( int header )
       return "";
   }
 }
+
+
+
+/*******************************************************************************
+Function: sipuri constructor
+Purpose: Parse a SIP URI.
+Updated: 03.01.2019
+*******************************************************************************/
+sipuri::sipuri( stringptr s )
+{
+  this->s = s;
+
+  /* Find display name */
+  size_t dispstart = s->find( '"' );
+  if( std::string::npos != dispstart )
+  {
+    size_t dispend = s->find( '"', dispstart + 1 );
+    if( std::string::npos != dispstart )
+    {
+      this->displayname = substring( s, dispstart + 1, dispend );
+    }
+  }
+
+  size_t sipstart = s->find( "sip:" );
+  if( std::string::npos == sipstart )
+  {
+    sipstart = s->find( "sips:" );
+    if( std::string::npos == sipstart )
+    {
+      /* Nothing more we can do */
+      return;
+    }
+    this->protocol = substring( s, sipstart, sipstart + 4 );
+  }
+  else
+  {
+    this->protocol = substring( s, sipstart, sipstart + 3 );
+  }
+
+  /* We return to the display name where no quotes are used */
+  if( 0 == this->displayname.end() )
+  {
+    if( sipstart > 0 )
+    {
+      const char *start = s->c_str();
+      char *end = (char *)start + sipstart;
+      char *ptr = (char *)start;
+      int startpos = 0;
+      int endpos = sipstart;
+      for(  ; ptr < end; ptr++ )
+      {
+        if( ' ' != *ptr )
+        {
+          break;
+        }
+        startpos++;
+      }
+
+      for( ptr = end; ptr > start; ptr-- )
+      {
+        if( ' ' == *ptr )
+        {
+          break;
+        }
+        endpos--;
+      }
+      this->displayname = substring( s, startpos, endpos );
+    }
+  }
+
+  size_t starthost =  this->protocol.end() + 1; /* +1 = : */
+  size_t offset = starthost;
+  char *hoststart = (char *)s->c_str() + offset;
+  char *endstr = (char *)s->c_str() + s->size();
+  for( ; hoststart < endstr; hoststart++ )
+  {
+    switch( *hoststart )
+    {
+      case '@':
+      {
+        if( 0 == this->user.end() )
+        {
+          this->user = substring( s, starthost, offset );
+        }
+        else
+        {
+          this->secret.end( offset );
+        }
+        starthost = offset + 1;
+        break;
+      }
+      case ':':
+      {
+        if( 0 == this->user.end() )
+        {
+          this->user = substring( s, starthost, offset );
+        }
+        this->secret = substring( s, offset + 1, offset );
+        starthost = offset + 1;
+        break;
+      }
+      case '>':
+      {
+        this->host = substring( s, starthost, offset );
+        break;
+      }
+      case ';':
+      {
+        if( 0 == this->host.end() )
+        {
+          this->host = substring( s, starthost, offset );
+        }
+        if( 0 == this->parameters.start() )
+        {
+          this->parameters = substring( s, offset + 1, s->size() );
+        }
+
+        break;
+      }
+      case '?':
+      {
+        if( 0 == this->host.end() )
+        {
+          this->host = substring( s, starthost, offset );
+        }
+
+        if( 0 != this->parameters.end() )
+        {
+          this->parameters.end( offset );
+        }
+        this->headers = substring( s, offset + 1, s->size() );
+        break;
+      }
+    }
+
+    offset++;
+  }
+
+  if( 0 == this->host.end() )
+  {
+    this->host = substring( s, starthost, s->size() );
+  }
+}
+
+
+/*****************************************************************************
+Function: getparameter
+Purpose: Returns the substring index into s for the given param name.
+std::string s = From: sip:+12125551212@server.phone2net.com;tag=887s
+getparameter( s, "tag" );
+Will return a substring index to '887s'.
+Updated: 18.12.2018
+*****************************************************************************/
+substring sipuri::getparameter( std::string name )
+{
+  if( 0 == this->parameters.end() )
+  {
+    return this->parameters;
+  }
+
+  size_t startpos = this->s->find( name + '=', this->parameters.start() );
+
+  if( std::string::npos == startpos )
+  {
+    return substring();
+  }
+
+  size_t endpos = this->s->find( ';', startpos + name.size() + 1 );
+
+  if( std::string::npos == endpos )
+  {
+    endpos = this->s->find( '?', startpos + name.size() + 1 );
+    if( std::string::npos == endpos )
+    {
+      return substring( this->s, startpos + name.size() + 1, this->s->size() );
+    }
+  }
+  return substring( this->s, startpos + name.size() + 1, endpos );
+}
+
+
+/*****************************************************************************
+Function: getheader
+Purpose: Similar to get parameter but for headers. In a SIP URI anything after
+the ? is considered a header. Name value pairs.
+Updated: 18.12.2018
+*****************************************************************************/
+substring sipuri::getheader( std::string name )
+{
+  if( 0 == this->headers.end() )
+  {
+    return this->headers;
+  }
+
+  size_t startpos = this->s->find( name + '=', this->headers.start() );
+
+  if( std::string::npos == startpos )
+  {
+    return substring();
+  }
+  size_t endpos = this->s->find( '&', startpos + name.size() + 1 );
+
+  if( std::string::npos == endpos )
+  {
+    return substring( this->s, startpos + name.size() + 1, this->s->size() );
+  }
+  return substring( this->s, startpos + name.size() + 1, endpos );
+}
+

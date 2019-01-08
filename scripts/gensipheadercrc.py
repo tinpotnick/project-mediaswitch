@@ -8,6 +8,7 @@ import string
 
 sipheaders = [ # SIP Headers
           "Authorization",
+          "Allow",
           "Call-ID",
           "Content-Length",
           "CSeq",

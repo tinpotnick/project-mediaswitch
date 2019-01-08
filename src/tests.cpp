@@ -30,6 +30,7 @@ Updated: 30.12.2018
 #include "projectsipserver.h"
 #include "projectsippacket.h"
 #include "projectsipregistrar.h"
+#include "projectsipsm.h"
 
 /*******************************************************************************
 Function: readfile
@@ -80,6 +81,16 @@ stringptr gettestchunk( std::string &contents, std::string tag)
   return stringptr( new std::string( contents.substr( startpos, endpos - startpos ) ) );
 }
 
+/*******************************************************************************
+Function: respond
+Purpose: Store the results of any respnse from our test sm.
+Updated: 08.01.2019
+*******************************************************************************/
+void projectsipservertestpacket::respond( stringptr doc )
+{
+  this->response = doc;
+}
+
 
 /*******************************************************************************
 Function: testsippacket
@@ -104,7 +115,7 @@ void testsippacket( void )
             "Bob <sip:bob@biloxi.com>",
             "Wrong To header field." );
 
-    projecttest( testpacket.getrequesturi(),
+    projecttest( *testpacket.getrequesturi(),
             "sip:registrar.biloxi.com",
             "Wrong Request URI." );
 
@@ -141,6 +152,14 @@ void testsippacket( void )
             "SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1\r\n "
             ";received=192.0.2.3",
             "Wrong Content Type." );
+
+    projecttest( testpacket.getheaderparam( projectsippacket::Via, "branch" ),
+                  "z9hG4bK4b43c2ff8.1",
+                  "Bad branch value" );
+
+    projecttest( testpacket.getheaderparam( projectsippacket::Via, "received" ),
+                  "192.0.2.3",
+                  "Bad received value" );
 
   }
 
@@ -361,9 +380,6 @@ void stringtest( void )
     substring t( u, 5, 10 );
     substring t2( u, 0, 5 );
 
-    // std::cout << *t.substr() << std::endl;
-    // std::cout << *t2.substr() << std::endl;
-
     projecttest( t, "hello", "Uh oh, I was expecting hello" );
     projecttest( t2, "12345", "Uh oh, I was expecting 12345" );
 
@@ -373,7 +389,7 @@ void stringtest( void )
       return;
     }
 
-        if( !( t != "hell" ) )
+    if( !( t != "hell" ) )
     {
       std::cout << __FILE__ << ":" << __LINE__ << ": I was expecting to get false for hell" << std::endl;
       return;
@@ -409,12 +425,30 @@ void stringtest( void )
 }
 
 /*******************************************************************************
+Function: optionstest
+Purpose: Respond to an options request
+Updated: 08.01.2019
+*******************************************************************************/
+void optionstest( void )
+{
+  std::string testdata = readfile( "../testfiles/siptest1.txt" );
+
+  projectsipservertestpacket *p = new projectsipservertestpacket( gettestchunk( testdata, "OPTIONSTEST1" ) );
+  projectsippacketptr request( p );
+  
+  projectsipsm::handlesippacket( request );
+
+  std::cout << *( p->response ) << std::endl;
+}
+
+/*******************************************************************************
 Function: main
 Purpose: Run our tests
 Updated: 12.12.2018
 *******************************************************************************/
 int main( int argc, const char* argv[] )
 {
+  optionstest();
   stringtest();
   testurl();
   testsippacket();

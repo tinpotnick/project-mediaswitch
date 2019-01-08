@@ -25,4 +25,15 @@ Content-Type: multipart/signed;
  micalg=sha1; boundary=boundary42
 CSeq: 314159 INVITE
 ==END==
-
+==OPTIONSTEST1==
+OPTIONS sip:carol@chicago.com SIP/2.0
+Via: SIP/2.0/UDP pc33.atlanta.com;branch=z9hG4bKhjhs8ass877
+Max-Forwards: 70
+To: <sip:carol@chicago.com>
+From: Alice <sip:alice@atlanta.com>;tag=1928301774
+Call-ID: a84b4c76e66710
+CSeq: 63104 OPTIONS
+Contact: <sip:alice@pc33.atlanta.com>
+Accept: application/sdp
+Content-Length: 0
+==END==
