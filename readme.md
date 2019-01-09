@@ -1,6 +1,7 @@
-project scm:
+project mediasitch:
 
-s = signal (SIP)
-c = control (Call control)
-m = Media (RTP)
+There are 3 comonents to this project
+SIP
+Call control
+RTP
 
