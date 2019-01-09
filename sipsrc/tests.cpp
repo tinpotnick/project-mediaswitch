@@ -193,24 +193,24 @@ void testsippacket( void )
                   "Unexpected SIP packet."
                   );
 
-  }
 
-  {
-    projectsippacket testpacket;
-    testpacket.setrequestline( projectsippacket::REGISTER, "sip:registrar.biloxi.com" );
+    projectsippacket testpacket2;
+    testpacket2.setrequestline( projectsippacket::REGISTER, "sip:registrar.biloxi.com" );
 
-    testpacket.addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
-    testpacket.addheader( projectsippacket::CSeq, "314159 INVITE" );
+    testpacket2.addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
+    testpacket2.addheader( projectsippacket::CSeq, "314159 INVITE" );
 
-    testpacket.getmethod();
-    projecttest( testpacket.getheader( projectsippacket::From ), "Alice <sip:alice@atlanta.com>;tag=1928301774", "Header does not match." );
+    testpacket2.getmethod();
+    projecttest( testpacket2.getheader( projectsippacket::From ), "Alice <sip:alice@atlanta.com>;tag=1928301774", "Header does not match." );
 
-    testpacket.setbody( "Some SDP" );
+    testpacket2.addviaheader( "myhost", &testpacket );
+    testpacket2.setbody( "Some SDP" );
 
-    projecttest( *testpacket.strptr(), 
+    projecttest( *testpacket2.strptr(), 
                   "REGISTER sip:registrar.biloxi.com SIP/2.0\r\n"
                   "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
                   "CSeq: 314159 INVITE\r\n"
+                  "Via: SIP/2.0/UDP myhost;branch=z9hG4bK4b43c2ff8.1\r\n"
                   "\r\n"
                   "Some SDP",
                   "Unexpected SIP packet."

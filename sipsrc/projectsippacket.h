@@ -67,6 +67,9 @@ public:
   static stringptr branch();
   substring getheaderparam( int header, const char *param );
 
+  /* specific headers */
+  bool addviaheader( const char *host, projectsippacket *ref );
+
   /*
     Request-Line  =  Method SP Request-URI SP SIP-Version CRLF
     RESPONSE indicates it found a status code - so is a response

@@ -91,16 +91,7 @@ void projectsipsm::handleoptions( projectsippacketptr pk )
   projectsippacket response;
 
   response.setstatusline( 200, "OK" );
-#warning Create a addheaderparam
-
-  std::string via;
-  via.reserve( DEFAULTHEADERLINELENGTH );
-  via = "SIP/2.0/UDP ";
-  via += this->hostname;
-  via += ";branch=";
-  via += * ( pk->getheaderparam( projectsippacket::Via, "branch" ).substr() );
-
-  response.addheader( projectsippacket::Via, via );
+  response.addviaheader( this->hostname.c_str(), pk.get() );
 
   response.addheader( projectsippacket::To,
                       pk->getheader( projectsippacket::To ) );
@@ -112,12 +103,12 @@ void projectsipsm::handleoptions( projectsippacketptr pk )
                       pk->getheader( projectsippacket::CSeq ) );
   response.addheader( projectsippacket::Contact,
                       pk->getheader( projectsippacket::Contact ) );
-
   response.addheader( projectsippacket::Allow,
                       "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-
   response.addheader( projectsippacket::Content_Type,
                       "application/sdp" );
+  response.addheader( projectsippacket::Content_Length,
+                      "0" );
 
   pk->respond( response.strptr() );
 }
@@ -140,17 +131,57 @@ void projectsipsm::handleregister( projectsippacketptr pk )
     return;
   }
 
+  if( false == pk->hasheader( projectsippacket::Authorization ) )
+  {
+    response.setstatusline( 401, "Unauthorized" );
+    response.addviaheader( this->hostname.c_str(), pk.get() );
+
+    response.addheader( projectsippacket::To,
+                        pk->getheader( projectsippacket::To ) );
+    response.addheader( projectsippacket::From,
+                        pk->getheader( projectsippacket::From ) );
+    response.addheader( projectsippacket::Call_ID,
+                        pk->getheader( projectsippacket::Call_ID ) );
+    response.addheader( projectsippacket::CSeq,
+                        pk->getheader( projectsippacket::CSeq ) );
+    response.addheader( projectsippacket::Contact,
+                        pk->getheader( projectsippacket::Contact ) );
+    response.addheader( projectsippacket::Allow,
+                        "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+    response.addheader( projectsippacket::Content_Type,
+                        "application/sdp" );
+    response.addheader( projectsippacket::Content_Length,
+                        "0" );
+
+    pk->respond( response.strptr() );
+    return;
+  }
+
   stringptr uri = pk->getrequesturi();
   if( !uri || uri->size() < 4 )
   {
     return;
   }
 
-  if( std::string::npos != uri->find( '@' ) )
+  int expires = DEFAULTSIPEXPIRES;
+  substring ex;
+  if( pk->hasheader( projectsippacket::Expires ) )
   {
-    return;
+    ex = pk->getheader( projectsippacket::Expires );
+  }
+  else
+  {
+    ex = pk->getheaderparam( projectsippacket::Contact, "expires" );
   }
 
+  if( 0 != ex.end() )
+  {
+    expires = ex.toint();
+    if( -1 == expires )
+    {
+      expires = DEFAULTSIPEXPIRES;
+    }
+  }
 }
 
 

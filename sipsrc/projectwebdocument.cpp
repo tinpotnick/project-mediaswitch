@@ -894,6 +894,7 @@ Updated: 02.01.2019
 *******************************************************************************/
 void projectwebdocument::addheader( int header, const char * value )
 {
+  /* TODO: perhaps not convert to std::string first. */
   std::string strvalue( value );
   this->addheader( header, strvalue );
 }
@@ -932,7 +933,7 @@ void projectwebdocument::addheader( int header, std::string value )
     /* We can just append */
     size_t headerstart = this->document->size() + headernamelength + 2;
     *this->document += completeheader;
-    this->storeheader( header, substring( this->document, headerstart, this->document->size() - 2 ) );
+    this->storeheader( header, substring( this->document, headerstart, headerstart + value.length() ) );
     *this->document += "\r\n";
   }
   else
@@ -946,7 +947,7 @@ void projectwebdocument::addheader( int header, std::string value )
       this->document->insert( this->body.start() - 2, completeheader );
     }
 
-    this->storeheader( header, substring( this->document, this->body.start(), this->body.start() + completeheader.size() - 2 ) );
+    this->storeheader( header, substring( this->document, this->body.start(), this->body.start() + completeheader.size() - 4 ) );
 
     this->body = substring( this->document, 
                             this->body.start() + completeheader.size(), 

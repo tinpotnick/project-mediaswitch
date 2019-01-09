@@ -56,6 +56,7 @@ public:
   substring( stringptr s );
   substring( stringptr s, size_t start, size_t end );
   stringptr substr();
+  const char *c_str(){ return this->s->c_str() + this->startpos; };
 
   size_t end();
   size_t end( size_t end );

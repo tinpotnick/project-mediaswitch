@@ -5,6 +5,8 @@
 
 #include "projectsippacket.h"
 
+#define DEFAULTSIPEXPIRES 3600
+
 /*******************************************************************************
 Class: projectsipsm
 Purpose: Manage our SIP state machine for all connections.

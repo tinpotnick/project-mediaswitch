@@ -115,6 +115,50 @@ substring projectsippacket::getheaderparam( int header, const char *param )
 }
 
 /*******************************************************************************
+Function: addviaheader
+Purpose: Add a via header:
+setheaderparam( "server10.biloxi.com" "z9hG4bK4b43c2ff8.1" );
+Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
+Updated: 09.01.2019
+*******************************************************************************/
+bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
+{
+
+  substring branch = ref->getheaderparam( projectsippacket::Via, "branch" );
+
+  size_t lh = strlen( host );
+  size_t lb = branch.end() - branch.start();
+
+  if( ( lh + lb ) > DEFAULTHEADERLINELENGTH )
+  {
+    return false;
+  }
+
+  char paramvalue[ DEFAULTHEADERLINELENGTH ];
+  memcpy( &paramvalue[ 0 ], "SIP/2.0/UDP ", 12 );
+  memcpy( &paramvalue[ 12 ], host, lh );
+  paramvalue[ lh + 12 ] = ';';
+
+  if( 0 != lb )
+  {
+    memcpy( &paramvalue[ lh + 12 + 1 ], "branch=", 7 );
+    const char *branchsrc = branch.c_str();
+    memcpy( &paramvalue[ lh + 12 + 1 + 7 ], branchsrc, lb );
+    paramvalue[ lh + 12 + 1 + 7 + lb ] = 0;
+  }
+  else
+  {
+    stringptr bptr = projectsippacket::branch();
+    memcpy( &paramvalue[ lh + 12 + 1 ], bptr->c_str(), bptr->length() );
+    paramvalue[ lh + 12 + 1 + 1 + bptr->length() ] = 0;
+  }
+
+  this->addheader( projectsippacket::Via, paramvalue );
+
+  return true;
+}
+
+/*******************************************************************************
 Function: projectsippacket destructor
 Purpose:
 Updated: 16.12.2018
