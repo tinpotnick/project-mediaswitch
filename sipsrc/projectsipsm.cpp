@@ -1,9 +1,11 @@
 
-/* gethostname */
-#include <unistd.h>
 
+#include "projectsipconfig.h"
 #include "projectsipsm.h"
+#include "projectsipregistrar.h"
+#include "projectsipdirectory.h"
 
+/* Our one instalce. */
 static projectsipsm sipsm;
 
 
@@ -14,13 +16,6 @@ Updated: 08.01.2019
 *******************************************************************************/
 projectsipsm::projectsipsm()
 {
-  char b[ 200 ];
-  if( -1 == gethostname( b, sizeof( b ) ) )
-  {
-    this->hostname = "unknown";
-    return;
-  }
-  this->hostname = b;
 }
 
 /*******************************************************************************
@@ -91,7 +86,7 @@ void projectsipsm::handleoptions( projectsippacketptr pk )
   projectsippacket response;
 
   response.setstatusline( 200, "OK" );
-  response.addviaheader( this->hostname.c_str(), pk.get() );
+  response.addviaheader( ::cnf.gethostname(), pk.get() );
 
   response.addheader( projectsippacket::To,
                       pk->getheader( projectsippacket::To ) );
@@ -115,7 +110,8 @@ void projectsipsm::handleoptions( projectsippacketptr pk )
 
 /*******************************************************************************
 Function: handleregister
-Purpose: As it says. RFC 3261 section 10.
+Purpose: As it says. RFC 3261 section 10. We do not support anonymous 
+registrations.
 Updated: 17.12.2018
 *******************************************************************************/
 void projectsipsm::handleregister( projectsippacketptr pk )
@@ -131,57 +127,6 @@ void projectsipsm::handleregister( projectsippacketptr pk )
     return;
   }
 
-  if( false == pk->hasheader( projectsippacket::Authorization ) )
-  {
-    response.setstatusline( 401, "Unauthorized" );
-    response.addviaheader( this->hostname.c_str(), pk.get() );
-
-    response.addheader( projectsippacket::To,
-                        pk->getheader( projectsippacket::To ) );
-    response.addheader( projectsippacket::From,
-                        pk->getheader( projectsippacket::From ) );
-    response.addheader( projectsippacket::Call_ID,
-                        pk->getheader( projectsippacket::Call_ID ) );
-    response.addheader( projectsippacket::CSeq,
-                        pk->getheader( projectsippacket::CSeq ) );
-    response.addheader( projectsippacket::Contact,
-                        pk->getheader( projectsippacket::Contact ) );
-    response.addheader( projectsippacket::Allow,
-                        "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-    response.addheader( projectsippacket::Content_Type,
-                        "application/sdp" );
-    response.addheader( projectsippacket::Content_Length,
-                        "0" );
-
-    pk->respond( response.strptr() );
-    return;
-  }
-
-  stringptr uri = pk->getrequesturi();
-  if( !uri || uri->size() < 4 )
-  {
-    return;
-  }
-
-  int expires = DEFAULTSIPEXPIRES;
-  substring ex;
-  if( pk->hasheader( projectsippacket::Expires ) )
-  {
-    ex = pk->getheader( projectsippacket::Expires );
-  }
-  else
-  {
-    ex = pk->getheaderparam( projectsippacket::Contact, "expires" );
-  }
-
-  if( 0 != ex.end() )
-  {
-    expires = ex.toint();
-    if( -1 == expires )
-    {
-      expires = DEFAULTSIPEXPIRES;
-    }
-  }
+  registrarsippacket( pk );
 }
-
 

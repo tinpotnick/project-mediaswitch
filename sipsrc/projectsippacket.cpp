@@ -5,9 +5,7 @@
 #include <algorithm>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_io.hpp>
-#include <boost/uuid/random_generator.hpp>
+#include <openssl/md5.h>
 
 #include "projectsippacket.h"
 
@@ -18,13 +16,15 @@ Purpose:
 Updated: 12.12.2018
 *******************************************************************************/
 projectsippacket::projectsippacket( stringptr pk )
-  : projectwebdocument( pk )
+  : projectwebdocument( pk ),
+  nonce ( new std::string() )
 {
 
 }
 
 projectsippacket::projectsippacket()
-  : projectwebdocument()
+  : projectwebdocument(),
+  nonce ( new std::string() )
 {
 
 }
@@ -50,7 +50,7 @@ stringptr projectsippacket::branch()
 
   stringptr s = stringptr( new std::string() );
 
-  s->reserve( 100 );
+  s->reserve( DEFAULTHEADERLINELENGTH );
 
   try
   {
@@ -156,6 +156,115 @@ bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
   this->addheader( projectsippacket::Via, paramvalue );
 
   return true;
+}
+
+/*******************************************************************************
+Function: addauthenticateheader
+Purpose: Generate a nonce parameter used for auth and add the authenticate 
+header. Ref RFC 2617 section 3.2.1.
+Updated: 03.01.2019
+*******************************************************************************/
+bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
+{
+
+  boost::uuids::basic_random_generator<boost::mt19937> gen;
+
+  std::string s;
+  s.reserve( DEFAULTHEADERLINELENGTH );
+
+  s = "Digest realm=\"";
+  sipuri suri( ref->getrequesturi() );
+  s += *suri.host.substr();
+  
+  s += "\" algorithm=\"MD5\" nonce=\"";
+
+  try
+  {
+    *( this->nonce ) = boost::lexical_cast< std::string >( gen() );
+    s += *( this->nonce );
+  }
+  catch( boost::bad_lexical_cast &e )
+  {
+    // This shouldn't happen
+  }
+  s += "\" opaque=\"";
+
+  try
+  {
+    s += boost::lexical_cast< std::string >( gen() );
+  }
+  catch( boost::bad_lexical_cast &e )
+  {
+    // This shouldn't happen
+  }
+  s += "\"";
+  
+  this->addheader( projectsippacket::WWW_Authenticate, s.c_str() );
+  return true;
+}
+
+/*******************************************************************************
+Function: getnonce
+Purpose: Returns the nonce as a string.
+Updated: 10.01.2019
+*******************************************************************************/
+stringptr projectsippacket::getnonce( void )
+{
+  return this->nonce;
+}
+
+/*******************************************************************************
+Function: checkauth
+Purpose: Check the auth of this packet. The reference contans the nonce to check
+we set the nonce and it is not a replay. 
+Updated: 10.01.2019
+*******************************************************************************/
+bool projectsippacket::checkauth( stringptr nonce, stringptr password )
+{
+#if 0
+  uint32_t ha1[ 4 ];
+  uint32_t ha2[ 4 ];
+  uint32_t hash[ 4 ];
+  std::string urp;
+  urp.reserve( DEFAULTHEADERLINELENGTH );
+
+  sipuri turi( this->getheader( projectsippacket::To ) );
+  urp = *turi.user.substr();
+  urp += ':';
+
+  /* realm */
+  sipuri suri( this->getrequesturi() );
+  urp += *suri.host.substr();
+
+  urp += *password;
+
+  md5_hash( urp.c_str(), urp.length(), ha1 );
+  hex_decode( ha1, );
+
+  urp = this->getmethodstr( this->getmethod() );
+  urp += ':';
+  urp += this->getrequesturi().substr();
+
+  md5_hash( urp.c_str(), urp.length(), ha2 );
+
+  urp = tostring( ha1 );
+  urp += ':';
+  urp += *nonce;
+  urp += tostrin( ha2 );
+  md5_hash( urp.c_str(), urp.length(), hash );
+
+  /*
+    nonce = 8e4a6b9f
+    HA1 = MD5("myusername:myrealm.org:password”)
+    HA2 = MD5("REGISTER:sip:sip.example.com")
+    response = MD5(HA1+":8e4a6b9f:"+HA2);
+  */
+  //stringptr s = stringptr( std::string() );
+  //s->reserve( DEFAULTHEADERLINELENGTH );
+
+  //*s = boost::md5( "message" ).hex_str_value();
+#endif
+  return false;
 }
 
 /*******************************************************************************

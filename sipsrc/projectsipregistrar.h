@@ -5,6 +5,7 @@
 
 #define OPTIONSPINGFREQUENCY 30
 #define OPTIONSMAXFAILCOUNT 7
+#define DEFAULTSIPEXPIRES 3600
 
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/hashed_index.hpp>
@@ -18,6 +19,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <boost/shared_ptr.hpp>
+#include <functional>
 
 #include "projectsippacket.h"
 
@@ -29,24 +31,43 @@ Updated: 18.12.2018
 class projectsipregistration
 {
 public:
-  projectsipregistration( std::string u, int expires /*seconds */ );
+  projectsipregistration( std::string u );
 
   std::string user; /* fully qualified user@domain */
-  boost::posix_time::ptime expires; /* when we exipre the registration */
+  boost::posix_time::ptime expires; /* when we expire the registration */
   boost::posix_time::ptime nextping; /* when is the next options (ping) due */
   int outstandingping; /* how many pings we have sent without a response. */
 
   /* our state functions */
-  void regstart( void );
-  void regwaitauth( void );
+  void regstart( projectsippacketptr pk );
+  void regwaitauth( projectsippacketptr pk );
 
-  typedef void (projectsipregistration::*regstate)( void );
-  regstate lastreg;
-  regstate nextreg;
-
+  std::function<void ( projectsippacketptr pk ) > nextstate;
+  std::function<void ( projectsippacketptr pk ) > laststate;
 };
 
 typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;
+
+class projectsipupdateexpires
+{
+public:
+  projectsipupdateexpires( const boost::posix_time::ptime &newexpire )
+      : expires( newexpire ){}
+
+  void operator()( projectsipregistrationptr e )
+  {
+    e->expires = this->expires;
+  }
+
+private:
+  boost::posix_time::ptime expires;
+};
+
+/*******************************************************************************
+Functions: Some public functions.
+Updated: 10.01.2019
+*******************************************************************************/
+void registrarsippacket( projectsippacketptr pk );
 
 /* tags for multi index */
 struct regindexuser{};
@@ -95,9 +116,6 @@ typedef boost::multi_index::multi_index_container<
     >
   >
 > projectsipregistrations;
-
-/* Public functions */
-void processsippacket( projectsippacket &pk );
 
 #ifdef TESTCODE
 

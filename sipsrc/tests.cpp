@@ -31,6 +31,9 @@ Updated: 30.12.2018
 #include "projectsippacket.h"
 #include "projectsipregistrar.h"
 #include "projectsipsm.h"
+#include "projectsipstring.h"
+
+#include <openssl/md5.h>
 
 /*******************************************************************************
 Function: readfile
@@ -438,7 +441,35 @@ void optionstest( void )
   
   projectsipsm::handlesippacket( request );
 
+  std::cout << "Packet size: " << p->response->length() << std::endl;
+  std::cout << "===========================================" << std::endl;
   std::cout << *( p->response ) << std::endl;
+  std::cout << "===========================================" << std::endl;
+}
+
+void authtest( void )
+{
+  std::string testdata = readfile( "../testfiles/siptest1.txt" );
+
+  projectsipservertestpacket *p = new projectsipservertestpacket( gettestchunk( testdata, "TEST1" ) );
+  projectsippacketptr request( p );
+  
+  projectsipsm::handlesippacket( request );
+
+  std::cout << "Packet size: " << p->response->length() << std::endl;
+  std::cout << "===========================================" << std::endl;
+  std::cout << *( p->response ) << std::endl;
+  std::cout << "===========================================" << std::endl;
+
+
+  projectsipservertestpacket *auth = new projectsipservertestpacket( gettestchunk( testdata, "AUTHREGISTER1" ) );
+  projectsippacketptr authrequest( auth );
+
+  projectsipsm::handlesippacket( authrequest );
+/*
+  1002@bling.babblevoice.com
+  dijwvc
+*/
 }
 
 /*******************************************************************************
@@ -448,6 +479,26 @@ Updated: 12.12.2018
 *******************************************************************************/
 int main( int argc, const char* argv[] )
 {
+  std::string t( "The quick brown fox jumps over 13 lazy dogs." );
+
+  unsigned char digest[16];
+  MD5_CTX context;
+  MD5_Init(&context);
+  MD5_Update(&context, t.c_str(), t.length() );
+  MD5_Final(digest, &context);
+
+  std::string s;
+  s.reserve( 33 ); 
+  
+  for( int i = 0;i < 16; i++ )
+  {
+    unsigned char c = digest[ i ];
+    s += to_hex( c >> 4 );
+    s += to_hex( c );
+  }
+
+
+  authtest();
   optionstest();
   stringtest();
   testurl();

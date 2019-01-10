@@ -37,3 +37,20 @@ Contact: <sip:alice@pc33.atlanta.com>
 Accept: application/sdp
 Content-Length: 0
 ==END==
+==AUTHREGISTER1==
+REGISTER sip:bling.babblevoice.com SIP/2.0
+Accept: application/reginfo+xml, application/rlmi+xml, application/sdp, application/simple-message-summary, application/watcherinfo+xml, message/sipfrag, multipart/mixed
+Via: SIP/2.0/UDP 192.168.0.57:5070;branch=z9hG4bK3dff0a14e7bba48f1;rport
+Max-Forwards: 70
+From: "Dr Hannah" <sip:1002@bling.babblevoice.com>;tag=59c20d7fc1
+To: "Dr Hannah" <sip:1002@bling.babblevoice.com>
+Call-ID: 23a8ac6c820f9f54
+CSeq: 738647351 REGISTER
+Allow: ACK, BYE, CANCEL, INVITE, NOTIFY, OPTIONS, REFER, SUBSCRIBE, UPDATE
+Allow-Events: refer
+Authorization: Digest username="1002",realm="bling.babblevoice.com",nonce="5836a4cc-0db4-4094-ad2d-718bc5f14fd3",uri="sip:bling.babblevoice.com",response="eb2a97572af7e5ec2ed4175450856374",algorithm=MD5,qop=auth,cnonce="b9727c36",nc=00000044
+Contact: <sip:1002@192.168.0.57:5070;transport=udp>;expires=3600
+Supported: eventlist, join, replaces, sdp-anat
+User-Agent: Vtech Vesa VSP726A 2.0.5.1-0
+Content-Length: 0
+==END==

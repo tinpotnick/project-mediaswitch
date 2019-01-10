@@ -5,6 +5,9 @@
 
 #include <string>
 #include <boost/shared_ptr.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/random_generator.hpp>
 
 #include "projectwebdocument.h"
 
@@ -66,9 +69,12 @@ public:
 
   static stringptr branch();
   substring getheaderparam( int header, const char *param );
+  stringptr getnonce( void );
 
   /* specific headers */
   bool addviaheader( const char *host, projectsippacket *ref );
+  bool addwwwauthenticateheader( projectsippacket *ref );
+  bool checkauth( stringptr nonce, stringptr password) ;
 
   /*
     Request-Line  =  Method SP Request-URI SP SIP-Version CRLF
@@ -106,6 +112,8 @@ private:
 
   virtual const char *getheaderstr( int header );
   virtual const char *getmethodstr( int method );
+
+  stringptr nonce;
   
 };
 

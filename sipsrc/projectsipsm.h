@@ -5,8 +5,6 @@
 
 #include "projectsippacket.h"
 
-#define DEFAULTSIPEXPIRES 3600
-
 /*******************************************************************************
 Class: projectsipsm
 Purpose: Manage our SIP state machine for all connections.
@@ -21,9 +19,6 @@ public:
 private:
   void handleregister( projectsippacketptr pk );
   void handleoptions( projectsippacketptr pk );
-
-  std::string hostname;
-
 };
 
 
