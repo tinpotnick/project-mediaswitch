@@ -54,3 +54,45 @@ Supported: eventlist, join, replaces, sdp-anat
 User-Agent: Vtech Vesa VSP726A 2.0.5.1-0
 Content-Length: 0
 ==END==
+==AUTHREGISTER2==
+REGISTER sip:bling.babblevoice.com SIP/2.0
+Via: SIP/2.0/UDP 82.19.197.210:55381;branch=z9hG4bKb9df62429DE4F559
+From: "Reception 1" <sip:1003@bling.babblevoice.com>;tag=1E697808-FD555877
+To: <sip:1003@bling.babblevoice.com>
+CSeq: 1 REGISTER
+Call-ID: f87f4505d3431a912cf5e72c778131fe
+Contact: <sip:1003@82.19.197.210:55381>;methods="INVITE,ACK,BYE,CANCEL,OPTIONS,INFO,MESSAGE,SUBSCRIBE,NOTIFY,PRACK,UPDATE,REFER"
+User-Agent: PolycomVVX-VVX_101-UA/5.8.0.12848
+Accept-Language: en
+Max-Forwards: 70
+Expires: 3600
+Content-Length: 0
+==END==
+==AUTHREGISTER3==
+SIP/2.0 401 Unauthorized
+Via: SIP/2.0/UDP 82.19.197.210:55381;branch=z9hG4bKb9df62429DE4F559;rport=55381
+From: "Reception 1" <sip:1003@bling.babblevoice.com>;tag=1E697808-FD555877
+To: <sip:1003@bling.babblevoice.com>;tag=a6K1Qv528a6vg
+Call-ID: f87f4505d3431a912cf5e72c778131fe
+CSeq: 1 REGISTER
+User-Agent: FreeSWITCH
+Allow: INVITE, ACK, BYE, CANCEL, OPTIONS, MESSAGE, INFO, UPDATE, REGISTER, REFER, NOTIFY, PUBLISH, SUBSCRIBE
+Supported: timer, path, replaces
+WWW-Authenticate: Digest realm="bling.babblevoice.com", nonce="dbb93832-9090-4763-b9f1-49f0ee8b0b4a", algorithm=MD5, qop="auth"
+Content-Length: 0
+==END==
+==AUTHREGISTER4==
+REGISTER sip:bling.babblevoice.com SIP/2.0
+Via: SIP/2.0/UDP 82.19.197.210:55381;branch=z9hG4bK5576cb6c774386EB
+From: "Reception 1" <sip:1003@bling.babblevoice.com>;tag=1E697808-FD555877
+To: <sip:1003@bling.babblevoice.com>
+CSeq: 2 REGISTER
+Call-ID: f87f4505d3431a912cf5e72c778131fe
+Contact: <sip:1003@82.19.197.210:55381>;methods="INVITE,ACK,BYE,CANCEL,OPTIONS,INFO,MESSAGE,SUBSCRIBE,NOTIFY,PRACK,UPDATE,REFER"
+User-Agent: PolycomVVX-VVX_101-UA/5.8.0.12848
+Accept-Language: en
+Authorization: Digest username="1003", realm="bling.babblevoice.com", nonce="dbb93832-9090-4763-b9f1-49f0ee8b0b4a", qop=auth, cnonce="NwppxHEoHM8cIGF", nc=00000001, uri="sip:bling.babblevoice.com", response="cd1748aebcbc01c47270acab477e0e56", algorithm=MD5
+Max-Forwards: 70
+Expires: 3600
+Content-Length: 0
+==END==

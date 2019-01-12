@@ -33,8 +33,6 @@ Updated: 30.12.2018
 #include "projectsipsm.h"
 #include "projectsipstring.h"
 
-#include <openssl/md5.h>
-
 /*******************************************************************************
 Function: readfile
 Purpose: Read a file into a std::string
@@ -479,23 +477,39 @@ Updated: 12.12.2018
 *******************************************************************************/
 int main( int argc, const char* argv[] )
 {
-  std::string t( "The quick brown fox jumps over 13 lazy dogs." );
 
-  unsigned char digest[16];
-  MD5_CTX context;
-  MD5_Init(&context);
-  MD5_Update(&context, t.c_str(), t.length() );
-  MD5_Final(digest, &context);
-
-  std::string s;
-  s.reserve( 33 ); 
   
-  for( int i = 0;i < 16; i++ )
-  {
-    unsigned char c = digest[ i ];
-    s += to_hex( c >> 4 );
-    s += to_hex( c );
-  }
+  // echo -n "1003:bling.babblevoice.com:123654789" | md5sum
+  // 5f4c92ab75d915b278f953a51a1c9fba
+  // echo -n "REGISTER:sip:bling.babblevoice.com" | md5sum
+  // 40fb13f699461fb10e32df00daa901e5
+  // echo -n "5f4c92ab75d915b278f953a51a1c9fba:dbb93832-9090-4763-b9f1-49f0ee8b0b4a:40fb13f699461fb10e32df00daa901e5" | md5sum
+  std::string user = "1003";
+  std::string password = "123654789";
+  std::string realm = "bling.babblevoice.com";
+  std::string method = "REGISTER";
+  std::string uri = "sip:bling.babblevoice.com";
+  std::string nonce = "dbb93832-9090-4763-b9f1-49f0ee8b0b4a";
+  std::string cnonce = "NwppxHEoHM8cIGF";
+  std::string nc = "00000001";
+  std::string qop = "auth";
+  //response="cd1748aebcbc01c47270acab477e0e56"
+  unsigned char buf[ 33 ];
+
+  requestdigest( ( const unsigned char* ) user.c_str(), user.length(), 
+                                ( const unsigned char* )realm.c_str(), realm.length(), 
+                                ( const unsigned char* )password.c_str(), password.length(),
+                                ( const unsigned char* )nonce.c_str(), nonce.length(), 
+                                ( const unsigned char* )nc.c_str(), nc.length(),
+                                ( const unsigned char* )cnonce.c_str(), cnonce.length(),
+                                ( const unsigned char* )method.c_str(), method.length(), 
+                                ( const unsigned char* )uri.c_str(), uri.length(),
+                                ( const unsigned char* )qop.c_str(), qop.length(),
+                                "MD5",
+                                buf );
+
+  std::cout << "Got: " << buf << std::endl;
+  std::cout << "Should be: " << "cd1748aebcbc01c47270acab477e0e56" << std::endl;
 
 
   authtest();
