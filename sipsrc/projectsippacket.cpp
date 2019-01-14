@@ -214,6 +214,167 @@ stringptr projectsippacket::getnonce( void )
 }
 
 /*******************************************************************************
+Function: md5hashtostring
+Purpose: Converts input 16 bytes hex to string hex. buf need to be 33 bytes to 
+include null terminator.
+Updated: 08.01.2019
+*******************************************************************************/
+static inline void md5hashtostring( char* buf )
+{
+  char *in = buf + 15;
+  buf += 31;
+
+  for( int i = 0; i < 16; i++ )
+  {
+    char c = *in;
+    *buf = tohex( c );
+    buf--;
+    *buf = tohex( c >> 4 );
+    buf--;
+    in--;
+  }
+  buf[ 33 ] = 0;
+}
+
+/*******************************************************************************
+Function: ha1
+Purpose: Calculate the h(a1) using cnonce and cnonce (algorithm = "MD5-sess").
+Ref RFC 2617.
+Updated: 11.01.2019
+*******************************************************************************/
+static inline char * ha1( const char *username, size_t ul, 
+                          const char *realm, size_t rl, 
+                          const char *password, size_t pl,
+                          const char *nonce, size_t cl, 
+                          const char *cnonce, size_t cnl, 
+                          const char *alg,
+                          char *buf )
+{
+  MD5_CTX context;
+  MD5_Init( &context);
+  MD5_Update( &context, username, ul );
+  MD5_Update( &context, ":", 1 );
+  MD5_Update( &context, realm, rl );
+  MD5_Update( &context, ":", 1 );
+  MD5_Update( &context, password, pl );
+  MD5_Final( ( unsigned char* ) buf, &context );
+
+  if ( strcasecmp( alg, "md5-sess" ) == 0 )
+  {
+    MD5_Init( &context );
+    MD5_Update( &context, buf, 16 );
+    MD5_Update( &context, ":", 1 );
+    MD5_Update( &context, nonce, cl );
+    MD5_Update( &context, ":", 1 );
+    MD5_Update( &context, cnonce, cnl );
+    MD5_Final( ( unsigned char* ) buf, &context );
+  }
+
+  md5hashtostring( buf );
+
+  return buf;
+}
+
+/*******************************************************************************
+Function: ha2
+Purpose: Calculate the h(a2). Ref RFC 2617.
+Updated: 11.01.2019
+*******************************************************************************/
+static inline char * ha2( const char *method, size_t ml, 
+                                    const char *uri, size_t ul,
+                                    char *buf )
+{
+  MD5_CTX context;
+  MD5_Init( &context);
+  MD5_Update( &context, method, ml );
+  MD5_Update( &context, ":", 1 );
+  MD5_Update( &context, uri, ul );
+  MD5_Final( ( unsigned char* ) buf, &context );
+
+  md5hashtostring( buf );
+
+  return buf;
+}
+
+/*******************************************************************************
+Function: kd
+Purpose: Calculate the kd. Ref RFC 2617.
+Updated: 11.01.2019
+*******************************************************************************/
+static inline char *kd( const char *ha1,
+                                  const char *nonce, size_t nl,
+                                  const char *nc, size_t ncl,
+                                  const char *cnonce, size_t cl,
+                                  const char *qop, size_t ql,
+                                  const char *ha2,
+                                  char * buf )
+{
+  MD5_CTX context;
+  MD5_Init( &context );
+  MD5_Update( &context, ha1, 32 );
+  MD5_Update( &context, ":", 1 );
+  MD5_Update( &context, nonce, nl );
+  MD5_Update( &context, ":", 1 );
+
+  if ( *qop )
+  {
+    MD5_Update( &context, nc, ncl );
+    MD5_Update( &context, ":", 1 );
+    MD5_Update( &context, cnonce, cl );
+    MD5_Update( &context, ":", 1);
+    MD5_Update( &context, qop, ql );
+    MD5_Update( &context, ":", 1 );
+  }
+
+  MD5_Update( &context, ha2, 32 );
+  MD5_Final( ( unsigned char* ) buf, &context );
+  md5hashtostring( buf );
+
+  return buf;
+}
+#if 1
+/*******************************************************************************
+Function: requestdigest
+Purpose: The 1 call to calculate the SIP request digest.
+Updated: 11.01.2019
+*******************************************************************************/
+char * requestdigest( const char *username, size_t ul, 
+                      const char *realm, size_t rl, 
+                      const char *password, size_t pl,
+                      const char *nonce, size_t nl, 
+                      const char *nc, size_t ncl, 
+                      const char *cnonce, size_t cnl,
+                      const char *method, size_t ml, 
+                      const char *uri, size_t url,
+                      const char *qop, size_t ql,
+                      const char *alg,
+                      char *buf )
+{
+  char h1[ 33 ];
+  char h2[ 33 ];
+
+  kd( 
+    ha1( username, ul, 
+         realm, rl, 
+         password, pl,
+         nonce, nl, 
+         cnonce, cnl,
+         alg,
+         h1 ),
+    nonce, nl,
+    nc, ncl,
+    cnonce, cnl,
+    qop, ql,
+    ha2( method, ml, 
+         uri, url,
+         h2 ),
+    buf );
+
+  return buf;
+}
+#endif
+
+/*******************************************************************************
 Function: checkauth
 Purpose: Check the auth of this packet. The reference contans the nonce to check
 we set the nonce and it is not a replay. 
@@ -221,49 +382,35 @@ Updated: 10.01.2019
 *******************************************************************************/
 bool projectsippacket::checkauth( stringptr nonce, stringptr password )
 {
+  char h1[ 33 ];
+  char h2[ 33 ];
+  char response[ 33 ];
 #if 0
-  uint32_t ha1[ 4 ];
-  uint32_t ha2[ 4 ];
-  uint32_t hash[ 4 ];
-  std::string urp;
-  urp.reserve( DEFAULTHEADERLINELENGTH );
+  sipuri turi( this->getheader( projectsippacket::To ).substr() );
+  sipuri suri( this->uri );
+  substring cnonce = this->getheaderparam( projectsippacket::Authorization, "cnonce" );
+  substring noncecount = this->getheaderparam( projectsippacket::Authorization, "nc" );
+  substring qop = this->getheaderparam( projectsippacket::Authorization, "qop" );
 
-  sipuri turi( this->getheader( projectsippacket::To ) );
-  urp = *turi.user.substr();
-  urp += ':';
-
-  /* realm */
-  sipuri suri( this->getrequesturi() );
-  urp += *suri.host.substr();
-
-  urp += *password;
-
-  md5_hash( urp.c_str(), urp.length(), ha1 );
-  hex_decode( ha1, );
-
-  urp = this->getmethodstr( this->getmethod() );
-  urp += ':';
-  urp += this->getrequesturi().substr();
-
-  md5_hash( urp.c_str(), urp.length(), ha2 );
-
-  urp = tostring( ha1 );
-  urp += ':';
-  urp += *nonce;
-  urp += tostrin( ha2 );
-  md5_hash( urp.c_str(), urp.length(), hash );
-
-  /*
-    nonce = 8e4a6b9f
-    HA1 = MD5("myusername:myrealm.org:password”)
-    HA2 = MD5("REGISTER:sip:sip.example.com")
-    response = MD5(HA1+":8e4a6b9f:"+HA2);
-  */
-  //stringptr s = stringptr( std::string() );
-  //s->reserve( DEFAULTHEADERLINELENGTH );
-
-  //*s = boost::md5( "message" ).hex_str_value();
+  kd( 
+    ha1( turi.user.c_str(), turi.user.length(), 
+         suri.c_str(), suri.length(), 
+         password->c_str(), password->length(),
+         nonce->c_str(), nonce->length(), 
+         cnonce.c_str(), cnonce.length(),
+         "MD5",
+         h1 ),
+    nonce->c_str(), nonce->length(),
+    noncecount.c_str(), noncecount.length(),
+    cnonce.c_str(), cnonce.length(),
+    qop.c_str(), qop.length(),
+    ha2( this->methodstr.c_str(), this->methodstr.length(), 
+         this->uri.c_str(), this->uri.length(),
+         h2 ),
+    response );
 #endif
+  /* we now know what our response should be */
+
   return false;
 }
 
@@ -501,139 +648,71 @@ Function: sipuri constructor
 Purpose: Parse a SIP URI.
 Updated: 03.01.2019
 *******************************************************************************/
-sipuri::sipuri( stringptr s )
+sipuri::sipuri( substring s ) :
+   s( s ),
+   displayname( s ),
+   protocol( s ),
+   user( s ),
+   secret( s ),
+   host( s ),
+   parameters( s ),
+   headers( s )
 {
-  this->s = s;
-
   /* Find display name */
-  size_t dispstart = s->find( '"' );
-  if( std::string::npos != dispstart )
-  {
-    size_t dispend = s->find( '"', dispstart + 1 );
-    if( std::string::npos != dispstart )
-    {
-      this->displayname = substring( s, dispstart + 1, dispend );
-    }
-  }
+  this->displayname = s.findsubstr( '"', '"' );
 
-  size_t sipstart = s->find( "sip:" );
-  if( std::string::npos == sipstart )
+  this->protocol = s.find( "sip:" );
+  if( 0 == this->protocol.end() )
   {
-    sipstart = s->find( "sips:" );
-    if( std::string::npos == sipstart )
+    this->protocol = s.find( "sips:" );
+    if( 0 == this->protocol.end() )
     {
       /* Nothing more we can do */
       return;
     }
-    this->protocol = substring( s, sipstart, sipstart + 4 );
+  }
+  this->protocol--; /* remove the : */
+
+  substring sipuserhost = s.findsubstr( '<', '>' );
+  if( 0 == sipuserhost.end() )
+  {
+    sipuserhost.end( s.end() );
+  }
+
+  substring userhost = sipuserhost;
+  userhost.start( this->protocol.end() + 1 );
+
+  this->host = userhost.aftertoken( '@' );
+  if( 0 == this->host.end() )
+  {
+    this->host = userhost;
   }
   else
   {
-    this->protocol = substring( s, sipstart, sipstart + 3 );
+    substring userpass = userhost.findend( '@' );
+    this->user = userpass.findend( ':' );
+    this->secret = userpass.aftertoken( ':' );
   }
 
-  /* We return to the display name where no quotes are used */
-  if( 0 == this->displayname.end() )
-  {
-    if( sipstart > 0 )
-    {
-      const char *start = s->c_str();
-      char *end = (char *)start + sipstart;
-      char *ptr = (char *)start;
-      int startpos = 0;
-      int endpos = sipstart;
-      for(  ; ptr < end; ptr++ )
-      {
-        if( ' ' != *ptr )
-        {
-          break;
-        }
-        startpos++;
-      }
+  this->headers = s.findsubstr( '?', ';' );  
+  this->parameters = s.findsubstr( ';', '?' );
 
-      for( ptr = end; ptr > start; ptr-- )
-      {
-        if( ' ' == *ptr )
-        {
-          break;
-        }
-        endpos--;
-      }
-      this->displayname = substring( s, startpos, endpos );
-    }
+  if( 0 != this->headers.end() )
+  {
+    this->host.end( std::min( this->headers.start() - 1, userhost.end() ) );
   }
 
-  size_t starthost =  this->protocol.end() + 1; /* +1 = : */
-  size_t offset = starthost;
-  char *hoststart = (char *)s->c_str() + offset;
-  char *endstr = (char *)s->c_str() + s->size();
-  for( ; hoststart < endstr; hoststart++ )
+  if( 0 != this->parameters.end() )
   {
-    switch( *hoststart )
-    {
-      case '@':
-      {
-        if( 0 == this->user.end() )
-        {
-          this->user = substring( s, starthost, offset );
-        }
-        else
-        {
-          this->secret.end( offset );
-        }
-        starthost = offset + 1;
-        break;
-      }
-      case ':':
-      {
-        if( 0 == this->user.end() )
-        {
-          this->user = substring( s, starthost, offset );
-        }
-        this->secret = substring( s, offset + 1, offset );
-        starthost = offset + 1;
-        break;
-      }
-      case '>':
-      {
-        this->host = substring( s, starthost, offset );
-        break;
-      }
-      case ';':
-      {
-        if( 0 == this->host.end() )
-        {
-          this->host = substring( s, starthost, offset );
-        }
-        if( 0 == this->parameters.start() )
-        {
-          this->parameters = substring( s, offset + 1, s->size() );
-        }
-
-        break;
-      }
-      case '?':
-      {
-        if( 0 == this->host.end() )
-        {
-          this->host = substring( s, starthost, offset );
-        }
-
-        if( 0 != this->parameters.end() )
-        {
-          this->parameters.end( offset );
-        }
-        this->headers = substring( s, offset + 1, s->size() );
-        break;
-      }
-    }
-
-    offset++;
+    this->host.end( std::min( this->parameters.start() - 1, this->host.end() ) );
   }
 
-  if( 0 == this->host.end() )
+  if( 0 == this->displayname.end() &&
+      sipuserhost.start() > 1 )
   {
-    this->host = substring( s, starthost, s->size() );
+    // We can now look for an unquoted display name
+    this->displayname.end( sipuserhost.start() - 2 );
+    this->displayname.trim();
   }
 }
 
@@ -653,24 +732,12 @@ substring sipuri::getparameter( std::string name )
     return this->parameters;
   }
 
-  size_t startpos = this->s->find( name + '=', this->parameters.start() );
-
-  if( std::string::npos == startpos )
+  substring param = this->parameters.aftertoken( std::string( name + '=' ).c_str() );
+  if( 0 == param.end() )
   {
-    return substring();
+    return substring( this->s, 0, 0 );
   }
-
-  size_t endpos = this->s->find( ';', startpos + name.size() + 1 );
-
-  if( std::string::npos == endpos )
-  {
-    endpos = this->s->find( '?', startpos + name.size() + 1 );
-    if( std::string::npos == endpos )
-    {
-      return substring( this->s, startpos + name.size() + 1, this->s->size() );
-    }
-  }
-  return substring( this->s, startpos + name.size() + 1, endpos );
+  return param.findend( ';' );
 }
 
 
@@ -687,18 +754,13 @@ substring sipuri::getheader( std::string name )
     return this->headers;
   }
 
-  size_t startpos = this->s->find( name + '=', this->headers.start() );
+  substring header = this->headers.aftertoken( std::string( name + '=' ).c_str() );
 
-  if( std::string::npos == startpos )
+  if( 0 == header.end() )
   {
-    return substring();
+    return substring( this->s, 0, 0 );
   }
-  size_t endpos = this->s->find( '&', startpos + name.size() + 1 );
 
-  if( std::string::npos == endpos )
-  {
-    return substring( this->s, startpos + name.size() + 1, this->s->size() );
-  }
-  return substring( this->s, startpos + name.size() + 1, endpos );
+  return header.findend( '&' );
 }
 

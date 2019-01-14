@@ -43,11 +43,13 @@ class substring
 public:
   substring();
   substring( char * s );
+  substring( substring ss, size_t start, size_t end ){ this->s = ss.get(); this->startpos = start; this->endpos = end; };
   substring( stringptr s );
   substring( stringptr s, size_t start, size_t end );
   stringptr substr();
   const char *c_str(){ return this->s->c_str() + this->startpos; };
 
+  stringptr get( void ){ return this->s; }
   size_t end();
   size_t end( size_t end );
   size_t start();
@@ -56,7 +58,15 @@ public:
   substring rfind( const char * );
   substring find( const char * );
   substring rfind( const char );
-  substring find( const char );
+  substring find( const char, size_t offset = 0 );
+
+  substring findsubstr( const char, const char end = 0 );
+  substring findend( const char );
+  substring aftertoken( const char * );
+  substring aftertoken( const char );
+  substring rtrim( void );
+  substring ltrim( void );
+  substring trim( void );
 
   size_t operator++( int );
 
@@ -94,17 +104,20 @@ typedef boost::shared_ptr< substring > substringptr;
 stringptr urldecode( stringptr str );
 stringptr urlencode( stringptr str );
 
-unsigned char * requestdigest( const unsigned char *username, size_t ul, 
-                                const unsigned char *realm, size_t rl, 
-                                const unsigned char *password, size_t pl,
-                                const unsigned char *nonce, size_t nl, 
-                                const unsigned char *nc, size_t ncl, 
-                                const unsigned char *cnonce, size_t cnl,
-                                const unsigned char *method, size_t ml, 
-                                const unsigned char *uri, size_t url,
-                                const unsigned char *qop, size_t ql,
-                                const char *alg,
-                                unsigned char *buf );
+stringptr urldecode( substring str );
+stringptr urlencode( substring str );
+
+char * requestdigest( const char *username, size_t ul, 
+                      const char *realm, size_t rl, 
+                      const char *password, size_t pl,
+                      const char *nonce, size_t nl, 
+                      const char *nc, size_t ncl, 
+                      const char *cnonce, size_t cnl,
+                      const char *method, size_t ml, 
+                      const char *uri, size_t url,
+                      const char *qop, size_t ql,
+                      const char *alg,
+                      char *buf );
 
 char fromhex( char ch );
 char tohex( char code );

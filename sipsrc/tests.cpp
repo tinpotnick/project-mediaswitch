@@ -234,57 +234,57 @@ void testurl( void )
     stringptr u( new std::string( "http://myhost/my/big/path?myquerystring" ) );
     httpuri s( u );
 
-    projecttest( s.protocol.substr(), "http", "Bad protocol." );
-    projecttest( s.host.substr(), "myhost", "Bad host." );
-    projecttest( s.path.substr(), "/my/big/path", "Bad path." );
-    projecttest( s.query.substr(), "myquerystring", "Bad query." );
+    projecttest( s.protocol, "http", "Bad protocol." );
+    projecttest( s.host, "myhost", "Bad host." );
+    projecttest( s.path, "/my/big/path", "Bad path." );
+    projecttest( s.query, "myquerystring", "Bad query." );
   }
 
   {
     stringptr u( new std::string( "\"Bob\" <sips:bob@biloxi.com> ;tag=a48s" ) );
     sipuri s( u );
 
-    projecttest( s.displayname.substr(), "Bob", "Bad Display name." );
-    projecttest( s.protocol.substr(), "sips", "Bad proto." );
-    projecttest( s.user.substr(), "bob", "Bad user." );
-    projecttest( s.host.substr(), "biloxi.com", "Bad host." );
-    projecttest( s.parameters.substr(), "tag=a48s", "Bad params." );
+    projecttest( s.displayname, "Bob", "Bad Display name." );
+    projecttest( s.protocol, "sips", "Bad proto." );
+    projecttest( s.user, "bob", "Bad user." );
+    projecttest( s.host, "biloxi.com", "Bad host." );
+    projecttest( s.parameters, "tag=a48s", "Bad params." );
   }
 
   {
     stringptr u( new std::string( "Anonymous <sip:c8oqz84zk7z@privacy.org>;tag=hyh8" ) );
     sipuri s( u );
 
-    projecttest( s.displayname.substr(), "Anonymous", "Bad Display name." );
-    projecttest( s.protocol.substr(), "sip", "Bad proto." );
-    projecttest( s.user.substr(), "c8oqz84zk7z", "Bad user." );
-    projecttest( s.host.substr(), "privacy.org", "Bad host." );
-    projecttest( s.parameters.substr(), "tag=hyh8", "Bad params." );
+    projecttest( s.displayname, "Anonymous", "Bad Display name." );
+    projecttest( s.protocol, "sip", "Bad proto." );
+    projecttest( s.user, "c8oqz84zk7z", "Bad user." );
+    projecttest( s.host, "privacy.org", "Bad host." );
+    projecttest( s.parameters, "tag=hyh8", "Bad params." );
   }
 
   {
     stringptr u( new std::string( "sip:+12125551212@phone2net.com;tag=887s" ) );
     sipuri s( u );
 
-    projecttest( s.displayname.substr(), "", "Bad Display name." );
-    projecttest( s.protocol.substr(), "sip", "Bad proto." );
-    projecttest( s.user.substr(), "+12125551212", "Bad user." );
-    projecttest( s.host.substr(), "phone2net.com", "Bad host." );
-    projecttest( s.parameters.substr(), "tag=887s", "Bad params." );
-    projecttest( s.getparameter( "tag" ).substr(), "887s", "Bad tag param." );
+    projecttest( s.displayname, "", "Bad Display name." );
+    projecttest( s.protocol, "sip", "Bad proto." );
+    projecttest( s.user, "+12125551212", "Bad user." );
+    projecttest( s.host, "phone2net.com", "Bad host." );
+    projecttest( s.parameters, "tag=887s", "Bad params." );
+    projecttest( s.getparameter( "tag" ), "887s", "Bad tag param." );
   }
 
   {
     stringptr u( new std::string( "<sip:+12125551212@phone2net.com>;tag=887s;blah=5566654gt" ) );
     sipuri s( u );
 
-    projecttest( s.displayname.substr(), "", "Bad Display name." );
-    projecttest( s.protocol.substr(), "sip", "Bad proto." );
-    projecttest( s.user.substr(), "+12125551212", "Bad user." );
-    projecttest( s.host.substr(), "phone2net.com", "Bad host." );
-    projecttest( s.parameters.substr(), "tag=887s;blah=5566654gt", "Bad params." );
-    projecttest( s.getparameter( "tag" ).substr(), "887s", "Bad tag param." );
-    projecttest( s.getparameter( "blah" ).substr(), "5566654gt", "Bad blah param." );
+    projecttest( s.displayname, "", "Bad Display name." );
+    projecttest( s.protocol, "sip", "Bad proto." );
+    projecttest( s.user, "+12125551212", "Bad user." );
+    projecttest( s.host, "phone2net.com", "Bad host." );
+    projecttest( s.parameters, "tag=887s;blah=5566654gt", "Bad params." );
+    projecttest( s.getparameter( "tag" ), "887s", "Bad tag param." );
+    projecttest( s.getparameter( "blah" ), "5566654gt", "Bad blah param." );
   }
 
   /*
@@ -293,58 +293,58 @@ void testurl( void )
   {
     stringptr u( new std::string( "sip:alice@atlanta.com" ) );
     sipuri s( u );
-    projecttest( s.protocol.substr(), "sip", "Bad proto." );
-    projecttest( s.user.substr(), "alice", std::string( "Bad user: " ) + *u );
-    projecttest( s.host.substr(), "atlanta.com", "Bad host." );
+    projecttest( s.protocol, "sip", "Bad proto." );
+    projecttest( s.user, "alice", std::string( "Bad user: " ) + *u );
+    projecttest( s.host, "atlanta.com", "Bad host." );
   }
 
   {
     stringptr u( new std::string( "sip:alice:secretword@atlanta.com;transport=tcp" ) );
     sipuri s( u );
-    projecttest( s.protocol.substr(), "sip", "Bad proto." );
-    projecttest( s.user.substr(), "alice", "Bad user." );
-    projecttest( s.secret.substr(), "secretword", "Bad secret." );
-    projecttest( s.host.substr(), "atlanta.com", "Bad host." );
-    projecttest( s.parameters.substr(), "transport=tcp", "Bad params." );
-    projecttest( s.getparameter( "transport" ).substr(), "tcp", "Bad transport param." );
+    projecttest( s.protocol, "sip", "Bad proto." );
+    projecttest( s.user, "alice", "Bad user." );
+    projecttest( s.secret, "secretword", "Bad secret." );
+    projecttest( s.host, "atlanta.com", "Bad host." );
+    projecttest( s.parameters, "transport=tcp", "Bad params." );
+    projecttest( s.getparameter( "transport" ), "tcp", "Bad transport param." );
   }
 
   {
     stringptr u( new std::string( "sips:alice@atlanta.com?subject=project%20x&priority=urgent" ) );
     sipuri s( u );
-    projecttest( s.protocol.substr(), "sips", "Bad proto." );
-    projecttest( s.user.substr(), "alice", "Bad user." );
-    projecttest( s.host.substr(), "atlanta.com", "Bad host." );
-    projecttest( urldecode( s.headers.substr() ), "subject=project x&priority=urgent", "Bad headers." );
-    projecttest( urldecode( s.getheader( "subject" ).substr() ), "project x", "Bad header." );
-    projecttest( urldecode( s.getheader( "priority" ).substr() ), "urgent", "Bad header." );
+    projecttest( s.protocol, "sips", "Bad proto." );
+    projecttest( s.user, "alice", "Bad user." );
+    projecttest( s.host, "atlanta.com", "Bad host." );
+    projecttest( urldecode( s.headers ), "subject=project x&priority=urgent", "Bad headers." );
+    projecttest( urldecode( s.getheader( "subject" ) ), "project x", "Bad header." );
+    projecttest( urldecode( s.getheader( "priority" ) ), "urgent", "Bad header." );
   }
 
   {
     stringptr u( new std::string( "sip:+1-212-555-1212:1234@gateway.com;user=phone" ) );
     sipuri s( u );
-    projecttest( s.protocol.substr(), "sip", "Bad proto." );
-    projecttest( s.user.substr(), "+1-212-555-1212", "Bad user." );
-    projecttest( s.secret.substr(), "1234", "Bad secret." );
-    projecttest( s.host.substr(), "gateway.com", "Bad host." );
-    projecttest( s.parameters.substr(), "user=phone", "Bad params." );
-    projecttest( s.getparameter( "user" ).substr(), "phone", "Bad transport param." );
+    projecttest( s.protocol, "sip", "Bad proto." );
+    projecttest( s.user, "+1-212-555-1212", "Bad user." );
+    projecttest( s.secret, "1234", "Bad secret." );
+    projecttest( s.host, "gateway.com", "Bad host." );
+    projecttest( s.parameters, "user=phone", "Bad params." );
+    projecttest( s.getparameter( "user" ), "phone", "Bad transport param." );
   }
 
   {
     stringptr u( new std::string( "sips:1212@gateway.com" ) );
     sipuri s( u );
-    projecttest( s.protocol.substr(), "sips", "Bad proto." );
-    projecttest( s.user.substr(), "1212", "Bad user." );
-    projecttest( s.host.substr(), "gateway.com", "Bad host." );
+    projecttest( s.protocol, "sips", "Bad proto." );
+    projecttest( s.user, "1212", "Bad user." );
+    projecttest( s.host, "gateway.com", "Bad host." );
   }
 
   {
     stringptr u( new std::string( "sip:alice@192.0.2.4" ) );
     sipuri s( u );
-    projecttest( s.protocol.substr(), "sip", "Bad proto." );
-    projecttest( s.user.substr(), "alice", "Bad user." );
-    projecttest( s.host.substr(), "192.0.2.4", "Bad host." );
+    projecttest( s.protocol, "sip", "Bad proto." );
+    projecttest( s.user, "alice", "Bad user." );
+    projecttest( s.host, "192.0.2.4", "Bad host." );
   }
 
   {
@@ -422,6 +422,42 @@ void stringtest( void )
     }
   }
 
+  {
+    stringptr u( new std::string( "Contact: <sip:1003@82.19.197.210:55381>;methods=" ) );
+    substring t( u );
+
+    substring r = t.findsubstr( '<', '>' );
+
+    projecttest( r, "sip:1003@82.19.197.210:55381", "Uh oh, I was expecting 'sip:1003@82.19.197.210:55381'" );
+  }
+
+  {
+    stringptr u( new std::string( "Contact: \"Bob\" <sip:1003@82.19.197.210:55381>;methods=" ) );
+    substring t( u );
+
+    substring r = t.findsubstr( '"', '"' );
+
+    projecttest( r, "Bob", "Uh oh, I was expecting 'Bob'" );
+  }
+
+  {
+    stringptr u( new std::string( "Contact: \"Bob\" <sip:1003@82.19.197.210:55381>;methods=" ) );
+    substring t( u );
+
+    substring r = t.findsubstr( ';' );
+
+    projecttest( r, "methods=", "Uh oh, I was expecting 'methods='" );
+  }
+
+  {
+    stringptr u( new std::string( "Contact: \"Bob\" <sip:1003@82.19.197.210:55381>;methods=" ) );
+    substring t( u );
+
+    substring r = t.findsubstr( '<', '>' ).aftertoken( "sip:" ).findend( '@' );
+
+    projecttest( r, "1003", "Uh oh, I was expecting '1003'" );
+  }
+
   std::cout << "All string tests passed, looking good" << std::endl;
 }
 
@@ -494,19 +530,19 @@ int main( int argc, const char* argv[] )
   std::string nc = "00000001";
   std::string qop = "auth";
   //response="cd1748aebcbc01c47270acab477e0e56"
-  unsigned char buf[ 33 ];
+  char buf[ 33 ];
 
-  requestdigest( ( const unsigned char* ) user.c_str(), user.length(), 
-                                ( const unsigned char* )realm.c_str(), realm.length(), 
-                                ( const unsigned char* )password.c_str(), password.length(),
-                                ( const unsigned char* )nonce.c_str(), nonce.length(), 
-                                ( const unsigned char* )nc.c_str(), nc.length(),
-                                ( const unsigned char* )cnonce.c_str(), cnonce.length(),
-                                ( const unsigned char* )method.c_str(), method.length(), 
-                                ( const unsigned char* )uri.c_str(), uri.length(),
-                                ( const unsigned char* )qop.c_str(), qop.length(),
-                                "MD5",
-                                buf );
+  requestdigest( user.c_str(), user.length(), 
+                  realm.c_str(), realm.length(), 
+                  password.c_str(), password.length(),
+                  nonce.c_str(), nonce.length(), 
+                  nc.c_str(), nc.length(),
+                  cnonce.c_str(), cnonce.length(),
+                  method.c_str(), method.length(), 
+                  uri.c_str(), uri.length(),
+                  qop.c_str(), qop.length(),
+                  "MD5",
+                  buf );
 
   std::cout << "Got: " << buf << std::endl;
   std::cout << "Should be: " << "cd1748aebcbc01c47270acab477e0e56" << std::endl;

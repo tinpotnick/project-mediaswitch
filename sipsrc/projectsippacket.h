@@ -36,11 +36,11 @@ Updated: 17.12.2018
 class sipuri
 {
 public:
-  sipuri( stringptr s );
+  sipuri( substring s );
   substring getparameter( std::string name );
   substring getheader( std::string name );
 
-  stringptr s;
+  substring s;
   substring displayname;
   substring protocol;
   substring user;

@@ -2,14 +2,7 @@
 #include <cstring>
 #include <boost/lexical_cast.hpp>
 
-/* md5 */
-#include <openssl/md5.h>
-
 #include "projectsipstring.h"
-
-
-// to remove after fixing
-#include <iostream>
 
 /*******************************************************************************
 Function: fromhex
@@ -27,10 +20,10 @@ Function: tohex
 Purpose: Converts an integer value to its hex character
 Updated: 18.12.2018
 *******************************************************************************/
+static char __tohexhex[] = "0123456789abcdef";
 char tohex( char code )
 {
-  static char hex[] = "0123456789abcdef";
-  return hex[ code & 15 ];
+  return __tohexhex[ code & 15 ];
 }
 
 /*******************************************************************************
@@ -112,6 +105,28 @@ stringptr urldecode( stringptr str )
 }
 
 
+/*******************************************************************************
+Function: urldecode
+Purpose: Same as above but takes a substring as a param.
+Updated: 14.01.2019
+*******************************************************************************/
+stringptr urldecode( substring str )
+{
+  return urldecode( str.substr() );
+}
+
+
+/*******************************************************************************
+Function: urlencode
+Purpose: Same as above but takes a substring as a param.
+Updated: 14.01.2019
+*******************************************************************************/
+stringptr urlencode( substring str )
+{
+  return urlencode( str.substr() );
+}
+
+
 
 /*******************************************************************************
 Function: operator != substring const char *
@@ -122,6 +137,11 @@ bool operator!=( const substring& lhs, const char *rhs )
 { 
   const char *c = rhs;
   size_t index = lhs.startpos;
+
+  if( 0 == ( lhs.endpos - lhs.startpos ) && 0 == *rhs )
+  {
+    return false;
+  }
 
   for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
         it != lhs.s->end();
@@ -164,6 +184,11 @@ bool operator==( const substring& lhs, const char *rhs )
 {
   const char *c = rhs;
   size_t index = lhs.startpos;
+
+  if( 0 == ( lhs.endpos - lhs.startpos ) && 0 == *rhs )
+  {
+    return true;
+  }
 
   for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
         it != lhs.s->end();
@@ -335,7 +360,12 @@ Updated: 08.01.2019
 *******************************************************************************/
 size_t substring::operator--( int )
 {
-  return this->endpos --;
+  this->endpos--;
+  if( this->endpos < this-> startpos )
+  {
+    this->endpos = this->startpos;
+  }
+  return this->endpos;
 }
 
 /*******************************************************************************
@@ -443,9 +473,9 @@ Function: find
 Purpose: See above
 Updated: 08.01.2019
 *******************************************************************************/
-substring substring::find( const char s )
+substring substring::find( const char s, size_t offset )
 {
-  size_t rfindpos = this->s->find( s, this->startpos );
+  size_t rfindpos = this->s->find( s, this->startpos + offset );
 
   if( std::string::npos == rfindpos ||
         rfindpos > this->endpos )
@@ -458,164 +488,177 @@ substring substring::find( const char s )
 
 
 /*******************************************************************************
-Function: md5hashtostring
-Purpose: Converts input 16 bytes hex to string hex. buf need to be 33 bytes to 
-include null terminator.
-Updated: 08.01.2019
+Function: findsubstr
+Purpose: Finds a substring in a string surounded by start and stop. For example
+s = " Test <1002@bling.babblevoice.com>"
+r = findsubstr( '<'.'>' );
+Wounld return a substring == "1002@bling.babblevoice.com"
+Updated: 13.01.2019
 *******************************************************************************/
-static inline void md5hashtostring( unsigned char* buf )
+substring substring::findsubstr( const char start, const char stop )
 {
-  unsigned char *in = buf + 15;
-  buf += 31;
+  size_t startpos = this->s->find( start, this->startpos );
 
-  for( int i = 0; i < 16; i++ )
+  if( std::string::npos == startpos ||
+        startpos > this->endpos )
   {
-    unsigned char c = *in;
-    *buf = tohex( c );
-    buf--;
-    *buf = tohex( c >> 4 );
-    buf--;
-    in--;
-  }
-  buf[ 33 ] = 0;
-}
-
-/*******************************************************************************
-Function: ha1
-Purpose: Calculate the h(a1) using cnonce and cnonce (algorithm = "MD5-sess").
-Ref RFC 2617.
-Updated: 11.01.2019
-*******************************************************************************/
-static inline unsigned char * ha1( const unsigned char *username, size_t ul, 
-                          const unsigned char *realm, size_t rl, 
-                          const unsigned char *password, size_t pl,
-                          const unsigned char *nonce, size_t cl, 
-                          const unsigned char *cnonce, size_t cnl, 
-                          const char *alg,
-                          unsigned char *buf )
-{
-  MD5_CTX context;
-  MD5_Init( &context);
-  MD5_Update( &context, username, ul );
-  MD5_Update( &context, ":", 1 );
-  MD5_Update( &context, realm, rl );
-  MD5_Update( &context, ":", 1 );
-  MD5_Update( &context, password, pl );
-  MD5_Final( buf, &context );
-
-  if ( strcasecmp( alg, "md5-sess" ) == 0 )
-  {
-    MD5_Init( &context );
-    MD5_Update( &context, buf, 16 );
-    MD5_Update( &context, ":", 1 );
-    MD5_Update( &context, nonce, cl );
-    MD5_Update( &context, ":", 1 );
-    MD5_Update( &context, cnonce, cnl );
-    MD5_Final( buf, &context );
+    return substring( this->s, 0, 0 );
   }
 
-  md5hashtostring( buf );
-
-  return buf;
-}
-
-/*******************************************************************************
-Function: ha2
-Purpose: Calculate the h(a2). Ref RFC 2617.
-Updated: 11.01.2019
-*******************************************************************************/
-static inline unsigned char * ha2( const unsigned char *method, size_t ml, 
-                          const unsigned char *uri, size_t ul,
-                          unsigned char *buf )
-{
-  MD5_CTX context;
-  MD5_Init( &context);
-  MD5_Update( &context, method, ml );
-  MD5_Update( &context, ":", 1 );
-  MD5_Update( &context, uri, ul );
-  MD5_Final( buf, &context );
-
-  md5hashtostring( buf );
-
-  return buf;
-}
-
-/*******************************************************************************
-Function: kd
-Purpose: Calculate the kd. Ref RFC 2617.
-Updated: 11.01.2019
-*******************************************************************************/
-static inline unsigned char *kd( const unsigned char *ha1,
-                                  const unsigned char *nonce, size_t nl,
-                                  const unsigned char *nc, size_t ncl,
-                                  const unsigned char *cnonce, size_t cl,
-                                  const unsigned char *qop, size_t ql,
-                                  const unsigned char *ha2,
-                                  unsigned char * buf )
-{
-  MD5_CTX context;
-  MD5_Init( &context );
-  MD5_Update( &context, ha1, 32 );
-  MD5_Update( &context, ":", 1 );
-  MD5_Update( &context, nonce, nl );
-  MD5_Update( &context, ":", 1 );
-
-  if ( *qop )
+  if( 0 == stop )
   {
-    MD5_Update( &context, nc, ncl );
-    MD5_Update( &context, ":", 1 );
-    MD5_Update( &context, cnonce, cl );
-    MD5_Update( &context, ":", 1);
-    MD5_Update( &context, qop, ql );
-    MD5_Update( &context, ":", 1 );
+    return substring( this->s, startpos + 1, this->endpos );
   }
 
-  MD5_Update( &context, ha2, 32 );
-  MD5_Final( buf, &context );
-  md5hashtostring( buf );
+  size_t endpos = this->s->find( stop, startpos + 1 );
 
-  return buf;
+  if( std::string::npos == endpos ||
+        endpos > this->endpos )
+  {
+    return substring( this->s, startpos + 1, this->endpos );
+  }
+
+  return substring( this->s, startpos + 1, endpos );
 }
 
 /*******************************************************************************
-Function: requestdigest
-Purpose: The 1 call to calculate the SIP request digest.
-Updated: 11.01.2019
+Function: findend
+Purpose: Changes the end position based on searching for a character. It starts 
+at the current start position and will set the end at character found (leaving
+that character out). For example
+s = " Test <1002@bling.babblevoice.com>"
+r = findsubstr( '<'.'>' );
+t = r.findend( '@' );
+It it fails to find a new end, the current end is maintained.
+Wounld return a substring == "1002"
+Updated: 13.01.2019
 *******************************************************************************/
-unsigned char * requestdigest( const unsigned char *username, size_t ul, 
-                                const unsigned char *realm, size_t rl, 
-                                const unsigned char *password, size_t pl,
-                                const unsigned char *nonce, size_t nl, 
-                                const unsigned char *nc, size_t ncl, 
-                                const unsigned char *cnonce, size_t cnl,
-                                const unsigned char *method, size_t ml, 
-                                const unsigned char *uri, size_t url,
-                                const unsigned char *qop, size_t ql,
-                                const char *alg,
-                                unsigned char *buf )
+substring substring::findend( const char ch )
 {
-  unsigned char h1[ 33 ];
-  unsigned char h2[ 33 ];
+  size_t findpos = this->s->find( ch, this->startpos );
 
-  kd( 
-    ha1( username, ul, 
-         realm, rl, 
-         password, pl,
-         nonce, nl, 
-         cnonce, cnl,
-         alg,
-         h1 ),
-    nonce, nl,
-    nc, ncl,
-    cnonce, cnl,
-    qop, ql,
-    ha2( method, ml, 
-         uri, url,
-         h2 ),
-    buf );
+  if( std::string::npos == findpos ||
+        findpos > this->endpos )
+  {
+    return substring( this->s, this->startpos, this->endpos );
+  }
 
-  return buf;
+  return substring( this->s, this->startpos, findpos );
 }
 
 
+/*******************************************************************************
+Function: aftertoken
+Purpose: Looks for the string after a token, for example:
+s = "1002@bling.babblevoice.com"
+r = aftertoken( "1002@" );
+Wounld return a substring == "bling.babblevoice.com"
+Updated: 13.01.2019
+*******************************************************************************/
+substring substring::aftertoken( const char * token )
+{
+  size_t findpos = this->s->find( token, this->startpos );
 
+  if( std::string::npos == findpos ||
+        findpos > this->endpos )
+  {
+    return substring( this->s, 0, 0 );
+  }
+
+  return substring( this->s, findpos + strlen( token ), this->endpos );
+}
+
+/*******************************************************************************
+Function: aftertoken
+Purpose: Looks for the string after a token, for example:
+s = "1002@bling.babblevoice.com"
+r = aftertoken( "1002@" );
+Wounld return a substring == "bling.babblevoice.com"
+Updated: 13.01.2019
+*******************************************************************************/
+substring substring::aftertoken( const char token )
+{
+  size_t findpos = this->s->find( token, this->startpos );
+
+  if( std::string::npos == findpos ||
+        findpos > this->endpos )
+  {
+    return substring( this->s, 0, 0 );
+  }
+
+  return substring( this->s, findpos + 1, this->endpos );
+}
+
+
+/*******************************************************************************
+Function: ltrim
+Purpose: Removes whitespace from beggining of substring.
+Updated: 14.01.2019
+*******************************************************************************/
+substring substring::ltrim( void )
+{
+  const char *c = this->s->c_str();
+  size_t newstartpos = this->startpos;
+  for( size_t i = this->startpos; i < this->endpos; i++ )
+  {
+    switch( *c )
+    {
+      case ' ':
+      case '\t':
+      case '\r':
+      case '\n':
+      {
+        newstartpos++;
+        break;
+      }
+      default:
+      {
+        return substring( this->s, newstartpos, this->endpos );
+      }
+    }
+    c++;
+  }
+  return substring( this->s, newstartpos, this->endpos );
+}
+
+/*******************************************************************************
+Function: rtrim
+Purpose: Removes whitespace from end of substring.
+Updated: 14.01.2019
+*******************************************************************************/
+substring substring::rtrim( void )
+{
+  const char *c = this->s->c_str() + this->endpos;
+
+  size_t newendpos = this->endpos;
+  for( size_t i = this->endpos; i > this->startpos; i-- )
+  {
+    switch( *c )
+    {
+      case ' ':
+      case '\t':
+      case '\r':
+      case '\n':
+      {
+        newendpos--;
+        break;
+      }
+      default:
+      {
+        return substring( this->s, this->startpos, newendpos );
+      }
+    }
+    c--;
+  }
+  return substring( this->s, this->startpos, newendpos );
+}
+
+/*******************************************************************************
+Function: trim
+Purpose: Removes whitespace from beggining and end of substring.
+Updated: 14.01.2019
+*******************************************************************************/
+substring substring::trim( void )
+{
+  return this->ltrim().rtrim();
+}
