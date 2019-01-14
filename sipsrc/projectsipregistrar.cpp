@@ -137,11 +137,11 @@ void registrarsippacket( projectsippacketptr pk )
   sipuri suri( uri );
   std::string s;
   s.reserve( DEFAULTHEADERLINELENGTH );
-  s = *suri.host.substr();
+  s = suri.host.str();
   s += '@';
 
-  sipuri turi( pk->getheader( projectsippacket::To ).substr() );
-  s += *turi.user.substr();
+  sipuri turi( pk->getheader( projectsippacket::To ) );
+  s += turi.user.str();
 
   projectsipregistrationptr r;
   projectsipregistrations::index< regindexuser >::type::iterator it = regs.get< regindexuser >().find( s );

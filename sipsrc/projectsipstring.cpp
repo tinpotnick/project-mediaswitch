@@ -112,7 +112,7 @@ Updated: 14.01.2019
 *******************************************************************************/
 stringptr urldecode( substring str )
 {
-  return urldecode( str.substr() );
+  return urldecode( str.strptr() );
 }
 
 
@@ -123,7 +123,7 @@ Updated: 14.01.2019
 *******************************************************************************/
 stringptr urlencode( substring str )
 {
-  return urlencode( str.substr() );
+  return urlencode( str.strptr() );
 }
 
 
@@ -271,12 +271,42 @@ substring::substring( stringptr s, size_t start, size_t end )
   this->endpos = end;
 }
 
+
 /*******************************************************************************
-Function: substr
+Function: string
+Purpose: Return a new std::string (copy string).
+Updated: 14.01.2019
+*******************************************************************************/
+std::string substring::str( void )
+{
+  if ( !this->s )
+  {
+    return std::string( "" );
+  }
+
+  if( 0 == this->endpos )
+  {
+    return std::string( "" );
+  }
+
+  if( this->startpos > s->size() )
+  {
+    return std::string( "" );
+  }
+
+  if( this->endpos > s->size() )
+  {
+    return std::string( "" );
+  }
+  return std::string( s->substr( this->startpos, this->endpos - this->startpos ) );
+}
+
+/*******************************************************************************
+Function: stringptr
 Purpose: Return a new stringptr (copy string).
 Updated: 08.01.2019
 *******************************************************************************/
-stringptr substring::substr()
+stringptr substring::strptr()
 {
   if ( !this->s )
   {

@@ -46,7 +46,10 @@ public:
   substring( substring ss, size_t start, size_t end ){ this->s = ss.get(); this->startpos = start; this->endpos = end; };
   substring( stringptr s );
   substring( stringptr s, size_t start, size_t end );
-  stringptr substr();
+
+  std::string str( void );
+  stringptr strptr( void );
+
   const char *c_str(){ return this->s->c_str() + this->startpos; };
 
   stringptr get( void ){ return this->s; }
@@ -94,7 +97,7 @@ Updated: 30.12.2018
 *******************************************************************************/
 inline std::ostream & operator << ( std::ostream& os, substring obj )
 {
-  os << *( obj.substr() );
+  os << obj.str();
   return os;
 }
 #endif /* TESTCODE */

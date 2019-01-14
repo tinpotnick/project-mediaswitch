@@ -418,7 +418,7 @@ stringptr projectwebdocument::getreasonphrase( void )
     this->parsersline();
   }
 
-  return this->reasonphrase.substr();
+  return this->reasonphrase.strptr();
 }
 
 /*******************************************************************************
@@ -433,7 +433,7 @@ stringptr projectwebdocument::getrequesturi( void )
     this->parsersline();
   }
 
-  return this->uri.substr();
+  return this->uri.strptr();
 }
 
 /*******************************************************************************
@@ -453,7 +453,7 @@ stringptr projectwebdocument::getbody( void )
     this->parseheaders();
   }
 
-  return this->body.substr();
+  return this->body.strptr();
 }
 
 /*******************************************************************************
@@ -657,7 +657,7 @@ void projectwebdocument::parsersline( void )
     /* Status */
     try
     {
-      this->statuscode = boost::lexical_cast<int>( *( this->statuscodestr.substr() ) );
+      this->statuscode = boost::lexical_cast<int>( this->statuscodestr.str() );
     }
     catch( const boost::bad_lexical_cast& )
     {
@@ -906,7 +906,7 @@ Updated: 02.01.2019
 *******************************************************************************/
 void projectwebdocument::addheader( int header, substring value )
 {
-  std::string strvalue( *value.substr() );
+  std::string strvalue( value.str() );
   this->addheader( header, strvalue );
 }
 

@@ -174,7 +174,7 @@ bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
 
   s = "Digest realm=\"";
   sipuri suri( ref->getrequesturi() );
-  s += *suri.host.substr();
+  s += suri.host.str();
   
   s += "\" algorithm=\"MD5\" nonce=\"";
 
