@@ -1,7 +1,7 @@
 CCOPTS:=-Wall -g -O0
 LL:=-lboost_system -lpthread -lcrypto
 
-default: ../Debug/project-s
+default: ../Debug/project-sip
 
 # Find all sources
 CPPSOURCES:=$(shell ls *.cpp)
@@ -11,8 +11,8 @@ CSOURCES:=$(shell ls *.c)
 # Make targets out of them
 ALLOBJS=$(CPPSOURCES:%.cpp=../Debug/%.o) $(CSOURCES:%.c=../Debug/%.o)
 
-TESTOBJECTS = $(filter-out ../Debug/main.o, $(ALLOBJS))
-SOBJECTS = $(filter-out test.o, $(ALLOBJS))
+TESTOBJECTS = $(filter-out %main.o, $(ALLOBJS))
+SOBJECTS = $(filter-out %tests.o, $(ALLOBJS))
 
 ../Debug/project-sip: $(SOBJECTS)
 	g++ $(SOBJECTS) -o ../Debug/project-sip $(LL)

@@ -116,7 +116,7 @@ void testsippacket( void )
             "Bob <sip:bob@biloxi.com>",
             "Wrong To header field." );
 
-    projecttest( *testpacket.getrequesturi(),
+    projecttest( testpacket.getrequesturi(),
             "sip:registrar.biloxi.com",
             "Wrong Request URI." );
 
@@ -216,6 +216,22 @@ void testsippacket( void )
                   "Some SDP",
                   "Unexpected SIP packet."
                   );
+
+  }
+
+  {
+    
+    projectsippacket testpacket( gettestchunk( testdata, "AUTHREGISTER5" ) );
+
+    projecttest(
+      testpacket.getheaderparam( projectsippacket::Authorization, "response" ),
+      "fcb607534a1cf55bfe5641539d7371ef",
+      "Couldn't find response correctly." );
+
+    projecttest(
+      testpacket.getheaderparam( projectsippacket::Authorization, "algorithm" ),
+      "MD5",
+      "Algorithm was wrong." );
 
   }
 
@@ -380,9 +396,17 @@ void stringtest( void )
     stringptr u( new std::string( "12345hello6789" ) );
     substring t( u, 5, 10 );
     substring t2( u, 0, 5 );
+    substring t3( u, 0, 5 );
 
     projecttest( t, "hello", "Uh oh, I was expecting hello" );
     projecttest( t2, "12345", "Uh oh, I was expecting 12345" );
+
+    projecttest( t2, t3, "This really should be the same." );
+    if( t == t2 )
+    {
+      std::cout << __FILE__ << ":" << __LINE__ << ": We should not get here..." << std::endl;
+      return;
+    }
 
     if( !( t != "hello678" ) )
     {

@@ -3,6 +3,7 @@
 
 #include "projectsipregistrar.h"
 #include "projectsipconfig.h"
+#include "projectsipdirectory.h"
 #include "test.h"
 
 static projectsipregistrations regs;
@@ -52,38 +53,76 @@ void projectsipregistration::regstart( projectsippacketptr pk )
       expires = DEFAULTSIPEXPIRES;
     }
   }
-#warning TODO
-  /*
-    do we request an hour from the client or adjust ourselves. I think we 
-    should request the client to go to an hour but this will be more work.
-  */
+
+  if( 0 == expires && DEFAULTSIPEXPIRES > expires )
+  {
+    /*
+     If a UA receives a 423 (Interval Too Brief) response, it MAY retry
+     the registration after making the expiration interval of all contact
+     addresses in the REGISTER request equal to or greater than the
+     expiration interval within the Min-Expires header field of the 423
+     (Interval Too Brief) response.
+    */
+    projectsippacket response;
+    this->lastpacket = projectsippacketptr( new projectsippacket() );
+
+    this->lastpacket->setstatusline( 423, "Interval Too Brief" );
+    this->lastpacket->addviaheader( ::cnf.gethostname(), pk.get() );
+
+    this->lastpacket->addheader( projectsippacket::Min_Expires, 
+                DEFAULTSIPEXPIRES );
+
+    this->lastpacket->addheader( projectsippacket::To,
+                this->lastpacket->getheader( projectsippacket::To ) );
+    this->lastpacket->addheader( projectsippacket::From,
+                this->lastpacket->getheader( projectsippacket::From ) );
+    this->lastpacket->addheader( projectsippacket::Call_ID,
+                this->lastpacket->getheader( projectsippacket::Call_ID ) );
+    this->lastpacket->addheader( projectsippacket::CSeq,
+                this->lastpacket->getheader( projectsippacket::CSeq ) );
+    this->lastpacket->addheader( projectsippacket::Contact,
+                this->lastpacket->getheader( projectsippacket::Contact ) );
+    this->lastpacket->addheader( projectsippacket::Allow,
+                "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+    this->lastpacket->addheader( projectsippacket::Content_Type,
+                "application/sdp" );
+    this->lastpacket->addheader( projectsippacket::Content_Length,
+                        "0" );
+
+    this->lastpacket->respond( this->lastpacket->strptr() );
+
+    return;
+  }
 
   if( false == pk->hasheader( projectsippacket::Authorization ) )
   {
     projectsippacket response;
-    response.setstatusline( 401, "Unauthorized" );
-    response.addviaheader( ::cnf.gethostname(), pk.get() );
+    this->lastpacket = projectsippacketptr( new projectsippacket() );
 
-    response.addwwwauthenticateheader( pk.get() );
+    this->lastpacket->setstatusline( 401, "Unauthorized" );
+    this->lastpacket->addviaheader( ::cnf.gethostname(), pk.get() );
 
-    response.addheader( projectsippacket::To,
+    this->lastpacket->addwwwauthenticateheader( pk.get() );
+
+    this->lastpacket->addheader( projectsippacket::To,
                         pk->getheader( projectsippacket::To ) );
-    response.addheader( projectsippacket::From,
+    this->lastpacket->addheader( projectsippacket::From,
                         pk->getheader( projectsippacket::From ) );
-    response.addheader( projectsippacket::Call_ID,
+    this->lastpacket->addheader( projectsippacket::Call_ID,
                         pk->getheader( projectsippacket::Call_ID ) );
-    response.addheader( projectsippacket::CSeq,
+    this->lastpacket->addheader( projectsippacket::CSeq,
                         pk->getheader( projectsippacket::CSeq ) );
-    response.addheader( projectsippacket::Contact,
+    this->lastpacket->addheader( projectsippacket::Contact,
                         pk->getheader( projectsippacket::Contact ) );
-    response.addheader( projectsippacket::Allow,
+    this->lastpacket->addheader( projectsippacket::Allow,
                         "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-    response.addheader( projectsippacket::Content_Type,
+    this->lastpacket->addheader( projectsippacket::Content_Type,
                         "application/sdp" );
-    response.addheader( projectsippacket::Content_Length,
+    this->lastpacket->addheader( projectsippacket::Content_Length,
                         "0" );
 
-    pk->respond( response.strptr() );
+    pk->respond( this->lastpacket->strptr() );
+
     return;
   }
 
@@ -99,21 +138,97 @@ Updated: 10.01.2019
 *******************************************************************************/
 void projectsipregistration::regwaitauth( projectsippacketptr pk )
 {
-  /* Check auth */
+  this->currentpacket = pk;
+  /* 
+    Check auth
+    1. Get the users password (if applicable)
+    2. Check the hash.
+  */
+  projectsipdirectory::lookup( 
+                pk->geturihost(), 
+                pk->gettouser(), 
+                std::bind( 
+                  &projectsipregistration::regcompleteauth, 
+                  this, 
+                  std::placeholders::_1 ) );
+}
 
-  /* We have authd. */
-  /* Modify our entry in our container */
+/*******************************************************************************
+Function: regcompleteauth
+Purpose: This should be called after we have looked up our password for this
+realm/user combo.
+Updated: 15.01.2019
+*******************************************************************************/
+void projectsipregistration::regcompleteauth( stringptr password )
+{
+  if( !this->currentpacket->checkauth( this->currentpacket.get(), password ) )
+  {
+    // Failed auth
+    return;
+  }
+
+  /* We have authd. Get an iterator into our container so that we can modify. */
   projectsipregistrations::index< regindexuser >::type::iterator userit;
   userit = regs.get< regindexuser >().find( this->user );
-  if( regs.get< regindexuser >().end() != userit )
+
+  /* Modify our entry in our container. If expires == 0 then we remove bindings. */
+  if( 0 == this->currentpacket->getheaderparam( projectsippacket::Contact, "expires" ).toint() )
   {
-    regs.get< regindexuser >().modify( 
-          userit, 
-          projectsipupdateexpires( 
-            ( *userit )->expires + 
-            boost::posix_time::seconds( DEFAULTSIPEXPIRES ) 
-          ) );
+    if( regs.get< regindexuser >().end() != userit )
+    {
+      regs.get< regindexuser >().erase( userit );
+    }
   }
+  else
+  {
+    /* we either nee to create or modify our entry */
+    if( regs.get< regindexuser >().end() == userit )
+    {
+    }
+    else
+    {
+      regs.get< regindexuser >().modify( 
+            userit, 
+            projectsipupdateexpires( 
+              ( *userit )->expires + 
+              boost::posix_time::seconds( DEFAULTSIPEXPIRES ) 
+            ) );
+    }
+  }
+
+  /*
+    Now send a 200 
+    The registrar returns a 200 (OK) response.  The response MUST
+    contain Contact header field values enumerating all current
+    bindings.  Each Contact value MUST feature an "expires"
+    parameter indicating its expiration interval chosen by the
+    registrar.  The response SHOULD include a Date header field.
+  */
+  projectsippacket response;
+  this->lastpacket = projectsippacketptr( new projectsippacket() );
+
+  this->lastpacket->setstatusline( 200, "Ok" );
+  this->lastpacket->addviaheader( ::cnf.gethostname(), this->lastpacket.get() );
+
+  this->lastpacket->addheader( projectsippacket::To,
+              this->currentpacket->getheader( projectsippacket::To ) );
+  this->lastpacket->addheader( projectsippacket::From,
+              this->currentpacket->getheader( projectsippacket::From ) );
+  this->lastpacket->addheader( projectsippacket::Call_ID,
+              this->currentpacket->getheader( projectsippacket::Call_ID ) );
+  this->lastpacket->addheader( projectsippacket::CSeq,
+              this->currentpacket->getheader( projectsippacket::CSeq ) );
+  this->lastpacket->addheader( projectsippacket::Contact,
+              this->currentpacket->getheader( projectsippacket::Contact ) );
+  this->lastpacket->addheader( projectsippacket::Allow,
+              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  this->lastpacket->addheader( projectsippacket::Content_Type,
+              "application/sdp" );
+  this->lastpacket->addheader( projectsippacket::Content_Length,
+              "0" );
+
+  this->currentpacket->respond( this->lastpacket->strptr() );
+
 }
 
 
@@ -124,24 +239,22 @@ the packet must have already been checked as a REGISTER packet and has all
 of the required headers.
 Updated: 10.101.2019
 *******************************************************************************/
-void registrarsippacket( projectsippacketptr pk )
+void projectsipregistration::registrarsippacket( projectsippacketptr pk )
 {
   /*
     Work out who this registration is for.
   */
-  stringptr uri = pk->getrequesturi();
-  if( !uri || uri->size() < 4 )
+  substring uri = pk->getrequesturi();
+  if( uri.length() < 4 )
   {
     return;
   }
-  sipuri suri( uri );
+
   std::string s;
   s.reserve( DEFAULTHEADERLINELENGTH );
-  s = suri.host.str();
+  s = pk->gettouser().str();
   s += '@';
-
-  sipuri turi( pk->getheader( projectsippacket::To ) );
-  s += turi.user.str();
+  s += pk->geturihost().str();
 
   projectsipregistrationptr r;
   projectsipregistrations::index< regindexuser >::type::iterator it = regs.get< regindexuser >().find( s );

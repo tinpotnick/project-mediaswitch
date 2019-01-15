@@ -38,12 +38,21 @@ public:
   boost::posix_time::ptime nextping; /* when is the next options (ping) due */
   int outstandingping; /* how many pings we have sent without a response. */
 
+  /* Used in situations where we have to make an asynchronous call elsewhere */
+  projectsippacketptr currentpacket;
+
+  /* Used in situations, such as auth, where we need historic information */
+  projectsippacketptr lastpacket;
+
   /* our state functions */
   void regstart( projectsippacketptr pk );
   void regwaitauth( projectsippacketptr pk );
+  void regcompleteauth( stringptr password );
 
   std::function<void ( projectsippacketptr pk ) > nextstate;
   std::function<void ( projectsippacketptr pk ) > laststate;
+
+  static void registrarsippacket( projectsippacketptr pk );
 };
 
 typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;
@@ -63,11 +72,6 @@ private:
   boost::posix_time::ptime expires;
 };
 
-/*******************************************************************************
-Functions: Some public functions.
-Updated: 10.01.2019
-*******************************************************************************/
-void registrarsippacket( projectsippacketptr pk );
 
 /* tags for multi index */
 struct regindexuser{};

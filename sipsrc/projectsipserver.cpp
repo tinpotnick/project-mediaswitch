@@ -5,6 +5,7 @@
 
 #include "projectsipserver.h"
 #include "projectsipsm.h"
+#include "projectsipdirectory.h"
 
 /*******************************************************************************
 Function: projectsipserver constructor

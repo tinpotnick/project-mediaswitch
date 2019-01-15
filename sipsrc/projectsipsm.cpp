@@ -127,6 +127,6 @@ void projectsipsm::handleregister( projectsippacketptr pk )
     return;
   }
 
-  registrarsippacket( pk );
+  projectsipregistration::registrarsippacket( pk );
 }
 

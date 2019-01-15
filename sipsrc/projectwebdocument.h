@@ -140,10 +140,10 @@ public:
   */
   int getmethod( void );
   int getstatuscode( void );
-  stringptr getreasonphrase( void );
-  stringptr getrequesturi( void );
+  substring getreasonphrase( void );
+  substring getrequesturi( void );
   substring getheader( int header );
-  stringptr getbody();
+  substring getbody();
   bool hasheader( int header );
 
   /*

@@ -176,6 +176,44 @@ bool operator!=( const substring& lhs, const char *rhs )
 }
 
 /*******************************************************************************
+Function: operator != substring const substring&
+Purpose: compare a substring with a substring
+Updated: 15.01.2019
+*******************************************************************************/
+bool operator!=( const substring& lhs, const substring& rhs )
+{
+  std::string::iterator rit = moveonbyn( rhs.s, rhs.startpos );
+
+  if( ( lhs.endpos - lhs.startpos ) == ( rhs.endpos - rhs.startpos ) )
+  {
+    return false;
+  }
+
+  for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
+        it != lhs.s->end();
+        it ++ )
+  {
+    if( rhs.s->end() != rit )
+    {
+      break;
+    }
+
+    if( *it != *rit )
+    {
+      return true;
+    }
+    rit++;
+  }
+
+  if( rhs.s->end() != rit )
+  {
+    return true;
+  }
+
+  return false;
+}
+
+/*******************************************************************************
 Function: operator == substring const char *
 Purpose: compare a substring with a const char*
 Updated: 30.12.2018
@@ -216,6 +254,43 @@ bool operator==( const substring& lhs, const char *rhs )
   return true;
 }
 
+/*******************************************************************************
+Function: operator == substring const substring&
+Purpose: compare a substring with a substring
+Updated: 15.01.2019
+*******************************************************************************/
+bool operator==( const substring& lhs, const substring& rhs )
+{
+  std::string::iterator rit = moveonbyn( rhs.s, rhs.startpos );
+
+  if( ( lhs.endpos - lhs.startpos ) != ( rhs.endpos - rhs.startpos ) )
+  {
+    return false;
+  }
+
+  for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
+        it != lhs.s->end();
+        it ++ )
+  {
+    if( rhs.s->end() != rit )
+    {
+      break;
+    }
+    if( *it != *rit )
+    {
+      return false;
+    }
+
+    rit++;
+  }
+
+  if( rhs.s->end() != rit )
+  {
+    return false;
+  }
+
+  return true;
+}
 
 /*******************************************************************************
 Class: substring
@@ -514,6 +589,23 @@ substring substring::find( const char s, size_t offset )
   }
 
   return substring( this->s, rfindpos, rfindpos + 1 );
+}
+
+/*******************************************************************************
+Function: find_first_of
+Purpose: Similar to the std::string::find_first_of - finds the first character
+in the str provided. Moves the end to that location.
+Updated: 15.01.2019
+*******************************************************************************/
+substring substring::mvend_first_of( const char *str )
+{
+  size_t rfindpos = this->s->find_first_of( str, this->startpos );
+    if( std::string::npos == rfindpos ||
+        rfindpos > this->endpos )
+  {
+    return substring( this->s, this->startpos, this->endpos );
+  }
+  return substring( this->s, this->startpos, rfindpos );
 }
 
 

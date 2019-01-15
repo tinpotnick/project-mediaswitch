@@ -3,6 +3,7 @@
 #ifndef PROJECTSIPDIRECTORY_H
 #define PROJECTSIPDIRECTORY_H
 
+#include "projectsipstring.h"
 #include "projectwebdocument.h"
 
 /*******************************************************************************
@@ -19,8 +20,8 @@ Updated: 09.01.2019
 *******************************************************************************/
 class projectsipdirectory
 {
-
-  static void lookup( substring domain, substring user );
+public:
+  static void lookup( substring domain, substring user, std::function<void ( stringptr ) > callback );
 };
 
 #endif /* PROJECTSIPDIRECTORY_H */

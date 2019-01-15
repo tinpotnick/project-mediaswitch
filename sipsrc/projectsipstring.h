@@ -62,6 +62,7 @@ public:
   substring find( const char * );
   substring rfind( const char );
   substring find( const char, size_t offset = 0 );
+  substring mvend_first_of( const char *str );
 
   substring findsubstr( const char, const char end = 0 );
   substring findend( const char );
@@ -79,6 +80,8 @@ public:
 
   friend bool operator != ( const substring& lhs, const char *rhs );
   friend bool operator == ( const substring& lhs, const char *rhs );
+  friend bool operator == ( const substring& lhs, const substring &rhs );
+  friend bool operator != ( const substring& lhs, const substring &rhs );
 
 private:
   size_t startpos;
@@ -86,8 +89,10 @@ private:
   stringptr s;
 };
 
-bool operator==( const substring& lhs, const char *rhs );
-bool operator!=( const substring& lhs, const char *rhs );
+bool operator == ( const substring& lhs, const char *rhs );
+bool operator != ( const substring& lhs, const char *rhs );
+bool operator == ( const substring& lhs, const substring &rhs );
+bool operator != ( const substring& lhs, const substring &rhs );
 
 #ifdef TESTCODE
 /*******************************************************************************

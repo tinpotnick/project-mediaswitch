@@ -26,6 +26,7 @@ sipheaders = [ # SIP Headers
           "To",
           "Via",
           "User-Agent",
+          "Min-Expires",
           "WWW-Authenticate",
           # SIP Verbs
           "REGISTER",

@@ -69,12 +69,14 @@ public:
 
   static stringptr branch();
   substring getheaderparam( int header, const char *param );
+  substring gettouser( void );
+  substring geturihost( void );
   stringptr getnonce( void );
 
   /* specific headers */
   bool addviaheader( const char *host, projectsippacket *ref );
   bool addwwwauthenticateheader( projectsippacket *ref );
-  bool checkauth( stringptr nonce, stringptr password) ;
+  bool checkauth( projectsippacket *ref, stringptr password );
 
   /*
     Request-Line  =  Method SP Request-URI SP SIP-Version CRLF
@@ -102,6 +104,7 @@ public:
         To,
         Via,
         User_Agent,
+        Min_Expires,
         WWW_Authenticate };
 
 private:

@@ -411,14 +411,14 @@ Function: getstatus
 Purpose: Gets the response code if a response packet.
 Updated: 13.12.2018
 *******************************************************************************/
-stringptr projectwebdocument::getreasonphrase( void )
+substring projectwebdocument::getreasonphrase( void )
 {
   if( METHODUNKNOWN == this->method )
   {
     this->parsersline();
   }
 
-  return this->reasonphrase.strptr();
+  return this->reasonphrase;
 }
 
 /*******************************************************************************
@@ -426,14 +426,14 @@ Function: getstatus
 Purpose: Gets the request URI.
 Updated: 13.12.2018
 *******************************************************************************/
-stringptr projectwebdocument::getrequesturi( void )
+substring projectwebdocument::getrequesturi( void )
 {
   if( METHODUNKNOWN == this->method )
   {
     this->parsersline();
   }
 
-  return this->uri.strptr();
+  return this->uri;
 }
 
 /*******************************************************************************
@@ -441,7 +441,7 @@ Function: projectsippacket
 Purpose: Get the body of the packet
 Updated: 13.12.2018
 *******************************************************************************/
-stringptr projectwebdocument::getbody( void )
+substring projectwebdocument::getbody( void )
 {
   if( METHODUNKNOWN == this->method )
   {
@@ -453,7 +453,7 @@ stringptr projectwebdocument::getbody( void )
     this->parseheaders();
   }
 
-  return this->body.strptr();
+  return this->body;
 }
 
 /*******************************************************************************

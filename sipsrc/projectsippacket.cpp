@@ -9,6 +9,8 @@
 
 #include "projectsippacket.h"
 
+// TODO rmeove when finished testing.
+#include <iostream>
 
 /*******************************************************************************
 Function: projectsippacket constructor
@@ -75,6 +77,7 @@ substring projectsippacket::getheaderparam( int header, const char *param )
 {
   substring retval( document );
   substring h( this->getheader( header ) );
+  retval.start( h.end() );
 
   if( 0 == h.end() )
   {
@@ -93,24 +96,32 @@ substring projectsippacket::getheaderparam( int header, const char *param )
 
   if( 0 == ppos.end() )
   {
-    return h;
+    searchfor[ 0 ] = ',';
+    ppos = h.rfind( searchfor );
+    if( 0 == ppos.end() )
+    {
+      ppos = h.rfind( &searchfor[ 1 ] );
+      if( 0 == ppos.end() )
+      {
+        return h;
+      }
+    }
   }
-
-  h.start( ppos.start() + 1 );
-
-  substring sepos = h.find( ';' );
-  substring cepos = h.find( '\r' );
-  sepos.end( std::min( sepos.end(), cepos.end() ) );
-
   retval.start( ppos.end() );
 
-  if( 0 == sepos.end() )
+  /* Check for a quoted string TODO - these are case sensative 
+  unquoted strings should be insensative */
+  substring pposquoted = ppos;
+  pposquoted.end( h.end() );
+  pposquoted = pposquoted.findsubstr( '"', '"' );
+
+  if( pposquoted.start() == ppos.start() + l + 3 )
   {
-    retval.end( h.end() );
-    return retval;
+    return pposquoted;
   }
-  
-  retval.end( sepos.end() - 1 );
+
+  retval = retval.mvend_first_of( ";\r," );
+
   return retval;
 }
 
@@ -380,27 +391,36 @@ Purpose: Check the auth of this packet. The reference contans the nonce to check
 we set the nonce and it is not a replay. 
 Updated: 10.01.2019
 *******************************************************************************/
-bool projectsippacket::checkauth( stringptr nonce, stringptr password )
+bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
 {
   char h1[ 33 ];
   char h2[ 33 ];
   char response[ 33 ];
-#if 0
-  sipuri turi( this->getheader( projectsippacket::To ).substr() );
-  sipuri suri( this->uri );
+
+  if( ref->getheaderparam( projectsippacket::Authorization, "opaque" ) != 
+        this->getheaderparam( projectsippacket::Authorization, "opaque" ) )
+  {
+    return false;
+  }
+
   substring cnonce = this->getheaderparam( projectsippacket::Authorization, "cnonce" );
   substring noncecount = this->getheaderparam( projectsippacket::Authorization, "nc" );
   substring qop = this->getheaderparam( projectsippacket::Authorization, "qop" );
+  substring user = this->gettouser();
+  substring host = this->geturihost();
+
+  substring nonce = ref->getheaderparam( projectsippacket::Authorization, "nonce" );
+  
 
   kd( 
-    ha1( turi.user.c_str(), turi.user.length(), 
-         suri.c_str(), suri.length(), 
+    ha1( user.c_str(), user.length(), 
+         host.c_str(), host.length(), 
          password->c_str(), password->length(),
-         nonce->c_str(), nonce->length(), 
+         nonce.c_str(), nonce.length(), 
          cnonce.c_str(), cnonce.length(),
          "MD5",
          h1 ),
-    nonce->c_str(), nonce->length(),
+    nonce.c_str(), nonce.length(),
     noncecount.c_str(), noncecount.length(),
     cnonce.c_str(), cnonce.length(),
     qop.c_str(), qop.length(),
@@ -408,10 +428,36 @@ bool projectsippacket::checkauth( stringptr nonce, stringptr password )
          this->uri.c_str(), this->uri.length(),
          h2 ),
     response );
-#endif
-  /* we now know what our response should be */
 
+  substring cresponse = this->getheaderparam( projectsippacket::Authorization, "response" );
+
+  std::cout << "Comparing " << cresponse.str() << " to " << response << std::endl;
+  if( cresponse == response )
+  {
+    return true;
+  }
+  /* we now know what our response should be */
   return false;
+}
+
+/*******************************************************************************
+Function: gettouser
+Purpose: Get the user addressed in the To header.
+Updated: 15.01.2019
+*******************************************************************************/
+substring projectsippacket::gettouser( void )
+{
+  return sipuri( this->getheader( projectsippacket::To ) ).user;
+}
+
+/*******************************************************************************
+Function: gettouser
+Purpose: Get the host part from the uri addressed in the To header.
+Updated: 15.01.2019
+*******************************************************************************/
+substring projectsippacket::geturihost( void )
+{
+  return sipuri( this->uri ).host;
 }
 
 /*******************************************************************************
@@ -575,6 +621,10 @@ int projectsippacket::getheaderfromcrc( int crc )
     {
       return User_Agent;
     }
+    case 0x2c17df2a:   /* min-expires */
+    {
+      return Min_Expires;
+    }
     case 0x5d0c2c5a:   /* www-authenticate */
     {
       return WWW_Authenticate;
@@ -634,6 +684,8 @@ const char *projectsippacket::getheaderstr( int header )
       return "Via";
     case User_Agent:
       return "User-Agent";
+    case Min_Expires:
+      return "Min-Expires";
     case WWW_Authenticate:
       return "WWW-Authenticate";
     default:
