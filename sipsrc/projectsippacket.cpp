@@ -9,9 +9,6 @@
 
 #include "projectsippacket.h"
 
-// TODO rmeove when finished testing.
-#include <iostream>
-
 /*******************************************************************************
 Function: projectsippacket constructor
 Purpose:
@@ -28,7 +25,6 @@ projectsippacket::projectsippacket()
   : projectwebdocument(),
   nonce ( new std::string() )
 {
-
 }
 
 /*******************************************************************************
@@ -103,7 +99,7 @@ substring projectsippacket::getheaderparam( int header, const char *param )
       ppos = h.rfind( &searchfor[ 1 ] );
       if( 0 == ppos.end() )
       {
-        return h;
+        return substring( document, 0, 0 );
       }
     }
   }
@@ -208,7 +204,7 @@ bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
   {
     // This shouldn't happen
   }
-  s += "\"";
+  s += "\" qop=\"auth\"";
   
   this->addheader( projectsippacket::WWW_Authenticate, s.c_str() );
   return true;
@@ -407,14 +403,24 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
   substring noncecount = this->getheaderparam( projectsippacket::Authorization, "nc" );
   substring qop = this->getheaderparam( projectsippacket::Authorization, "qop" );
   substring user = this->gettouser();
-  substring host = this->geturihost();
 
-  substring nonce = ref->getheaderparam( projectsippacket::Authorization, "nonce" );
+  substring realm = this->getheaderparam( projectsippacket::Authorization, "realm" );
+  if( 0 == realm.end() )
+  {
+    realm = this->geturihost();
+  }
   
+  substring nonce = ref->getheaderparam( projectsippacket::Authorization, "nonce" );
+
+  substring uri = this->getheaderparam( projectsippacket::Authorization, "uri" );
+  if( 0 == uri.end() )
+  {
+    uri = this->uri;
+  }
 
   kd( 
     ha1( user.c_str(), user.length(), 
-         host.c_str(), host.length(), 
+         realm.c_str(), realm.length(), 
          password->c_str(), password->length(),
          nonce.c_str(), nonce.length(), 
          cnonce.c_str(), cnonce.length(),
@@ -425,13 +431,12 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
     cnonce.c_str(), cnonce.length(),
     qop.c_str(), qop.length(),
     ha2( this->methodstr.c_str(), this->methodstr.length(), 
-         this->uri.c_str(), this->uri.length(),
+         uri.c_str(), uri.length(),
          h2 ),
     response );
 
   substring cresponse = this->getheaderparam( projectsippacket::Authorization, "response" );
 
-  std::cout << "Comparing " << cresponse.str() << " to " << response << std::endl;
   if( cresponse == response )
   {
     return true;

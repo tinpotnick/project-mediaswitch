@@ -107,8 +107,6 @@ inline std::ostream & operator << ( std::ostream& os, substring obj )
 }
 #endif /* TESTCODE */
 
-typedef boost::shared_ptr< substring > substringptr;
-
 stringptr urldecode( stringptr str );
 stringptr urlencode( stringptr str );
 

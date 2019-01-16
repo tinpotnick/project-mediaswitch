@@ -799,7 +799,6 @@ void projectwebdocument::setstatusline( int code, std::string reason )
   this->reasonphrase.start( newline.size() );
   newline += reason;
   this->reasonphrase.end( newline.size() );
-  this->rsline.end( newline.size() );
 
   newline += "\r\n";
 
@@ -816,6 +815,8 @@ void projectwebdocument::setstatusline( int code, std::string reason )
   {
     this->document->insert( 0, newline );
   }
+
+  this->rsline = substring( this->document, 0, newline.size() - 1 );
 }
 
 
@@ -923,21 +924,25 @@ void projectwebdocument::addheader( int header, std::string value )
   size_t headernamelength = completeheader.length();
   completeheader += ": " + value + "\r\n";
 
-  if( 0 == this->body.end() )
+  if( 0 == this->body.length() )
   {
     if( this->headercount > 0 )
     {
       this->document->erase( this->document->size() - 2, 2 );
     }
-
+std::cout << "Appending: " << completeheader << std::endl;
     /* We can just append */
     size_t headerstart = this->document->size() + headernamelength + 2;
     *this->document += completeheader;
     this->storeheader( header, substring( this->document, headerstart, headerstart + value.length() ) );
     *this->document += "\r\n";
+std::cout << "We now have: " << std::endl << *this->document << std::endl;
   }
   else
   {
+std::cout << "We haven't started using bodies!" << std::endl;
+std::cout << this->body.str() << std::endl;
+std::cout << ":" << this->body.start() << ":" << this->body.end() << std::endl;
     if( 0 == this->headercount )
     {
       this->document->insert( this->body.start(), completeheader + "\r\n" );

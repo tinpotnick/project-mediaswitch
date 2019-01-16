@@ -63,7 +63,6 @@ void projectsipregistration::regstart( projectsippacketptr pk )
      expiration interval within the Min-Expires header field of the 423
      (Interval Too Brief) response.
     */
-    projectsippacket response;
     this->lastpacket = projectsippacketptr( new projectsippacket() );
 
     this->lastpacket->setstatusline( 423, "Interval Too Brief" );
@@ -96,7 +95,6 @@ void projectsipregistration::regstart( projectsippacketptr pk )
 
   if( false == pk->hasheader( projectsippacket::Authorization ) )
   {
-    projectsippacket response;
     this->lastpacket = projectsippacketptr( new projectsippacket() );
 
     this->lastpacket->setstatusline( 401, "Unauthorized" );
@@ -204,31 +202,31 @@ void projectsipregistration::regcompleteauth( stringptr password )
     parameter indicating its expiration interval chosen by the
     registrar.  The response SHOULD include a Date header field.
   */
-  projectsippacket response;
-  this->lastpacket = projectsippacketptr( new projectsippacket() );
+  projectsippacketptr p = projectsippacketptr( new projectsippacket() );
+  
+//std::cout << "body: " << this->lastpacket->getbody().str() << std::endl;
+  p->setstatusline( 200, "Ok" );
 
-  this->lastpacket->setstatusline( 200, "Ok" );
-  this->lastpacket->addviaheader( ::cnf.gethostname(), this->lastpacket.get() );
-
-  this->lastpacket->addheader( projectsippacket::To,
+  p->addviaheader( ::cnf.gethostname(), this->lastpacket.get() );
+  p->addheader( projectsippacket::To,
               this->currentpacket->getheader( projectsippacket::To ) );
-  this->lastpacket->addheader( projectsippacket::From,
+  p->addheader( projectsippacket::From,
               this->currentpacket->getheader( projectsippacket::From ) );
-  this->lastpacket->addheader( projectsippacket::Call_ID,
+  p->addheader( projectsippacket::Call_ID,
               this->currentpacket->getheader( projectsippacket::Call_ID ) );
-  this->lastpacket->addheader( projectsippacket::CSeq,
+  p->addheader( projectsippacket::CSeq,
               this->currentpacket->getheader( projectsippacket::CSeq ) );
-  this->lastpacket->addheader( projectsippacket::Contact,
+  p->addheader( projectsippacket::Contact,
               this->currentpacket->getheader( projectsippacket::Contact ) );
-  this->lastpacket->addheader( projectsippacket::Allow,
+  p->addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-  this->lastpacket->addheader( projectsippacket::Content_Type,
+  p->addheader( projectsippacket::Content_Type,
               "application/sdp" );
-  this->lastpacket->addheader( projectsippacket::Content_Length,
+  p->addheader( projectsippacket::Content_Length,
               "0" );
 
-  this->currentpacket->respond( this->lastpacket->strptr() );
-
+  this->currentpacket->respond( p->strptr() );
+  this->lastpacket = p;
 }
 
 
