@@ -134,14 +134,32 @@ Purpose: compare a substring with a const char*
 Updated: 30.12.2018
 *******************************************************************************/
 bool operator!=( const substring& lhs, const char *rhs )
-{ 
-  const char *c = rhs;
-  size_t index = lhs.startpos;
+{
+  if( !lhs.s )
+  {
+    if( 0 == *rhs )
+    {
+      return true;
+    }
+    return false;
+  }
+
+  if( 0 == *rhs )
+  {
+    if( lhs.s->length() > 0 )
+    {
+      return false;
+    }
+    return true;
+  }
 
   if( 0 == ( lhs.endpos - lhs.startpos ) && 0 == *rhs )
   {
     return false;
   }
+
+  const char *c = rhs;
+  size_t index = lhs.startpos;
 
   for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
         it != lhs.s->end();
@@ -182,12 +200,30 @@ Updated: 15.01.2019
 *******************************************************************************/
 bool operator!=( const substring& lhs, const substring& rhs )
 {
-  std::string::iterator rit = moveonbyn( rhs.s, rhs.startpos );
+  if( !lhs.s )
+  {
+    if( !rhs.s )
+    {
+      return true;
+    }
+    return false;
+  }
+
+  if( !rhs.s )
+  {
+    if( lhs.s->length() > 0 )
+    {
+      return false;
+    }
+    return true;
+  }
 
   if( ( lhs.endpos - lhs.startpos ) == ( rhs.endpos - rhs.startpos ) )
   {
     return false;
   }
+
+  std::string::iterator rit = moveonbyn( rhs.s, rhs.startpos );
 
   for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
         it != lhs.s->end();
@@ -220,6 +256,15 @@ Updated: 30.12.2018
 *******************************************************************************/
 bool operator==( const substring& lhs, const char *rhs )
 {
+  if( !lhs.s )
+  {
+    if(  0 == *rhs )
+    {
+      return false;
+    }
+    return true;
+  }
+
   const char *c = rhs;
   size_t index = lhs.startpos;
 
@@ -261,12 +306,21 @@ Updated: 15.01.2019
 *******************************************************************************/
 bool operator==( const substring& lhs, const substring& rhs )
 {
-  std::string::iterator rit = moveonbyn( rhs.s, rhs.startpos );
+  if( !lhs.s )
+  {
+    if( !rhs.s )
+    {
+      return false;
+    }
+    return true;
+  }
 
   if( ( lhs.endpos - lhs.startpos ) != ( rhs.endpos - rhs.startpos ) )
   {
     return false;
   }
+
+  std::string::iterator rit = moveonbyn( rhs.s, rhs.startpos );
 
   for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
         it != lhs.s->end();

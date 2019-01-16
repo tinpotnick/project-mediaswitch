@@ -50,7 +50,7 @@ public:
   std::string str( void );
   stringptr strptr( void );
 
-  const char *c_str(){ return this->s->c_str() + this->startpos; };
+  const char *c_str(){ if(!this->s) return ""; return this->s->c_str() + this->startpos; };
 
   stringptr get( void ){ return this->s; }
   size_t end();

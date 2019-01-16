@@ -251,6 +251,9 @@ void projectsipregistration::regcompleteauth( stringptr password )
 
   this->currentpacket->respond( p->strptr() );
   this->authacceptpacket = p;
+
+  this->laststate = std::bind( &projectsipregistration::regwaitauth, this, std::placeholders::_1 );
+  this->nextstate = std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 );
 }
 
 
