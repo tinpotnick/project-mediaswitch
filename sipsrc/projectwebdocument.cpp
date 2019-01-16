@@ -930,19 +930,15 @@ void projectwebdocument::addheader( int header, std::string value )
     {
       this->document->erase( this->document->size() - 2, 2 );
     }
-std::cout << "Appending: " << completeheader << std::endl;
+
     /* We can just append */
     size_t headerstart = this->document->size() + headernamelength + 2;
     *this->document += completeheader;
     this->storeheader( header, substring( this->document, headerstart, headerstart + value.length() ) );
     *this->document += "\r\n";
-std::cout << "We now have: " << std::endl << *this->document << std::endl;
   }
   else
   {
-std::cout << "We haven't started using bodies!" << std::endl;
-std::cout << this->body.str() << std::endl;
-std::cout << ":" << this->body.start() << ":" << this->body.end() << std::endl;
     if( 0 == this->headercount )
     {
       this->document->insert( this->body.start(), completeheader + "\r\n" );

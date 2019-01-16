@@ -7,6 +7,9 @@
 #include <boost/lexical_cast.hpp>
 #include <openssl/md5.h>
 
+/* Debuggng */
+#include <iostream>
+
 #include "projectsippacket.h"
 
 /*******************************************************************************
@@ -15,15 +18,13 @@ Purpose:
 Updated: 12.12.2018
 *******************************************************************************/
 projectsippacket::projectsippacket( stringptr pk )
-  : projectwebdocument( pk ),
-  nonce ( new std::string() )
+  : projectwebdocument( pk )
 {
 
 }
 
 projectsippacket::projectsippacket()
-  : projectwebdocument(),
-  nonce ( new std::string() )
+  : projectwebdocument()
 {
 }
 
@@ -183,18 +184,17 @@ bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
   sipuri suri( ref->getrequesturi() );
   s += suri.host.str();
   
-  s += "\" algorithm=\"MD5\" nonce=\"";
+  s += "\",algorithm=\"MD5\",nonce=\"";
 
   try
   {
-    *( this->nonce ) = boost::lexical_cast< std::string >( gen() );
-    s += *( this->nonce );
+    s += boost::lexical_cast< std::string >( gen() );;
   }
   catch( boost::bad_lexical_cast &e )
   {
     // This shouldn't happen
   }
-  s += "\" opaque=\"";
+  s += "\",opaque=\"";
 
   try
   {
@@ -204,20 +204,10 @@ bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
   {
     // This shouldn't happen
   }
-  s += "\" qop=\"auth\"";
+  s += "\",qop=\"auth\"";
   
   this->addheader( projectsippacket::WWW_Authenticate, s.c_str() );
   return true;
-}
-
-/*******************************************************************************
-Function: getnonce
-Purpose: Returns the nonce as a string.
-Updated: 10.01.2019
-*******************************************************************************/
-stringptr projectsippacket::getnonce( void )
-{
-  return this->nonce;
 }
 
 /*******************************************************************************
@@ -393,8 +383,9 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
   char h2[ 33 ];
   char response[ 33 ];
 
-  if( ref->getheaderparam( projectsippacket::Authorization, "opaque" ) != 
-        this->getheaderparam( projectsippacket::Authorization, "opaque" ) )
+  substring requestopaque = ref->getheaderparam( projectsippacket::WWW_Authenticate, "opaque" );
+  substring receivedopaque = this->getheaderparam( projectsippacket::Authorization, "opaque" );
+  if( requestopaque != receivedopaque )
   {
     return false;
   }
@@ -410,8 +401,7 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
     realm = this->geturihost();
   }
   
-  substring nonce = ref->getheaderparam( projectsippacket::Authorization, "nonce" );
-
+  substring nonce = ref->getheaderparam( projectsippacket::WWW_Authenticate, "nonce" );
   substring uri = this->getheaderparam( projectsippacket::Authorization, "uri" );
   if( 0 == uri.end() )
   {

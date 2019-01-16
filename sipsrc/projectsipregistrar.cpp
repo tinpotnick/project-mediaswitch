@@ -63,66 +63,61 @@ void projectsipregistration::regstart( projectsippacketptr pk )
      expiration interval within the Min-Expires header field of the 423
      (Interval Too Brief) response.
     */
-    this->lastpacket = projectsippacketptr( new projectsippacket() );
+    projectsippacket toobrief;
 
-    this->lastpacket->setstatusline( 423, "Interval Too Brief" );
-    this->lastpacket->addviaheader( ::cnf.gethostname(), pk.get() );
+    toobrief.setstatusline( 423, "Interval Too Brief" );
+    toobrief.addviaheader( ::cnf.gethostname(), pk.get() );
 
-    this->lastpacket->addheader( projectsippacket::Min_Expires, 
+    toobrief.addheader( projectsippacket::Min_Expires, 
                 DEFAULTSIPEXPIRES );
 
-    this->lastpacket->addheader( projectsippacket::To,
-                this->lastpacket->getheader( projectsippacket::To ) );
-    this->lastpacket->addheader( projectsippacket::From,
-                this->lastpacket->getheader( projectsippacket::From ) );
-    this->lastpacket->addheader( projectsippacket::Call_ID,
-                this->lastpacket->getheader( projectsippacket::Call_ID ) );
-    this->lastpacket->addheader( projectsippacket::CSeq,
-                this->lastpacket->getheader( projectsippacket::CSeq ) );
-    this->lastpacket->addheader( projectsippacket::Contact,
-                this->lastpacket->getheader( projectsippacket::Contact ) );
-    this->lastpacket->addheader( projectsippacket::Allow,
+    toobrief.addheader( projectsippacket::To,
+                pk->getheader( projectsippacket::To ) );
+    toobrief.addheader( projectsippacket::From,
+                pk->getheader( projectsippacket::From ) );
+    toobrief.addheader( projectsippacket::Call_ID,
+                pk->getheader( projectsippacket::Call_ID ) );
+    toobrief.addheader( projectsippacket::CSeq,
+                pk->getheader( projectsippacket::CSeq ) );
+    toobrief.addheader( projectsippacket::Contact,
+                pk->getheader( projectsippacket::Contact ) );
+    toobrief.addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-    this->lastpacket->addheader( projectsippacket::Content_Type,
+    toobrief.addheader( projectsippacket::Content_Type,
                 "application/sdp" );
-    this->lastpacket->addheader( projectsippacket::Content_Length,
+    toobrief.addheader( projectsippacket::Content_Length,
                         "0" );
 
-    this->lastpacket->respond( this->lastpacket->strptr() );
+    pk->respond( toobrief.strptr() );
 
     return;
   }
 
-  if( false == pk->hasheader( projectsippacket::Authorization ) )
-  {
-    this->lastpacket = projectsippacketptr( new projectsippacket() );
+  this->authrequest = projectsippacketptr( new projectsippacket() );
 
-    this->lastpacket->setstatusline( 401, "Unauthorized" );
-    this->lastpacket->addviaheader( ::cnf.gethostname(), pk.get() );
+  this->authrequest->setstatusline( 401, "Unauthorized" );
+  this->authrequest->addviaheader( ::cnf.gethostname(), pk.get() );
 
-    this->lastpacket->addwwwauthenticateheader( pk.get() );
+  this->authrequest->addwwwauthenticateheader( pk.get() );
 
-    this->lastpacket->addheader( projectsippacket::To,
-                        pk->getheader( projectsippacket::To ) );
-    this->lastpacket->addheader( projectsippacket::From,
-                        pk->getheader( projectsippacket::From ) );
-    this->lastpacket->addheader( projectsippacket::Call_ID,
-                        pk->getheader( projectsippacket::Call_ID ) );
-    this->lastpacket->addheader( projectsippacket::CSeq,
-                        pk->getheader( projectsippacket::CSeq ) );
-    this->lastpacket->addheader( projectsippacket::Contact,
-                        pk->getheader( projectsippacket::Contact ) );
-    this->lastpacket->addheader( projectsippacket::Allow,
-                        "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-    this->lastpacket->addheader( projectsippacket::Content_Type,
-                        "application/sdp" );
-    this->lastpacket->addheader( projectsippacket::Content_Length,
-                        "0" );
+  this->authrequest->addheader( projectsippacket::To,
+                      pk->getheader( projectsippacket::To ) );
+  this->authrequest->addheader( projectsippacket::From,
+                      pk->getheader( projectsippacket::From ) );
+  this->authrequest->addheader( projectsippacket::Call_ID,
+                      pk->getheader( projectsippacket::Call_ID ) );
+  this->authrequest->addheader( projectsippacket::CSeq,
+                      pk->getheader( projectsippacket::CSeq ) );
+  this->authrequest->addheader( projectsippacket::Contact,
+                      pk->getheader( projectsippacket::Contact ) );
+  this->authrequest->addheader( projectsippacket::Allow,
+                      "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  this->authrequest->addheader( projectsippacket::Content_Type,
+                      "application/sdp" );
+  this->authrequest->addheader( projectsippacket::Content_Length,
+                      "0" );
 
-    pk->respond( this->lastpacket->strptr() );
-
-    return;
-  }
+  pk->respond( this->authrequest->strptr() );
 
   this->laststate = std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 );
   this->nextstate = std::bind( &projectsipregistration::regwaitauth, this, std::placeholders::_1 );
@@ -159,9 +154,32 @@ Updated: 15.01.2019
 *******************************************************************************/
 void projectsipregistration::regcompleteauth( stringptr password )
 {
-  if( !this->currentpacket->checkauth( this->currentpacket.get(), password ) )
+  if( !this->currentpacket->checkauth( this->authrequest.get(), password ) )
   {
-    // Failed auth
+    projectsippacket failedauth;
+
+    failedauth.setstatusline( 403, "Failed auth" );
+    failedauth.addviaheader( ::cnf.gethostname(), this->currentpacket.get() );
+
+    failedauth.addheader( projectsippacket::To,
+                this->currentpacket->getheader( projectsippacket::To ) );
+    failedauth.addheader( projectsippacket::From,
+                this->currentpacket->getheader( projectsippacket::From ) );
+    failedauth.addheader( projectsippacket::Call_ID,
+                this->currentpacket->getheader( projectsippacket::Call_ID ) );
+    failedauth.addheader( projectsippacket::CSeq,
+                this->currentpacket->getheader( projectsippacket::CSeq ) );
+    failedauth.addheader( projectsippacket::Contact,
+                this->currentpacket->getheader( projectsippacket::Contact ) );
+    failedauth.addheader( projectsippacket::Allow,
+                "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+    failedauth.addheader( projectsippacket::Content_Type,
+                "application/sdp" );
+    failedauth.addheader( projectsippacket::Content_Length,
+                        "0" );
+
+    this->currentpacket->respond( failedauth.strptr() );
+
     return;
   }
 
@@ -176,6 +194,7 @@ void projectsipregistration::regcompleteauth( stringptr password )
     {
       regs.get< regindexuser >().erase( userit );
     }
+    return;
   }
   else
   {
@@ -194,6 +213,12 @@ void projectsipregistration::regcompleteauth( stringptr password )
     }
   }
 
+  if( this->authrequest->getheader( projectsippacket::CSeq ) != 
+        this->currentpacket->getheader( projectsippacket::CSeq ) )
+  {
+
+  }
+
   /*
     Now send a 200 
     The registrar returns a 200 (OK) response.  The response MUST
@@ -203,11 +228,10 @@ void projectsipregistration::regcompleteauth( stringptr password )
     registrar.  The response SHOULD include a Date header field.
   */
   projectsippacketptr p = projectsippacketptr( new projectsippacket() );
-  
-//std::cout << "body: " << this->lastpacket->getbody().str() << std::endl;
+
   p->setstatusline( 200, "Ok" );
 
-  p->addviaheader( ::cnf.gethostname(), this->lastpacket.get() );
+  p->addviaheader( ::cnf.gethostname(), this->currentpacket.get() );
   p->addheader( projectsippacket::To,
               this->currentpacket->getheader( projectsippacket::To ) );
   p->addheader( projectsippacket::From,
@@ -226,7 +250,7 @@ void projectsipregistration::regcompleteauth( stringptr password )
               "0" );
 
   this->currentpacket->respond( p->strptr() );
-  this->lastpacket = p;
+  this->authacceptpacket = p;
 }
 
 

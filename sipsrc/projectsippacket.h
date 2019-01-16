@@ -71,7 +71,6 @@ public:
   substring getheaderparam( int header, const char *param );
   substring gettouser( void );
   substring geturihost( void );
-  stringptr getnonce( void );
 
   /* specific headers */
   bool addviaheader( const char *host, projectsippacket *ref );
@@ -115,9 +114,6 @@ private:
 
   virtual const char *getheaderstr( int header );
   virtual const char *getmethodstr( int method );
-
-  stringptr nonce;
-  
 };
 
 typedef boost::shared_ptr< projectsippacket > projectsippacketptr;

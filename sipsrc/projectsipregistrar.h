@@ -38,11 +38,16 @@ public:
   boost::posix_time::ptime nextping; /* when is the next options (ping) due */
   int outstandingping; /* how many pings we have sent without a response. */
 
+  /* Maintain packets of interest */
+
+  /* The packet we send to request they authenticate */
+  projectsippacketptr authrequest;
+
+  /* This is the packet we have authenticated and accepted */
+  projectsippacketptr authacceptpacket;
+
   /* Used in situations where we have to make an asynchronous call elsewhere */
   projectsippacketptr currentpacket;
-
-  /* Used in situations, such as auth, where we need historic information */
-  projectsippacketptr lastpacket;
 
   /* our state functions */
   void regstart( projectsippacketptr pk );
