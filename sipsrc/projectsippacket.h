@@ -71,6 +71,7 @@ public:
   substring getheaderparam( int header, const char *param );
   substring gettouser( void );
   substring geturihost( void );
+  int getexpires( void );
 
   /* specific headers */
   bool addviaheader( const char *host, projectsippacket *ref );

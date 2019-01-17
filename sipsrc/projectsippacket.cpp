@@ -456,6 +456,32 @@ substring projectsippacket::geturihost( void )
 }
 
 /*******************************************************************************
+Function: getexpires
+Purpose: Get the expires value from the different placesit might be.
+Updated: 17.01.2019
+*******************************************************************************/
+int projectsippacket::getexpires( void )
+{
+  int expires = -1;
+  substring ex;
+  if( this->hasheader( projectsippacket::Expires ) )
+  {
+    ex = this->getheader( projectsippacket::Expires );
+  }
+  else
+  {
+    ex = this->getheaderparam( projectsippacket::Contact, "expires" );
+  }
+
+  if( 0 != ex.end() )
+  {
+    expires = ex.toint();
+  }
+
+  return expires;
+}
+
+/*******************************************************************************
 Function: projectsippacket destructor
 Purpose:
 Updated: 16.12.2018

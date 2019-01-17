@@ -12,6 +12,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/member.hpp>
+#include <boost/asio.hpp>
 
 #include <string>
 
@@ -54,10 +55,16 @@ public:
   void regwaitauth( projectsippacketptr pk );
   void regcompleteauth( stringptr password );
 
+  void timerhandler( const boost::system::error_code& error );
+
   std::function<void ( projectsippacketptr pk ) > nextstate;
   std::function<void ( projectsippacketptr pk ) > laststate;
 
   static void registrarsippacket( projectsippacketptr pk );
+
+private:
+  void expire( void );
+  boost::asio::steady_timer timer;
 };
 
 typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;

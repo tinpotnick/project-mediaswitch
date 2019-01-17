@@ -1,12 +1,12 @@
 
-
-
 #include "projectsipregistrar.h"
 #include "projectsipconfig.h"
 #include "projectsipdirectory.h"
 #include "test.h"
 
 static projectsipregistrations regs;
+
+extern boost::asio::io_service io_service;
 
 /*******************************************************************************
 Function: projectsipregistration
@@ -19,7 +19,8 @@ projectsipregistration::projectsipregistration( std::string u ) :
   nextping( boost::posix_time::second_clock::local_time() + boost::posix_time::seconds( OPTIONSPINGFREQUENCY ) ),
   outstandingping( 0 ),
   nextstate( std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 ) ),
-  laststate( std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 ) )
+  laststate( std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 ) ),
+  timer( io_service )
 {
 }
 
@@ -34,24 +35,10 @@ void projectsipregistration::regstart( projectsippacketptr pk )
   /*
     What is the expires the client is requesting.
   */
-  int expires = DEFAULTSIPEXPIRES;
-  substring ex;
-  if( pk->hasheader( projectsippacket::Expires ) )
+  int expires = pk->getexpires();
+  if( -1 == expires )
   {
-    ex = pk->getheader( projectsippacket::Expires );
-  }
-  else
-  {
-    ex = pk->getheaderparam( projectsippacket::Contact, "expires" );
-  }
-
-  if( 0 != ex.end() )
-  {
-    expires = ex.toint();
-    if( -1 == expires )
-    {
-      expires = DEFAULTSIPEXPIRES;
-    }
+    expires = DEFAULTSIPEXPIRES;
   }
 
   if( 0 == expires && DEFAULTSIPEXPIRES > expires )
@@ -216,7 +203,9 @@ void projectsipregistration::regcompleteauth( stringptr password )
   if( this->authrequest->getheader( projectsippacket::CSeq ) != 
         this->currentpacket->getheader( projectsippacket::CSeq ) )
   {
-
+    // This should not happen. Although, if 2 different clients managed 
+    // to do this at the same time it could. This will make one stall.
+    return;
   }
 
   /*
@@ -252,17 +241,70 @@ void projectsipregistration::regcompleteauth( stringptr password )
   this->currentpacket->respond( p->strptr() );
   this->authacceptpacket = p;
 
+  int expires = p->getexpires();
+  if( -1 == expires )
+  {
+    expires = DEFAULTSIPEXPIRES;
+  }
+
+  this->expires = boost::posix_time::second_clock::local_time() + 
+                      boost::posix_time::seconds( expires );
+
   this->laststate = std::bind( &projectsipregistration::regwaitauth, this, std::placeholders::_1 );
   this->nextstate = std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 );
+
+  this->timer.expires_after( std::chrono::seconds( OPTIONSPINGFREQUENCY ) );
+  this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, this, std::placeholders::_1 ) );
 }
 
+/*******************************************************************************
+Function: expire
+Purpose: Expire(remove) this entry.
+Updated: 17.01.2019
+*******************************************************************************/
+void projectsipregistration::expire( void )
+{
+  projectsipregistrations::index< regindexuser >::type::iterator userit;
+  userit = regs.get< regindexuser >().find( this->user );
+
+  if( regs.get< regindexuser >().end() != userit )
+  {
+    regs.get< regindexuser >().erase( userit );
+  }
+}
+
+/*******************************************************************************
+Function: timer
+Purpose: Our timer callback.
+Updated: 17.01.2019
+*******************************************************************************/
+void projectsipregistration::timerhandler( const boost::system::error_code& error )
+{
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    if( this->expires > boost::posix_time::second_clock::local_time() )
+    {
+      this->expire();
+      return;
+    }
+
+    if( this->outstandingping > OPTIONSMAXFAILCOUNT )
+    {
+      this->expire();
+      return;
+    }
+
+    this->timer.expires_after( std::chrono::seconds( OPTIONSPINGFREQUENCY ) );
+    this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, this, std::placeholders::_1 ) );
+  }
+}
 
 /*******************************************************************************
 Function: processsippacket
 Purpose: Process a REGISTER packet. To get into this function
 the packet must have already been checked as a REGISTER packet and has all 
 of the required headers.
-Updated: 10.101.2019
+Updated: 10.01.2019
 *******************************************************************************/
 void projectsipregistration::registrarsippacket( projectsippacketptr pk )
 {
