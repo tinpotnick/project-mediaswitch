@@ -27,16 +27,16 @@ Updated: 12.12.2018
 void projectsipserver::handlereadsome( void )
 {
   socket.async_receive_from(
-  boost::asio::buffer( data, max_length ), sender_endpoint,
-  [ this ]( boost::system::error_code ec, std::size_t bytes_recvd )
-  {
-    if ( !ec && bytes_recvd > 0 && bytes_recvd <= 1500 )
-    {
-      this->bytesreceived = bytes_recvd;
-      this->handledata();
-    }
-    this->handlereadsome();
-  } );
+    boost::asio::buffer( this->data, max_length ), sender_endpoint,
+      [ this ]( boost::system::error_code ec, std::size_t bytes_recvd )
+      {
+        if ( !ec && bytes_recvd > 0 && bytes_recvd <= 1500 )
+        {
+          this->bytesreceived = bytes_recvd;
+          this->handledata();
+        }
+        this->handlereadsome();
+      } );
 }
 
 

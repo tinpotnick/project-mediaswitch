@@ -67,9 +67,12 @@ public:
   projectsippacket( stringptr packet );
   virtual ~projectsippacket();
 
-  static stringptr branch();
+  static stringptr branch( void );
+  static stringptr callid( void );
   substring getheaderparam( int header, const char *param );
   substring gettouser( void );
+  substring gettohost( void );
+  std::string getuserhost( void );
   substring geturihost( void );
   int getexpires( void );
 

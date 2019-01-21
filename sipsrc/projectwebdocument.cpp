@@ -507,6 +507,21 @@ bool projectwebdocument::hasheader( int header )
 }
 
 /*******************************************************************************
+Function: isrequest
+Purpose: Is this a request (or a response - false).
+Updated: 17.01.2019
+*******************************************************************************/
+bool projectwebdocument::isrequest( void )
+{
+  if( METHODUNKNOWN == this->method )
+  {
+    this->parsersline();
+  }
+
+  return RESPONSE != this->method;
+}
+
+/*******************************************************************************
 Function: getheader
 Purpose: get the header
 Updated: 12.12.2018
@@ -975,7 +990,42 @@ void projectwebdocument::setbody( const char *body )
   return;
 }
 
+/*******************************************************************************
+Function: httpuri
+Purpose: Constructor
+Updated: 18.01.2019
+*******************************************************************************/
+httpuri::httpuri( substring s )
+{
+  this->s = s;
+  substring protopos = s.find( "://" );
+  if( 0 != protopos.end() )
+  {
+    this->protocol = substring( s, 0, protopos.start() - 1 );
+  }
 
+  size_t hostpos = this->protocol.end();
+  if( hostpos != 0 )
+  {
+    hostpos += 3;
+  }
 
+  this->host.start( hostpos );
+  this->host = s.find( '/', hostpos );
+  if( 0 == this->host.end() )
+  {
+    this->host.end( s.length() );
+    return;
+  }
 
+  this->path = substring( s, this->host.end(), s.length() );
+
+  this->query = s.find( '?', this->host.end() );
+  if( 0 != this->query.end() )
+  {
+    this->path.end( this->query.start() );
+    this->query.start( this->query.start() + 1 );
+    this->query.end( s.length() );
+  }
+}
 

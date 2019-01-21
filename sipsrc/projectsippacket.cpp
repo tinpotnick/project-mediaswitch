@@ -64,6 +64,32 @@ stringptr projectsippacket::branch()
 }
 
 /*******************************************************************************
+Function: branch
+Purpose: Generate a new call id.
+Updated: 17.01.2019
+*******************************************************************************/
+stringptr projectsippacket::callid()
+{
+  boost::uuids::basic_random_generator<boost::mt19937> gen;
+  boost::uuids::uuid u = gen();
+
+  stringptr s = stringptr( new std::string() );
+
+  s->reserve( DEFAULTHEADERLINELENGTH );
+
+  try
+  {
+    *s = boost::lexical_cast< std::string >( u );
+  }
+  catch( boost::bad_lexical_cast &e )
+  {
+    // This shouldn't happen
+  }
+  
+  return s;
+}
+
+/*******************************************************************************
 Function: getheaderparam
 Purpose: Returns a param from the header, for example:
 Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
@@ -444,6 +470,41 @@ substring projectsippacket::gettouser( void )
 {
   return sipuri( this->getheader( projectsippacket::To ) ).user;
 }
+
+/*******************************************************************************
+Function: gettohost
+Purpose: Get the host addressed in the To header.
+Updated: 17.01.2019
+*******************************************************************************/
+substring projectsippacket::gettohost( void )
+{
+  return sipuri( this->getheader( projectsippacket::To ) ).host;
+}
+
+/*******************************************************************************
+Function: gettohost
+Purpose: Get the user@host addressed in the either To header and or URI
+based on request/response.
+Updated: 17.01.2019
+*******************************************************************************/
+std::string projectsippacket::getuserhost( void )
+{
+  std::string s;
+  s.reserve( DEFAULTHEADERLINELENGTH );
+  s = this->gettouser().str();
+  s += '@';
+
+  if( this->isrequest() )
+  {
+    s += this->geturihost().str();
+  }
+  else
+  {
+    s += this->gettohost().str();
+  }
+  return s;
+}
+
 
 /*******************************************************************************
 Function: gettouser

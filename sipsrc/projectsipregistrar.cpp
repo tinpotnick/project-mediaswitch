@@ -4,6 +4,9 @@
 #include "projectsipdirectory.h"
 #include "test.h"
 
+/* Debuggng */
+#include <iostream>
+
 static projectsipregistrations regs;
 
 extern boost::asio::io_service io_service;
@@ -20,7 +23,8 @@ projectsipregistration::projectsipregistration( std::string u ) :
   outstandingping( 0 ),
   nextstate( std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 ) ),
   laststate( std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 ) ),
-  timer( io_service )
+  timer( io_service ),
+  optionscseq( 0 )
 {
 }
 
@@ -32,6 +36,12 @@ Updated: 10.01.2019
 *******************************************************************************/
 void projectsipregistration::regstart( projectsippacketptr pk )
 {
+  if( !pk->isrequest() )
+  {
+    this->handleresponse( pk );
+    return;
+  }
+  
   /*
     What is the expires the client is requesting.
   */
@@ -118,6 +128,12 @@ Updated: 10.01.2019
 *******************************************************************************/
 void projectsipregistration::regwaitauth( projectsippacketptr pk )
 {
+  if( !pk->isrequest() )
+  {
+    this->handleresponse( pk );
+    return;
+  }
+
   this->currentpacket = pk;
   /* 
     Check auth
@@ -229,6 +245,7 @@ void projectsipregistration::regcompleteauth( stringptr password )
               this->currentpacket->getheader( projectsippacket::Call_ID ) );
   p->addheader( projectsippacket::CSeq,
               this->currentpacket->getheader( projectsippacket::CSeq ) );
+  // TODO correct this:
   p->addheader( projectsippacket::Contact,
               this->currentpacket->getheader( projectsippacket::Contact ) );
   p->addheader( projectsippacket::Allow,
@@ -239,7 +256,7 @@ void projectsipregistration::regcompleteauth( stringptr password )
               "0" );
 
   this->currentpacket->respond( p->strptr() );
-  this->authacceptpacket = p;
+  this->authacceptpacket = this->currentpacket;
 
   int expires = p->getexpires();
   if( -1 == expires )
@@ -282,7 +299,7 @@ void projectsipregistration::timerhandler( const boost::system::error_code& erro
 {
   if ( error != boost::asio::error::operation_aborted )
   {
-    if( this->expires > boost::posix_time::second_clock::local_time() )
+    if( boost::posix_time::second_clock::local_time() > this->expires )
     {
       this->expire();
       return;
@@ -293,9 +310,60 @@ void projectsipregistration::timerhandler( const boost::system::error_code& erro
       this->expire();
       return;
     }
+    this->sendoptions();
 
     this->timer.expires_after( std::chrono::seconds( OPTIONSPINGFREQUENCY ) );
     this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, this, std::placeholders::_1 ) );
+  }
+}
+
+/*******************************************************************************
+Function: sendoptions
+Purpose: Send an options packet. Construction of an OPTIONS packet 11.2.
+Updated: 17.01.2019
+*******************************************************************************/
+void projectsipregistration::sendoptions( void )
+{
+  projectsippacket request;
+  request.setrequestline( projectsippacket::OPTIONS, this->user );
+  request.addviaheader( ::cnf.gethostname(), this->authacceptpacket.get() );
+
+  request.addheader( projectsippacket::Max_Forwards, "70" );
+  request.addheader( projectsippacket::To,
+                      this->authacceptpacket->getheader( projectsippacket::To ) );
+  request.addheader( projectsippacket::From,
+                      this->authacceptpacket->getheader( projectsippacket::From ) );
+  request.addheader( projectsippacket::Call_ID,
+                      projectsippacket::callid() );
+  request.addheader( projectsippacket::CSeq,
+                      std::to_string( this->optionscseq ) + " OPTIONS" );
+  request.addheader( projectsippacket::Contact,
+                      std::string( "<sip:" ) + this->user + std::string( ">" ) );
+  request.addheader( projectsippacket::Allow,
+                      "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  request.addheader( projectsippacket::Content_Type,
+                      "application/sdp" );
+  request.addheader( projectsippacket::Content_Length,
+                      "0" );
+
+  this->authacceptpacket->respond( request.strptr() );
+
+  this->outstandingping++;
+}
+
+/*******************************************************************************
+Function: handleresponse
+Purpose: We received a SIP 200 OK in response to our OPTIONS request. We only 
+(at the moment) send out options.
+Updated: 17.01.2019
+*******************************************************************************/
+void projectsipregistration::handleresponse( projectsippacketptr pk )
+{
+  if( 0 != this->authacceptpacket->getheader( projectsippacket::CSeq )
+                .find( "OPTIONS" ).length() )
+  {
+    this->optionscseq++;
+    this->outstandingping = 0;
   }
 }
 
@@ -317,11 +385,7 @@ void projectsipregistration::registrarsippacket( projectsippacketptr pk )
     return;
   }
 
-  std::string s;
-  s.reserve( DEFAULTHEADERLINELENGTH );
-  s = pk->gettouser().str();
-  s += '@';
-  s += pk->geturihost().str();
+  std::string s = pk->getuserhost();
 
   projectsipregistrationptr r;
   projectsipregistrations::index< regindexuser >::type::iterator it = regs.get< regindexuser >().find( s );

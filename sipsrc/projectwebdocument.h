@@ -15,6 +15,8 @@
 #include <stdio.h>
 #endif
 
+#include <boost/shared_ptr.hpp>
+
 #include "projectsipstring.h"
 
 /*******************************************************************************
@@ -26,46 +28,9 @@ Updated: 17.12.2018
 class httpuri
 {
 public:
-  inline httpuri( stringptr s )
-  {
-    this->s = s;
-    size_t protopos = s->find( "://" );
-    if( std::string::npos != protopos )
-    {
-      this->protocol = substring( s, 0, protopos );
-    }
+  httpuri( substring s );
 
-    size_t hostpos = this->protocol.end();
-    if( hostpos != 0 )
-    {
-      hostpos += 3;
-    }
-
-    hostpos = s->find( '/', hostpos );
-    if( std::string::npos == hostpos )
-    {
-      hostpos = s->size();
-    }
-    this->host = substring( s, this->protocol.end() + 3, hostpos );
-    if( this->host.end() == s->size() )
-    {
-      return;
-    }
-
-    size_t querypos = s->find( '?', this->host.end() );
-    if( std::string::npos != querypos )
-    {
-      this->query = substring( s, querypos + 1, s->size() );
-      /* The path is inbetween the host and query */
-      this->path = substring( s, this->host.end(), querypos );
-      return;
-    }
-
-    this->path = substring( s, this->host.end(), s->size() );
-
-  }
-
-  stringptr s;
+  substring s;
   substring protocol;
   substring host;
   substring path;
@@ -145,6 +110,7 @@ public:
   substring getheader( int header );
   substring getbody();
   bool hasheader( int header );
+  bool isrequest( void );
 
   /*
     Set functions.
@@ -193,6 +159,6 @@ private:
   void storeheader( int headerindex, substring hval );
 };
 
-
+typedef boost::shared_ptr< projectwebdocument > projectwebdocumentptr;
 
 #endif /* PROJECTWEBDOC_H */

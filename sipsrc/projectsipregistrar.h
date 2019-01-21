@@ -54,6 +54,7 @@ public:
   void regstart( projectsippacketptr pk );
   void regwaitauth( projectsippacketptr pk );
   void regcompleteauth( stringptr password );
+  void handleresponse( projectsippacketptr pk );
 
   void timerhandler( const boost::system::error_code& error );
 
@@ -64,11 +65,20 @@ public:
 
 private:
   void expire( void );
+  void sendoptions( void );
   boost::asio::steady_timer timer;
+
+  unsigned int optionscseq;
 };
 
 typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;
 
+#warning
+/*
+TODO - remove the update expires. Boost timers can act on a single 
+timer per object so we don't need to index by expires and then also
+update this index...
+*/
 class projectsipupdateexpires
 {
 public:
