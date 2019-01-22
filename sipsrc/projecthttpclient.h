@@ -12,6 +12,15 @@
 
 #include "projectwebdocument.h"
 
+/*
+TODO 
+
+1. Get the io context within this file. Anyone file using
+a webclient doens't need to know about io contexts.
+
+2. The callback shoud supply the doument.
+
+*/
 
 /*******************************************************************************
 Class: projecthttpclient
@@ -22,6 +31,7 @@ class projecthttpclient :
   public boost::enable_shared_from_this< projecthttpclient >
 {
 public:
+  projecthttpclient();
   typedef boost::shared_ptr< projecthttpclient > pointer;
   static pointer create( boost::asio::io_context& iocontext );
 
