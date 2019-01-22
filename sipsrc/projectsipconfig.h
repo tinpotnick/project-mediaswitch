@@ -11,15 +11,13 @@ class projectsipconfig
 {
 public:
   projectsipconfig();
-  const char* gethostname( void );
+  static const char* gethostname( void );
+  static const char* gethostip( void );
+  static const int getsipport( void );
 
 private:
   std::string hostname;
 };
-
-#ifndef PROJECTSIPCONFIGEXTERN
-extern projectsipconfig cnf;
-#endif
 
 #endif /* PROJECTSIPCONFIG_H */
 

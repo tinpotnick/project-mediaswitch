@@ -37,6 +37,37 @@ projectsippacket::~projectsippacket()
 {
 }
 
+
+/*******************************************************************************
+Function: contact
+Purpose: Generate a contact parameter.
+Updated: 22.01.2019
+*******************************************************************************/
+stringptr projectsippacket::contact( stringptr user, stringptr host, int expires, int port )
+{
+  stringptr s = stringptr( new std::string() );
+  s->reserve( DEFAULTHEADERLINELENGTH );
+
+  *s = "<sip:";
+  *s += *user;
+  *s += '@';
+  *s += *host;
+
+  if( 5060 != port )
+  {
+    *s += std::to_string( port );
+  }
+
+  *s += '>';
+  if( 0 != expires )
+  {
+    *s += ";expires=";
+    *s += std::to_string( expires );
+  }
+
+  return s;
+}
+
 /*******************************************************************************
 Function: branch
 Purpose: Generate a branch parameter.

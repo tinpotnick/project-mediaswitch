@@ -838,3 +838,62 @@ substring substring::trim( void )
 {
   return this->ltrim().rtrim();
 }
+
+/*******************************************************************************
+Function: joinstring
+Purpose: Join a list of strings together delimitered with delim. This pair of 
+functions are designed to be used with small strings/lists.
+Updated: 22.01.2019
+*******************************************************************************/
+std::string joinstring( stringvector items, char delim )
+{
+	stringvector::iterator it;
+	std::string retval;
+
+	for ( it = items.begin(); it != items.end() ; it ++)
+	{
+		if ( retval != "" )
+		{
+			retval += delim;
+		}
+		retval += *it;
+	}
+
+	return retval;
+}
+
+/*******************************************************************************
+Function: splitstring
+Purpose: Split (Explode) a string using delim. e.g.
+sub.domain.com
+stringlist l;
+l[0] = sub
+l[1] = domain
+l[2] = com
+Updated: 22.01.2019
+*******************************************************************************/
+stringvector splitstring( std::string strtosplit, char delim )
+{
+	std::string stritem;
+	stringvector strlist;
+
+	for ( std::string::iterator it = strtosplit.begin() ; it != strtosplit.end(); it ++ )
+	{
+		if ( *it == delim )
+		{
+			strlist.push_back(stritem);
+			stritem = "";
+			continue;
+		}
+
+		stritem += *it;
+	}
+
+	// the final item - which doesn't have to have a delim...
+	if ( stritem != "" )
+	{
+		strlist.push_back(stritem);
+	}
+
+	return strlist;
+}

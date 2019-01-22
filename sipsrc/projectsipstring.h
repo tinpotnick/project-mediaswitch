@@ -1,6 +1,7 @@
 
 
 #include <string>
+#include <vector>
 #include <boost/shared_ptr.hpp>
 
 #ifndef PROJECTSIPSTRING_H
@@ -8,6 +9,7 @@
 
 
 typedef boost::shared_ptr< std::string > stringptr;
+typedef std::vector<std::string> stringvector;
 
 
 /*******************************************************************************
@@ -113,21 +115,11 @@ stringptr urlencode( stringptr str );
 stringptr urldecode( substring str );
 stringptr urlencode( substring str );
 
-char * requestdigest( const char *username, size_t ul, 
-                      const char *realm, size_t rl, 
-                      const char *password, size_t pl,
-                      const char *nonce, size_t nl, 
-                      const char *nc, size_t ncl, 
-                      const char *cnonce, size_t cnl,
-                      const char *method, size_t ml, 
-                      const char *uri, size_t url,
-                      const char *qop, size_t ql,
-                      const char *alg,
-                      char *buf );
+stringvector splitstring( std::string strtosplit, char delim );
+std::string joinstring( stringvector items, char delim );
 
 char fromhex( char ch );
 char tohex( char code );
-
 
 #endif /* PROJECTSIPSTRING_H */
 

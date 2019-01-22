@@ -4,8 +4,47 @@
 #include "projectsipdirectory.h"
 #include "projecthttpclient.h"
 
-static projectsipdirdomains dirdoms;
+static projectsipdirectory dir;
 
+
+/*******************************************************************************
+Function: projectsipdiruser
+Purpose: Constructor
+Updated: 22.01.2019
+*******************************************************************************/
+projectsipdiruser::projectsipdiruser( void )
+{
+}
+
+/*******************************************************************************
+Function: projectsipdirdomain::create
+Purpose: Create auto pointer.
+Updated: 22.01.2019
+*******************************************************************************/
+projectsipdiruser::pointer projectsipdiruser::create( void )
+{
+  return pointer( new projectsipdiruser() );
+}
+
+/*******************************************************************************
+Function: projectsipdirdomain
+Purpose: Constructor
+Updated: 22.01.2019
+*******************************************************************************/
+projectsipdirdomain::projectsipdirdomain( void )
+{
+
+}
+
+/*******************************************************************************
+Function: projectsipdirdomain::create
+Purpose: Create auto pointer.
+Updated: 22.01.2019
+*******************************************************************************/
+projectsipdirdomain::pointer projectsipdirdomain::create( void )
+{
+  return pointer( new projectsipdirdomain() );
+}
 
 /*******************************************************************************
 Function: projectsipdirectory
@@ -22,50 +61,64 @@ projectsipdirectory::projectsipdirectory( void )
   s->domain = stringptr( new std::string( "babblevoice" ) );
   d->subdomains.emplace( *( s->domain ), s );
 
-  s = projectsipdirdomain::create();
-  s->domain = stringptr( new std::string( "bling" ) );
-  d->subdomains.emplace( *( s->domain ), s );
+  projectsipdirdomain::pointer f = projectsipdirdomain::create();
+  f->domain = stringptr( new std::string( "bling" ) );
+  s->subdomains.emplace( *( f->domain ), f );
 
-  projectsipdiruser::pointer t;
-  t->username = stringptr( new std::string( "1000" ) );
+  projectsipdiruser::pointer t = projectsipdiruser::create();;
+  t->username = stringptr( new std::string( "1003" ) );
   t->secret = stringptr( new std::string( "1123654789" ) );
-  s->users.emplace( *( t->username ), t );
+  f->users.emplace( *( t->username ), t );
 
-  dirdoms.emplace( *( d->domain ), d );
+  dir.domains.emplace( *( d->domain ), d );
 }
 
 /*******************************************************************************
 Function: lookup
-Purpose: Looks up the users password from our directory. The call is 
-asynchronous as we may have to look elsewhere for our answer. We will have to
-introduce controls which prevent a rogue client just increasing our memory
-usage by querying random domain names.
-Updated: 15.01.2019
+Purpose: Looks up the users password from our directory. Our data must be 
+populated via the http server. This also then limits the look up on rogue
+clients trying to randomly lookup username/password combos. This may create a 
+slower load on startup and greater memory requirement. But seems to be the best
+option.
+Updated: 22.01.2019
 *******************************************************************************/
-void projectsipdirectory::lookup( substring domain, substring user, std::function<void ( stringptr ) > callback )
+stringptr projectsipdirectory::lookup( substring domain, substring user )
 {
-  projectsipdirdomain::map::iterator it = dirdoms.find( domain.str() );
+  std::string dstr = domain.str();
+  stringvector l = splitstring( dstr, '.' );
+  if( l.size() > 5 )
+  {
+    return stringptr();
+  }
 
-  if( dirdoms.end() != it )
+  projectsipdirdomain::pointer ref;
+  projectsipdirdomain::map *dirref = &dir.domains;
+  projectsipdirdomain::map::iterator it = dirref->end();
+  for( int i = l.size(); i != 0; i-- )
+  {
+    it = dirref->find( l[ i - 1 ] );
+    if( dirref->end() == it )
+    {
+      return stringptr();
+    }
+    ref = it->second;
+    dirref = &it->second->subdomains;
+  }
+
+  if( ref )
   {
     projectsipdirusers::iterator uit;
-    uit = it->second->users.find( user.str() );
+    std::string userstr = user.str();
+    uit = ref->users.find( userstr );
 
-    if( it->second->users.end() == uit )
+    if( ref->users.end() == uit )
     {
       // Does not exist.
-      callback( stringptr() );
-      return;
+      return stringptr();
     }
 
-    callback( uit->second->secret );
-    return;
+    return uit->second->secret;
   }
-#if 0
-  projecthttpclient::callback 
-  projecthttpclient::create()->asyncrequest();
 
-  stringptr result( new std::string( "1123654789" ) );
-  callback( result );
-#endif
+  return stringptr();
 }

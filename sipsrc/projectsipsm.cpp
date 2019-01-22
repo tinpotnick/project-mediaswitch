@@ -86,7 +86,7 @@ void projectsipsm::handleoptions( projectsippacketptr pk )
   projectsippacket response;
 
   response.setstatusline( 200, "OK" );
-  response.addviaheader( ::cnf.gethostname(), pk.get() );
+  response.addviaheader( projectsipconfig::gethostname(), pk.get() );
 
   response.addheader( projectsippacket::To,
                       pk->getheader( projectsippacket::To ) );

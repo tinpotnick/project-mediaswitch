@@ -63,7 +63,7 @@ void projectsipregistration::regstart( projectsippacketptr pk )
     projectsippacket toobrief;
 
     toobrief.setstatusline( 423, "Interval Too Brief" );
-    toobrief.addviaheader( ::cnf.gethostname(), pk.get() );
+    toobrief.addviaheader( projectsipconfig::gethostname(), pk.get() );
 
     toobrief.addheader( projectsippacket::Min_Expires, 
                 DEFAULTSIPEXPIRES );
@@ -77,7 +77,10 @@ void projectsipregistration::regstart( projectsippacketptr pk )
     toobrief.addheader( projectsippacket::CSeq,
                 pk->getheader( projectsippacket::CSeq ) );
     toobrief.addheader( projectsippacket::Contact,
-                pk->getheader( projectsippacket::Contact ) );
+                projectsippacket::contact( pk->gettouser().strptr(), 
+                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+                0, 
+                projectsipconfig::getsipport() ) );
     toobrief.addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
     toobrief.addheader( projectsippacket::Content_Type,
@@ -93,7 +96,7 @@ void projectsipregistration::regstart( projectsippacketptr pk )
   this->authrequest = projectsippacketptr( new projectsippacket() );
 
   this->authrequest->setstatusline( 401, "Unauthorized" );
-  this->authrequest->addviaheader( ::cnf.gethostname(), pk.get() );
+  this->authrequest->addviaheader( projectsipconfig::gethostname(), pk.get() );
 
   this->authrequest->addwwwauthenticateheader( pk.get() );
 
@@ -106,7 +109,10 @@ void projectsipregistration::regstart( projectsippacketptr pk )
   this->authrequest->addheader( projectsippacket::CSeq,
                       pk->getheader( projectsippacket::CSeq ) );
   this->authrequest->addheader( projectsippacket::Contact,
-                      pk->getheader( projectsippacket::Contact ) );
+                      projectsippacket::contact( pk->gettouser().strptr(), 
+                      stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+                      0, 
+                      projectsipconfig::getsipport() ) );
   this->authrequest->addheader( projectsippacket::Allow,
                       "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   this->authrequest->addheader( projectsippacket::Content_Type,
@@ -135,34 +141,19 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
   }
 
   this->currentpacket = pk;
-  /* 
-    Check auth
-    1. Get the users password (if applicable)
-    2. Check the hash.
-  */
-  projectsipdirectory::lookup( 
-                pk->geturihost(), 
-                pk->gettouser(), 
-                std::bind( 
-                  &projectsipregistration::regcompleteauth, 
-                  this, 
-                  std::placeholders::_1 ) );
-}
 
-/*******************************************************************************
-Function: regcompleteauth
-Purpose: This should be called after we have looked up our password for this
-realm/user combo.
-Updated: 15.01.2019
-*******************************************************************************/
-void projectsipregistration::regcompleteauth( stringptr password )
-{
-  if( !this->currentpacket->checkauth( this->authrequest.get(), password ) )
+  stringptr password = projectsipdirectory::lookup( 
+                pk->geturihost(), 
+                pk->gettouser() );
+
+
+  if( !password ||
+        !this->currentpacket->checkauth( this->authrequest.get(), password ) )
   {
     projectsippacket failedauth;
 
     failedauth.setstatusline( 403, "Failed auth" );
-    failedauth.addviaheader( ::cnf.gethostname(), this->currentpacket.get() );
+    failedauth.addviaheader( projectsipconfig::gethostname(), this->currentpacket.get() );
 
     failedauth.addheader( projectsippacket::To,
                 this->currentpacket->getheader( projectsippacket::To ) );
@@ -173,7 +164,10 @@ void projectsipregistration::regcompleteauth( stringptr password )
     failedauth.addheader( projectsippacket::CSeq,
                 this->currentpacket->getheader( projectsippacket::CSeq ) );
     failedauth.addheader( projectsippacket::Contact,
-                this->currentpacket->getheader( projectsippacket::Contact ) );
+                projectsippacket::contact( this->currentpacket->gettouser().strptr(), 
+                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+                0, 
+                projectsipconfig::getsipport() ) );
     failedauth.addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
     failedauth.addheader( projectsippacket::Content_Type,
@@ -191,7 +185,8 @@ void projectsipregistration::regcompleteauth( stringptr password )
   userit = regs.get< regindexuser >().find( this->user );
 
   /* Modify our entry in our container. If expires == 0 then we remove bindings. */
-  if( 0 == this->currentpacket->getheaderparam( projectsippacket::Contact, "expires" ).toint() )
+  int expires = this->currentpacket->getexpires();
+  if( 0 == expires )
   {
     if( regs.get< regindexuser >().end() != userit )
     {
@@ -199,28 +194,18 @@ void projectsipregistration::regcompleteauth( stringptr password )
     }
     return;
   }
-  else
+
+  if( -1 == expires )
   {
-    /* we either nee to create or modify our entry */
-    if( regs.get< regindexuser >().end() == userit )
-    {
-    }
-    else
-    {
-      regs.get< regindexuser >().modify( 
-            userit, 
-            projectsipupdateexpires( 
-              ( *userit )->expires + 
-              boost::posix_time::seconds( DEFAULTSIPEXPIRES ) 
-            ) );
-    }
+    expires = DEFAULTSIPEXPIRES;
   }
 
   if( this->authrequest->getheader( projectsippacket::CSeq ) != 
         this->currentpacket->getheader( projectsippacket::CSeq ) )
   {
     // This should not happen. Although, if 2 different clients managed 
-    // to do this at the same time it could. This will make one stall.
+    // to do this at the same time it could. This will make one stall
+    // (and retry).
     return;
   }
 
@@ -236,7 +221,7 @@ void projectsipregistration::regcompleteauth( stringptr password )
 
   p->setstatusline( 200, "Ok" );
 
-  p->addviaheader( ::cnf.gethostname(), this->currentpacket.get() );
+  p->addviaheader( projectsipconfig::gethostname(), this->currentpacket.get() );
   p->addheader( projectsippacket::To,
               this->currentpacket->getheader( projectsippacket::To ) );
   p->addheader( projectsippacket::From,
@@ -245,9 +230,12 @@ void projectsipregistration::regcompleteauth( stringptr password )
               this->currentpacket->getheader( projectsippacket::Call_ID ) );
   p->addheader( projectsippacket::CSeq,
               this->currentpacket->getheader( projectsippacket::CSeq ) );
-  // TODO correct this:
+
   p->addheader( projectsippacket::Contact,
-              this->currentpacket->getheader( projectsippacket::Contact ) );
+              projectsippacket::contact( this->currentpacket->gettouser().strptr(), 
+                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+                expires, 
+                projectsipconfig::getsipport() ) );
   p->addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   p->addheader( projectsippacket::Content_Type,
@@ -257,12 +245,6 @@ void projectsipregistration::regcompleteauth( stringptr password )
 
   this->currentpacket->respond( p->strptr() );
   this->authacceptpacket = this->currentpacket;
-
-  int expires = p->getexpires();
-  if( -1 == expires )
-  {
-    expires = DEFAULTSIPEXPIRES;
-  }
 
   this->expires = boost::posix_time::second_clock::local_time() + 
                       boost::posix_time::seconds( expires );
@@ -326,7 +308,7 @@ void projectsipregistration::sendoptions( void )
 {
   projectsippacket request;
   request.setrequestline( projectsippacket::OPTIONS, this->user );
-  request.addviaheader( ::cnf.gethostname(), this->authacceptpacket.get() );
+  request.addviaheader( projectsipconfig::gethostname(), this->authacceptpacket.get() );
 
   request.addheader( projectsippacket::Max_Forwards, "70" );
   request.addheader( projectsippacket::To,
@@ -338,7 +320,10 @@ void projectsipregistration::sendoptions( void )
   request.addheader( projectsippacket::CSeq,
                       std::to_string( this->optionscseq ) + " OPTIONS" );
   request.addheader( projectsippacket::Contact,
-                      std::string( "<sip:" ) + this->user + std::string( ">" ) );
+                      projectsippacket::contact( this->authacceptpacket->gettouser().strptr(), 
+                      stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+                      0, 
+                      projectsipconfig::getsipport() ) );
   request.addheader( projectsippacket::Allow,
                       "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   request.addheader( projectsippacket::Content_Type,

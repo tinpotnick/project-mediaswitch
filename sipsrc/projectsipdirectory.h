@@ -62,7 +62,9 @@ class projectsipdirectory
 {
 public:
   projectsipdirectory( void );
-  static void lookup( substring domain, substring user, std::function<void ( stringptr ) > callback );
+  static stringptr lookup( substring domain, substring user );
+
+  projectsipdirdomain::map domains;
 };
 
 #endif /* PROJECTSIPDIRECTORY_H */

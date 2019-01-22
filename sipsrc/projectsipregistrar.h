@@ -53,7 +53,6 @@ public:
   /* our state functions */
   void regstart( projectsippacketptr pk );
   void regwaitauth( projectsippacketptr pk );
-  void regcompleteauth( stringptr password );
   void handleresponse( projectsippacketptr pk );
 
   void timerhandler( const boost::system::error_code& error );
@@ -97,7 +96,6 @@ private:
 
 /* tags for multi index */
 struct regindexuser{};
-struct regindexexpires{};
 struct regindexnextping{};
 
 /*******************************************************************************
@@ -118,16 +116,6 @@ typedef boost::multi_index::multi_index_container<
         projectsipregistration,
         std::string,
         &projectsipregistration::user
-      >
-    >,
-    boost::multi_index::ordered_non_unique
-    <
-      boost::multi_index::tag< regindexexpires >,
-      boost::multi_index::member
-      <
-        projectsipregistration,
-        boost::posix_time::ptime,
-        &projectsipregistration::expires
       >
     >,
     boost::multi_index::ordered_non_unique

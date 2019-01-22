@@ -69,6 +69,8 @@ public:
 
   static stringptr branch( void );
   static stringptr callid( void );
+  static stringptr contact( stringptr user, stringptr host, int expires, int port );
+
   substring getheaderparam( int header, const char *param );
   substring gettouser( void );
   substring gettohost( void );
