@@ -15,6 +15,7 @@
 #include <boost/enable_shared_from_this.hpp>
 
 #include "projectsipserver.h"
+#include "projecthttpserver.h"
 
 boost::asio::io_service io_service;
 
@@ -101,6 +102,7 @@ void startserver( void )
 	try
 	{
     projectsipserver s( io_service, 5060 );
+    projecthttpserver h( io_service, 8080 );
 		io_service.run();
 	}
 	catch( std::exception& e )
