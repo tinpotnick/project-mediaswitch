@@ -2,7 +2,9 @@
 
 #include "projecthttpserver.h"
 #include "projectwebdocument.h"
+#include "projectsipregistrar.h"
 
+#include <iostream>
 
 /*******************************************************************************
 Function: projecthttpserver
@@ -92,10 +94,8 @@ void projecthttpconnection::start( void )
   #warning TODO
   /* How to make this more dynamic. Whilst the HTTP server part of this project is 
   low frequency it could have larger documents. */
-  this->inbuffer.reserve( 1024 );
-  boost::asio::async_read(
-    this->tcpsocket,
-    boost::asio::buffer( this->inbuffer ),
+  this->tcpsocket.async_read_some(
+    boost::asio::buffer( this->inbuffer, this->inbuffer.size() - 1 ),
     boost::bind(&projecthttpconnection::handleread, shared_from_this(),
 			boost::asio::placeholders::error,
 			boost::asio::placeholders::bytes_transferred) );
@@ -106,7 +106,9 @@ Function: handleread
 Purpose: Wait for data
 Updated: 22.01.2019
 *******************************************************************************/
-void projecthttpconnection::handleread( const boost::system::error_code& error, std::size_t bytes_transferred )
+void projecthttpconnection::handleread( 
+    const boost::system::error_code& error, 
+    std::size_t bytes_transferred )
 {
 
   if( !error )
@@ -115,13 +117,35 @@ void projecthttpconnection::handleread( const boost::system::error_code& error, 
     /* Do stuff */
     projectwebdocument d( s );
 
-    std::string body( "Hi" );
+    std::string path = d.getrequesturi().str();
 
+    if( path.length() < 1 )
+    {
+      // 404?
+      return;
+    }
+
+    path.erase( 0, 1 ); /* remove the leading / */
+    stringvector pathparts = splitstring( path, '/' );
     projectwebdocument response;
-    response.setstatusline( 200, "ok" );
-    response.addheader( projectwebdocument::Content_Length, body.length() );
 
-    response.setbody( body.c_str() );
+    if( "reg" == pathparts[ 0 ] )
+    {
+      projectsipregistration::registrarhttpget( pathparts, response );
+    }
+    else if( "dir" == pathparts[ 0 ] )
+    {
+      response.setstatusline( 200, "Ok" );
+
+      std::string body( "dir" );
+      response.addheader( projectwebdocument::Content_Length, body.length() );
+      response.setbody( body.c_str() );
+    }
+    else
+    {
+      response.setstatusline( 404, "Not found" );
+    }
+
     this->outbuffer = response.strptr();
 
     boost::asio::async_write( this->tcpsocket,
@@ -129,7 +153,6 @@ void projecthttpconnection::handleread( const boost::system::error_code& error, 
       boost::bind(&projecthttpconnection::handlewrite, shared_from_this(),
 			boost::asio::placeholders::error,
 			boost::asio::placeholders::bytes_transferred) );
-
   }
 }
 
@@ -138,7 +161,9 @@ Function: handlewrite
 Purpose: Once we have finished...
 Updated: 22.01.2019
 *******************************************************************************/
-void projecthttpconnection::handlewrite( const boost::system::error_code& error, std::size_t bytes_transferred )
+void projecthttpconnection::handlewrite( 
+    const boost::system::error_code& error, 
+    std::size_t bytes_transferred )
 {
   this->tcpsocket.close();
 }

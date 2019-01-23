@@ -1,4 +1,7 @@
 
+#include <boost/property_tree/ptree.hpp>
+#include "json.hpp"
+
 #include "projectsipregistrar.h"
 #include "projectsipconfig.h"
 #include "projectsipdirectory.h"
@@ -385,6 +388,24 @@ void projectsipregistration::registrarsippacket( projectsippacketptr pk )
   }
 
   r->nextstate( pk );
+}
+
+
+/*******************************************************************************
+Function: registrarhttpreq
+Purpose: Handle a request from our web server.
+Updated: 22.01.2019
+*******************************************************************************/
+void projectsipregistration::registrarhttpget( stringvector &path, projectwebdocument &response )
+{
+  JSON::Object v;
+  v[ "count" ] = ( JSON::Integer ) regs.size();
+  std::string t = JSON::to_string( v );
+
+  response.setstatusline( 200, "Ok" );
+  response.addheader( projectwebdocument::Content_Length, t.length() );
+  response.addheader( projectwebdocument::Content_Type, "text/json" );
+  response.setbody( t.c_str() );
 }
 
 

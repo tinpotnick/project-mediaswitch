@@ -61,6 +61,7 @@ public:
   std::function<void ( projectsippacketptr pk ) > laststate;
 
   static void registrarsippacket( projectsippacketptr pk );
+  static void registrarhttpget( stringvector &path, projectwebdocument &response );
 
 private:
   void expire( void );
@@ -72,31 +73,9 @@ private:
 
 typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;
 
-#warning
-/*
-TODO - remove the update expires. Boost timers can act on a single 
-timer per object so we don't need to index by expires and then also
-update this index...
-*/
-class projectsipupdateexpires
-{
-public:
-  projectsipupdateexpires( const boost::posix_time::ptime &newexpire )
-      : expires( newexpire ){}
-
-  void operator()( projectsipregistrationptr e )
-  {
-    e->expires = this->expires;
-  }
-
-private:
-  boost::posix_time::ptime expires;
-};
-
 
 /* tags for multi index */
 struct regindexuser{};
-struct regindexnextping{};
 
 /*******************************************************************************
 Class: projectsipregistrations
@@ -116,16 +95,6 @@ typedef boost::multi_index::multi_index_container<
         projectsipregistration,
         std::string,
         &projectsipregistration::user
-      >
-    >,
-    boost::multi_index::ordered_non_unique
-    <
-      boost::multi_index::tag< regindexnextping >,
-      boost::multi_index::member
-      <
-        projectsipregistration,
-        boost::posix_time::ptime,
-        &projectsipregistration::nextping
       >
     >
   >

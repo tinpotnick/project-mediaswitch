@@ -8,12 +8,13 @@
 
 
 // test
-#include <vector>
+#include <array>
 
 #ifndef PROJECTHTTPSERVER_H
 #define PROJECTHTTPSERVER_H
 
-typedef boost::array<char, 8096> rawDataArray;
+#define CHARARRAYLENGTH 8096
+typedef std::array<char, CHARARRAYLENGTH> chararray;
 
 /*******************************************************************************
 Class: projecthttpconnection
@@ -38,7 +39,7 @@ private:
   boost::asio::io_service &ioservice;
   boost::asio::ip::tcp::socket tcpsocket;
 
-  std::vector< char > inbuffer;
+  chararray inbuffer;
   stringptr outbuffer;
 };
 
