@@ -24,7 +24,9 @@ projectwebdocument::projectwebdocument() :
   statuscode( STATUSUNKNOWN ),
   methodstr( document ),
   statuscodestr( document ),
-  reasonphrase( document )
+  reasonphrase( document ),
+  uri( document ),
+  rsline( document )
 {
 }
 
@@ -42,7 +44,9 @@ projectwebdocument::projectwebdocument( stringptr doc ) :
   statuscode( STATUSUNKNOWN ),
   methodstr( doc ),
   statuscodestr( doc ),
-  reasonphrase( doc )
+  reasonphrase( doc ),
+  uri( doc ),
+  rsline( doc )
 {
 }
 
@@ -1010,13 +1014,14 @@ httpuri::httpuri( substring s )
     hostpos += 3;
   }
 
-  this->host.start( hostpos );
   this->host = s.find( '/', hostpos );
+  this->host.start( hostpos + 1 );
   if( 0 == this->host.end() )
   {
     this->host.end( s.length() );
     return;
   }
+  this->host--;
 
   this->path = substring( s, this->host.end(), s.length() );
 

@@ -10,6 +10,8 @@
 #include <boost/shared_ptr.hpp>
 #include <functional>
 
+#include <boost/asio/placeholders.hpp>
+
 #include "projectwebdocument.h"
 
 /*
@@ -37,15 +39,17 @@ public:
 
   projecthttpclient( boost::asio::io_service &ioservice );
 
+  enum{ FAIL_RESOLVE, FAIL_CONNECT, FAIL_READ, FAIL_WRITE };
+
   void asyncrequest( projectwebdocumentptr request, 
-      std::function< void ( boost::system::error_code errorcode ) > );
+      std::function< void ( int errorcode ) > );
 
   projectwebdocumentptr getresponse( void );
 
 private:
   boost::asio::io_service &ioservice;
   boost::asio::ip::tcp::socket socket;
-  std::function< void ( boost::system::error_code errorcode ) > callback;
+  std::function< void ( int errorcode ) > callback;
   stringptr requestdoc;
   projectwebdocumentptr response;
 

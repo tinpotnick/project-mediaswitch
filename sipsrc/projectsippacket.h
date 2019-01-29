@@ -72,9 +72,10 @@ public:
   static stringptr contact( stringptr user, stringptr host, int expires, int port );
 
   substring getheaderparam( int header, const char *param );
-  substring gettouser( void );
-  substring gettohost( void );
-  std::string getuserhost( void );
+  substring getuser( int tofrom = To );
+  substring gethost( int tofrom = To );
+  substring getdisplayname( int tofrom = To );
+  std::string getuserhost( int tofrom = To );
   substring geturihost( void );
   int getexpires( void );
 

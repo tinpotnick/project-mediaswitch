@@ -450,7 +450,7 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
   substring cnonce = this->getheaderparam( projectsippacket::Authorization, "cnonce" );
   substring noncecount = this->getheaderparam( projectsippacket::Authorization, "nc" );
   substring qop = this->getheaderparam( projectsippacket::Authorization, "qop" );
-  substring user = this->gettouser();
+  substring user = this->getuser();
 
   substring realm = this->getheaderparam( projectsippacket::Authorization, "realm" );
   if( 0 == realm.end() )
@@ -497,9 +497,9 @@ Function: gettouser
 Purpose: Get the user addressed in the To header.
 Updated: 15.01.2019
 *******************************************************************************/
-substring projectsippacket::gettouser( void )
+substring projectsippacket::getuser( int tofrom )
 {
-  return sipuri( this->getheader( projectsippacket::To ) ).user;
+  return sipuri( this->getheader( tofrom ) ).user;
 }
 
 /*******************************************************************************
@@ -507,22 +507,32 @@ Function: gettohost
 Purpose: Get the host addressed in the To header.
 Updated: 17.01.2019
 *******************************************************************************/
-substring projectsippacket::gettohost( void )
+substring projectsippacket::gethost( int tofrom )
 {
-  return sipuri( this->getheader( projectsippacket::To ) ).host;
+  return sipuri( this->getheader( tofrom ) ).host;
 }
 
 /*******************************************************************************
-Function: gettohost
+Function: getdisplayname
+Purpose: Returns the diaply name.
+Updated: 29.01.2019
+*******************************************************************************/
+substring projectsippacket::getdisplayname( int tofrom )
+{
+  return sipuri( this->getheader( tofrom ) ).displayname;
+}
+
+/*******************************************************************************
+Function: getuserhost
 Purpose: Get the user@host addressed in the either To header and or URI
 based on request/response.
 Updated: 17.01.2019
 *******************************************************************************/
-std::string projectsippacket::getuserhost( void )
+std::string projectsippacket::getuserhost( int tofrom )
 {
   std::string s;
   s.reserve( DEFAULTHEADERLINELENGTH );
-  s = this->gettouser().str();
+  s = this->getuser( tofrom ).str();
   s += '@';
 
   if( this->isrequest() )
@@ -531,14 +541,14 @@ std::string projectsippacket::getuserhost( void )
   }
   else
   {
-    s += this->gettohost().str();
+    s += this->gethost().str();
   }
   return s;
 }
 
 
 /*******************************************************************************
-Function: gettouser
+Function: geturihost
 Purpose: Get the host part from the uri addressed in the To header.
 Updated: 15.01.2019
 *******************************************************************************/

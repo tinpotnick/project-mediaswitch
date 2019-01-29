@@ -80,7 +80,7 @@ void projectsipregistration::regstart( projectsippacketptr pk )
     toobrief.addheader( projectsippacket::CSeq,
                 pk->getheader( projectsippacket::CSeq ) );
     toobrief.addheader( projectsippacket::Contact,
-                projectsippacket::contact( pk->gettouser().strptr(), 
+                projectsippacket::contact( pk->getuser().strptr(), 
                 stringptr( new std::string( projectsipconfig::gethostip() ) ), 
                 0, 
                 projectsipconfig::getsipport() ) );
@@ -112,7 +112,7 @@ void projectsipregistration::regstart( projectsippacketptr pk )
   this->authrequest->addheader( projectsippacket::CSeq,
                       pk->getheader( projectsippacket::CSeq ) );
   this->authrequest->addheader( projectsippacket::Contact,
-                      projectsippacket::contact( pk->gettouser().strptr(), 
+                      projectsippacket::contact( pk->getuser().strptr(), 
                       stringptr( new std::string( projectsipconfig::gethostip() ) ), 
                       0, 
                       projectsipconfig::getsipport() ) );
@@ -145,9 +145,9 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
   this->currentpacket = pk;
 
-  stringptr password = projectsipdirectory::lookup( 
+  stringptr password = projectsipdirectory::lookuppassword( 
                 pk->geturihost(), 
-                pk->gettouser() );
+                pk->getuser() );
 
 
   if( !password ||
@@ -167,7 +167,7 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
     failedauth.addheader( projectsippacket::CSeq,
                 this->currentpacket->getheader( projectsippacket::CSeq ) );
     failedauth.addheader( projectsippacket::Contact,
-                projectsippacket::contact( this->currentpacket->gettouser().strptr(), 
+                projectsippacket::contact( this->currentpacket->getuser().strptr(), 
                 stringptr( new std::string( projectsipconfig::gethostip() ) ), 
                 0, 
                 projectsipconfig::getsipport() ) );
@@ -220,33 +220,33 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
     parameter indicating its expiration interval chosen by the
     registrar.  The response SHOULD include a Date header field.
   */
-  projectsippacketptr p = projectsippacketptr( new projectsippacket() );
+  projectsippacket p;
 
-  p->setstatusline( 200, "Ok" );
+  p.setstatusline( 200, "Ok" );
 
-  p->addviaheader( projectsipconfig::gethostname(), this->currentpacket.get() );
-  p->addheader( projectsippacket::To,
+  p.addviaheader( projectsipconfig::gethostname(), this->currentpacket.get() );
+  p.addheader( projectsippacket::To,
               this->currentpacket->getheader( projectsippacket::To ) );
-  p->addheader( projectsippacket::From,
+  p.addheader( projectsippacket::From,
               this->currentpacket->getheader( projectsippacket::From ) );
-  p->addheader( projectsippacket::Call_ID,
+  p.addheader( projectsippacket::Call_ID,
               this->currentpacket->getheader( projectsippacket::Call_ID ) );
-  p->addheader( projectsippacket::CSeq,
+  p.addheader( projectsippacket::CSeq,
               this->currentpacket->getheader( projectsippacket::CSeq ) );
 
-  p->addheader( projectsippacket::Contact,
-              projectsippacket::contact( this->currentpacket->gettouser().strptr(), 
+  p.addheader( projectsippacket::Contact,
+              projectsippacket::contact( this->currentpacket->getuser().strptr(), 
                 stringptr( new std::string( projectsipconfig::gethostip() ) ), 
                 expires, 
                 projectsipconfig::getsipport() ) );
-  p->addheader( projectsippacket::Allow,
+  p.addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-  p->addheader( projectsippacket::Content_Type,
+  p.addheader( projectsippacket::Content_Type,
               "application/sdp" );
-  p->addheader( projectsippacket::Content_Length,
+  p.addheader( projectsippacket::Content_Length,
               "0" );
 
-  this->currentpacket->respond( p->strptr() );
+  this->currentpacket->respond( p.strptr() );
   this->authacceptpacket = this->currentpacket;
 
   this->expires = boost::posix_time::second_clock::local_time() + 
@@ -323,7 +323,7 @@ void projectsipregistration::sendoptions( void )
   request.addheader( projectsippacket::CSeq,
                       std::to_string( this->optionscseq ) + " OPTIONS" );
   request.addheader( projectsippacket::Contact,
-                      projectsippacket::contact( this->authacceptpacket->gettouser().strptr(), 
+                      projectsippacket::contact( this->authacceptpacket->getuser().strptr(), 
                       stringptr( new std::string( projectsipconfig::gethostip() ) ), 
                       0, 
                       projectsipconfig::getsipport() ) );

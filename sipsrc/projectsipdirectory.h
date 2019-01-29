@@ -62,7 +62,8 @@ class projectsipdirectory
 {
 public:
   projectsipdirectory( void );
-  static stringptr lookup( substring domain, substring user );
+  static stringptr lookuppassword( substring domain, substring user );
+  static projectsipdirdomain::pointer lookupdomain( substring domain );
 
   projectsipdirdomain::map domains;
 };

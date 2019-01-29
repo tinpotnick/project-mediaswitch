@@ -19,6 +19,8 @@ public:
 private:
   void handleregister( projectsippacketptr pk );
   void handleoptions( projectsippacketptr pk );
+  void handleinvite( projectsippacketptr pk );
+  void handleresponse( projectsippacketptr pk );
 };
 
 

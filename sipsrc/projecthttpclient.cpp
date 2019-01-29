@@ -1,7 +1,6 @@
 
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
-#include <boost/asio/placeholders.hpp>
 
 #include "projecthttpclient.h"
 
@@ -33,52 +32,60 @@ Purpose: Make a HTTP request with callback.
 Updated: 18.01.2019
 *******************************************************************************/
 void projecthttpclient::asyncrequest( projectwebdocumentptr request, 
-      std::function< void ( boost::system::error_code errorcode ) > callback )
+      std::function< void ( int errorcode ) > callback )
 {
   this->callback = callback;
-  boost::asio::ip::tcp::resolver resolve{ this->ioservice };
 
   httpuri uri( request->getrequesturi() );
   this->requestdoc = request->strptr();
 
-  resolve.async_resolve( boost::asio::ip::tcp::resolver::query( uri.host.str(), "80" ), 
-    [ this ]( boost::system::error_code errorcode, boost::asio::ip::tcp::resolver::iterator it )
+  boost::asio::ip::tcp::resolver resolver( this->ioservice );
+  #warning
+  // TODO - add a port number to the host.
+  boost::asio::ip::tcp::resolver::query query( uri.host.str(), "3000" );
+  boost::asio::ip::tcp::resolver::iterator it = resolver.resolve( query );
+  boost::asio::ip::tcp::resolver::iterator end;
+
+  if( it == end )
+  {
+    this->callback( FAIL_RESOLVE );
+    return;
+  }
+  this->socket.async_connect( *it, 
+  [ this ]( const boost::system::error_code &errorcode )
+  {
+    if( errorcode )
     {
-      if( errorcode )
-      {
-        this->callback( errorcode );
-        return;
-      }
-      this->socket.async_connect( *it, 
-      [ this ]( const boost::system::error_code &errorcode )
+      this->callback( FAIL_CONNECT );
+      return;
+    }
+    boost::asio::async_write(
+      this->socket,
+      boost::asio::buffer( this->requestdoc->c_str(), this->requestdoc->length() ),
+      [ this ]( boost::system::error_code errorcode, std::size_t bytestransferred )
       {
         if( errorcode )
         {
-          this->callback( errorcode );
+          this->callback( FAIL_WRITE );
           return;
         }
-        boost::asio::async_write(
+          boost::asio::async_read(
           this->socket,
-          boost::asio::buffer( this->requestdoc->c_str(), this->requestdoc->length() ),
+          boost::asio::buffer( this->inbounddata ),
           [ this ]( boost::system::error_code errorcode, std::size_t bytestransferred )
           {
             if( errorcode )
             {
-              this->callback( errorcode );
-              return;
+              this->callback( FAIL_READ );
             }
-              boost::asio::async_read(
-              this->socket,
-              boost::asio::buffer( this->inbounddata ),
-              [ this ]( boost::system::error_code errorcode, std::size_t bytestransferred )
-              {
-                this->callback( errorcode );
-                return;
-              } );
+            
+            this->callback( 0 );
+            return;
           } );
       } );
-    } );
+  } );
 }
+
 
 /*******************************************************************************
 Function: getresponse

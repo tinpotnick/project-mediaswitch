@@ -3,6 +3,7 @@
 #include "projectsipconfig.h"
 #include "projectsipsm.h"
 #include "projectsipregistrar.h"
+#include "projectsipdialog.h"
 #include "projectsipdirectory.h"
 
 /* Our one instalce. */
@@ -34,6 +35,7 @@ void projectsipsm::handlesippacket( projectsippacketptr pk )
     }
     case projectsippacket::INVITE:
     {
+      sipsm.handleinvite( pk );
       break;
     }
     case projectsippacket::OPTIONS:
@@ -55,6 +57,7 @@ void projectsipsm::handlesippacket( projectsippacketptr pk )
     }
     case projectsippacket::RESPONSE:
     {
+      sipsm.handleresponse( pk );
       break;
     }
   }
@@ -127,6 +130,51 @@ void projectsipsm::handleregister( projectsippacketptr pk )
     return;
   }
 
+  if ( 0 >= pk->getheader( projectsippacket::Max_Forwards ).toint() )
+  {
+    return;
+  }
+
   projectsipregistration::registrarsippacket( pk );
+}
+
+
+/*******************************************************************************
+Function: handleinvite
+Purpose: Handle INVITE
+Updated: 23.12.2018
+*******************************************************************************/
+void projectsipsm::handleinvite( projectsippacketptr pk )
+{
+  /* Required headers */
+  if( false == pk->hasheader( projectsippacket::To ) ||
+      false == pk->hasheader( projectsippacket::From ) ||
+      false == pk->hasheader( projectsippacket::Call_ID ) ||
+      false == pk->hasheader( projectsippacket::CSeq ) ||
+      false == pk->hasheader( projectsippacket::Contact ) ||
+      false == pk->hasheader( projectsippacket::Via ) )
+  {
+    return;
+  }
+
+  if ( 0 >= pk->getheader( projectsippacket::Max_Forwards ).toint() )
+  {
+    return;
+  }
+
+  projectsipdialog::invitesippacket( pk );
+}
+
+/*******************************************************************************
+Function: handleresponse
+Purpose: Handle responses to our requests.
+Updated: 23.12.2018
+*******************************************************************************/
+void projectsipsm::handleresponse( projectsippacketptr pk )
+{
+  if( false == projectsipdialog::invitesippacket( pk ) )
+  {
+    projectsipregistration::registrarsippacket( pk );
+  }
 }
 

@@ -74,7 +74,7 @@ projectsipdirectory::projectsipdirectory( void )
 }
 
 /*******************************************************************************
-Function: lookup
+Function: lookuppassword
 Purpose: Looks up the users password from our directory. Our data must be 
 populated via the http server. This also then limits the look up on rogue
 clients trying to randomly lookup username/password combos. This may create a 
@@ -82,28 +82,9 @@ slower load on startup and greater memory requirement. But seems to be the best
 option.
 Updated: 22.01.2019
 *******************************************************************************/
-stringptr projectsipdirectory::lookup( substring domain, substring user )
+stringptr projectsipdirectory::lookuppassword( substring domain, substring user )
 {
-  std::string dstr = domain.str();
-  stringvector l = splitstring( dstr, '.' );
-  if( l.size() > 5 )
-  {
-    return stringptr();
-  }
-
-  projectsipdirdomain::pointer ref;
-  projectsipdirdomain::map *dirref = &dir.domains;
-  projectsipdirdomain::map::iterator it = dirref->end();
-  for( int i = l.size(); i != 0; i-- )
-  {
-    it = dirref->find( l[ i - 1 ] );
-    if( dirref->end() == it )
-    {
-      return stringptr();
-    }
-    ref = it->second;
-    dirref = &it->second->subdomains;
-  }
+  projectsipdirdomain::pointer ref = projectsipdirectory::lookupdomain( domain );
 
   if( ref )
   {
@@ -122,3 +103,38 @@ stringptr projectsipdirectory::lookup( substring domain, substring user )
 
   return stringptr();
 }
+
+
+/*******************************************************************************
+Function: lookupdomain
+Purpose: Returns a domain object from our directory (assuming we have one).
+Updated: 22.01.2019
+*******************************************************************************/
+projectsipdirdomain::pointer projectsipdirectory::lookupdomain( substring domain )
+{
+  projectsipdirdomain::pointer ref;
+
+  std::string dstr = domain.str();
+  stringvector l = splitstring( dstr, '.' );
+  if( l.size() > 5 )
+  {
+    return ref;
+  }
+
+  projectsipdirdomain::map *dirref = &dir.domains;
+  projectsipdirdomain::map::iterator it = dirref->end();
+  for( int i = l.size(); i != 0; i-- )
+  {
+    it = dirref->find( l[ i - 1 ] );
+    if( dirref->end() == it )
+    {
+      return ref;
+    }
+    ref = it->second;
+    dirref = &it->second->subdomains;
+  }
+
+  return ref;
+}
+
+
