@@ -864,6 +864,12 @@ sipuri::sipuri( substring s ) :
   }
   else
   {
+    substring possiblehost = userhost.findsubstr( '@', ':' );
+    if( 0 != possiblehost.end() )
+    {
+      this->host = possiblehost;
+    }
+
     substring userpass = userhost.findend( '@' );
     this->user = userpass.findend( ':' );
     this->secret = userpass.aftertoken( ':' );

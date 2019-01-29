@@ -184,13 +184,12 @@ void projectsipdialog::passtocontrol( projectsippacketptr pk )
   d->setrequestline( projectwebdocument::POST, "http://127.0.0.1/invite" );
 
   JSON::Object v;
-  JSON::Object c;
+
   v[ "callid" ] = pk->getheader( projectsippacket::Call_ID ).str();
-  c[ "number" ] = pk->getuser( projectsippacket::From ).str();
-  c[ "name" ] = pk->getdisplayname( projectsippacket::From ).str();
-  v[ "callerid" ] = c;
-  v[ "to" ] = pk->getuserhost();
-  v[ "from" ] = pk->getuserhost( projectsippacket::From );
+  v[ "realm" ] = pk->geturihost().str();
+  v[ "to" ] = pk->getuser( projectsippacket::To ).str();
+  v[ "from" ] = pk->getuser( projectsippacket::From ).str();
+  v[ "authenticated" ] = ( JSON::Bool ) false;
 
   std::string t = JSON::to_string( v );
   d->addheader( projectwebdocument::Content_Length, t.length() );
