@@ -18,7 +18,17 @@ Updated: 23.01.2019
 *******************************************************************************/
 projectsipdialog::projectsipdialog() :
   laststate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
-  nextstate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) )
+  nextstate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
+  timer( io_service )
+{
+}
+
+/*******************************************************************************
+Function: projectsipdialog
+Purpose: Destructor
+Updated: 23.01.2019
+*******************************************************************************/
+projectsipdialog::~projectsipdialog()
 {
 }
 
@@ -74,6 +84,16 @@ bool projectsipdialog::invitesippacket( projectsippacketptr pk )
 }
 
 /*******************************************************************************
+Function: timerhandler
+Purpose: Timer handler
+Updated: 29.01.2019
+*******************************************************************************/
+void projectsipdialog::timerhandler( const boost::system::error_code& error )
+{
+  this->untrack();
+}
+
+/*******************************************************************************
 Function: invitestart
 Purpose: The start of a dialog state machine. We check we have a valid INVITE
 and if we need to authenticate the user.
@@ -82,6 +102,10 @@ Updated: 23.01.2019
 void projectsipdialog::invitestart( projectsippacketptr pk )
 {
   this->lastpacket = pk;
+
+  /* TODO - handle time outs more effectivly */
+  this->timer.expires_after( std::chrono::seconds( 3600 ) );
+  this->timer.async_wait( std::bind( &projectsipdialog::timerhandler, this, std::placeholders::_1 ) );
 
   // Do we need authenticating?
   if ( 0 /* do we need authenticating */ )
@@ -120,7 +144,7 @@ void projectsipdialog::invitestart( projectsippacketptr pk )
   }
 
   this->passtocontrol( pk );
-
+  this->nextstate =  std::bind( &projectsipdialog::donetrying, this, std::placeholders::_1 );
 }
 
 /*******************************************************************************
@@ -154,8 +178,6 @@ void projectsipdialog::passtocontrol( projectsippacketptr pk )
 
   pk->respond( trying.strptr() );
 
-  nextstate =  std::bind( &projectsipdialog::donetrying, this, std::placeholders::_1 );
-
   this->controlrequest = projecthttpclient::create( io_service );
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument );
 
@@ -179,8 +201,8 @@ void projectsipdialog::passtocontrol( projectsippacketptr pk )
 }
 
 /*******************************************************************************
-Function: httpcallback
-Purpose: We have made a request to our control server.
+Function: inviteauth
+Purpose: We have requested authenticaation.
 Updated: 23.01.2019
 *******************************************************************************/
 void projectsipdialog::inviteauth( projectsippacketptr pk )
@@ -235,6 +257,26 @@ void projectsipdialog::httpcallback( int errorcode )
 {
   if( 0 != errorcode )
   {
+    this->temporaryunavailable();
+    return;
+  }
+
+  projectwebdocumentptr r = this->controlrequest->getresponse();
+
+  if( !r || 200 != r->getstatuscode() )
+  {
+    this->temporaryunavailable();
+    return;
+  }
+}
+
+/*******************************************************************************
+Function: temporaryunavailble
+Purpose: Send 480 back to client.
+Updated: 29.01.2019
+*******************************************************************************/
+void projectsipdialog::temporaryunavailable( void )
+{
     projectsippacket unavail;
 
     unavail.setstatusline( 480, "Temporarily Unavailable" );
@@ -259,7 +301,6 @@ void projectsipdialog::httpcallback( int errorcode )
                         "0" );
 
     this->lastpacket->respond( unavail.strptr() );
-  }
 }
 
 /*******************************************************************************
@@ -274,7 +315,7 @@ void projectsipdialog::donetrying( projectsippacketptr pk )
   {
     case projectsippacket::INVITE:
     {
-      this->laststate( pk );
+      // Send a 100 again?
       break;
     }
     case projectsippacket::BYE:
@@ -305,10 +346,26 @@ void projectsipdialog::donetrying( projectsippacketptr pk )
 
       pk->respond( p.strptr() );
 
-      projectsipdialogs::index< projectsipdialogcallid >::type::iterator it;
-      it = dialogs.get< projectsipdialogcallid >().find( callid );
-      dialogs.erase( it );
+      this->untrack();
+      
       break;
     }
   }
 }
+
+/*******************************************************************************
+Function: untrack
+Purpose: Remove from our container so we can clean up.
+Updated: 29.01.2019
+*******************************************************************************/
+void projectsipdialog::untrack( void )
+{
+  projectsipdialogs::index< projectsipdialogcallid >::type::iterator it;
+  it = dialogs.get< projectsipdialogcallid >().find( this->callid );
+  if( dialogs.get< projectsipdialogcallid >().end() != it )
+  {
+    dialogs.erase( it );
+  }
+}
+
+

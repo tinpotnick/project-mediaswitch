@@ -3,6 +3,8 @@
 #ifndef PROJECTSIPDIALOG_H
 #define PROJECTSIPDIALOG_H
 
+#include <boost/enable_shared_from_this.hpp>
+
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -23,12 +25,15 @@ Class: projectsipdialog
 Purpose: Class to hold details about a specific dialog (INVITE).
 Updated: 23.12.2018
 *******************************************************************************/
-class projectsipdialog
+class projectsipdialog :
+  public boost::enable_shared_from_this< projectsipdialog >
 {
 public:
   projectsipdialog();
+  ~projectsipdialog();
   typedef boost::shared_ptr< projectsipdialog > pointer;
   static pointer create();
+  static bool invitesippacket( projectsippacketptr pk );
 
   std::string callid;
 
@@ -41,16 +46,19 @@ public:
 
   /* non state function */
   void passtocontrol( projectsippacketptr pk );
-
-  static bool invitesippacket( projectsippacketptr pk );
-
   void httpcallback( int errorcode );
+
+  void timerhandler( const boost::system::error_code& error );
 private:
 
+  void temporaryunavailable( void );
+  void untrack( void );
   projecthttpclient::pointer controlrequest;
 
   projectsippacketptr authrequest;
   projectsippacketptr lastpacket;
+
+  boost::asio::steady_timer timer;
 };
 
 
