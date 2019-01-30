@@ -392,11 +392,11 @@ void projectsipregistration::registrarsippacket( projectsippacketptr pk )
 
 
 /*******************************************************************************
-Function: registrarhttpreq
+Function: httpget
 Purpose: Handle a request from our web server.
 Updated: 22.01.2019
 *******************************************************************************/
-void projectsipregistration::registrarhttpget( stringvector &path, projectwebdocument &response )
+void projectsipregistration::httpget( stringvector &path, projectwebdocument &response )
 {
   JSON::Object v;
   v[ "count" ] = ( JSON::Integer ) regs.size();

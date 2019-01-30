@@ -19,7 +19,9 @@ Updated: 23.01.2019
 projectsipdialog::projectsipdialog() :
   laststate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
   nextstate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
-  timer( io_service )
+  timerstate( std::bind( &projectsipdialog::untrack, this ) ),
+  timer( io_service ),
+  retries( 3 )
 {
 }
 
@@ -90,7 +92,22 @@ Updated: 29.01.2019
 *******************************************************************************/
 void projectsipdialog::timerhandler( const boost::system::error_code& error )
 {
-  this->untrack();
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    this->timerstate();
+  }
+}
+
+/*******************************************************************************
+Function: waitfortimer
+Purpose: Async wait for timer.
+Updated: 30.01.2019
+*******************************************************************************/
+void projectsipdialog::waitfortimer( std::chrono::seconds s )
+{
+  this->timer.cancel();
+  this->timer.expires_after( s );
+  this->timer.async_wait( std::bind( &projectsipdialog::timerhandler, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
@@ -103,9 +120,9 @@ void projectsipdialog::invitestart( projectsippacketptr pk )
 {
   this->lastpacket = pk;
 
-  /* TODO - handle time outs more effectivly */
-  this->timer.expires_after( std::chrono::seconds( 3600 ) );
-  this->timer.async_wait( std::bind( &projectsipdialog::timerhandler, this, std::placeholders::_1 ) );
+  /* TODO - this timer needs to be removed. */
+  #warning
+  this->waitfortimer( std::chrono::seconds( 3600 ) );
 
   // Do we need authenticating?
   if ( 0 /* do we need authenticating */ )
@@ -154,29 +171,9 @@ Updated: 25.01.2019
 *******************************************************************************/
 void projectsipdialog::passtocontrol( projectsippacketptr pk )
 {
-  projectsippacket trying;
-  trying.setstatusline( 100, "Trying" );
-  trying.addviaheader( projectsipconfig::gethostname(), pk.get() );
-
-  trying.addheader( projectsippacket::To,
-              pk->getheader( projectsippacket::To ) );
-  trying.addheader( projectsippacket::From,
-              pk->getheader( projectsippacket::From ) );
-  trying.addheader( projectsippacket::Call_ID,
-              pk->getheader( projectsippacket::Call_ID ) );
-  trying.addheader( projectsippacket::CSeq,
-              pk->getheader( projectsippacket::CSeq ) );
-  trying.addheader( projectsippacket::Contact,
-              projectsippacket::contact( pk->getuser().strptr(), 
-              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-              0, 
-              projectsipconfig::getsipport() ) );
-  trying.addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-  trying.addheader( projectsippacket::Content_Length,
-                      "0" );
-
-  pk->respond( trying.strptr() );
+  this->lastpacket = pk;
+  this->retries = 3;
+  this->trying();
 
   this->controlrequest = projecthttpclient::create( io_service );
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument );
@@ -254,6 +251,7 @@ Updated: 23.01.2019
 *******************************************************************************/
 void projectsipdialog::httpcallback( int errorcode )
 {
+  this->retries = 3;
   if( 0 != errorcode )
   {
     this->temporaryunavailable();
@@ -270,36 +268,105 @@ void projectsipdialog::httpcallback( int errorcode )
 }
 
 /*******************************************************************************
+Function: trying
+Purpose: Send 100 back to client.
+Updated: 30.01.2019
+*******************************************************************************/
+void projectsipdialog::trying( void )
+{
+  projectsippacket trying;
+  trying.setstatusline( 100, "Trying" );
+  trying.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
+
+  trying.addheader( projectsippacket::To,
+              this->lastpacket->getheader( projectsippacket::To ) );
+  trying.addheader( projectsippacket::From,
+              this->lastpacket->getheader( projectsippacket::From ) );
+  trying.addheader( projectsippacket::Call_ID,
+              this->lastpacket->getheader( projectsippacket::Call_ID ) );
+  trying.addheader( projectsippacket::CSeq,
+              this->lastpacket->getheader( projectsippacket::CSeq ) );
+  trying.addheader( projectsippacket::Contact,
+              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
+              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              0, 
+              projectsipconfig::getsipport() ) );
+  trying.addheader( projectsippacket::Allow,
+              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  trying.addheader( projectsippacket::Content_Length,
+                      "0" );
+
+  this->lastpacket->respond( trying.strptr() );
+
+  if( 0 == this->retries-- )
+  {
+    this->timerstate = std::bind( &projectsipdialog::untrack, this );
+  }
+  else
+  {
+    this->timerstate = std::bind( &projectsipdialog::trying, this );
+  }
+  this->waitfortimer( std::chrono::seconds( 3 ) );
+}
+
+/*******************************************************************************
 Function: temporaryunavailble
 Purpose: Send 480 back to client.
 Updated: 29.01.2019
 *******************************************************************************/
 void projectsipdialog::temporaryunavailable( void )
 {
-    projectsippacket unavail;
+  projectsippacket unavail;
 
-    unavail.setstatusline( 480, "Temporarily Unavailable" );
-    unavail.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
+  unavail.setstatusline( 480, "Temporarily Unavailable" );
+  unavail.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
 
-    unavail.addheader( projectsippacket::To,
-                this->lastpacket->getheader( projectsippacket::To ) );
-    unavail.addheader( projectsippacket::From,
-                this->lastpacket->getheader( projectsippacket::From ) );
-    unavail.addheader( projectsippacket::Call_ID,
-                this->lastpacket->getheader( projectsippacket::Call_ID ) );
-    unavail.addheader( projectsippacket::CSeq,
-                this->lastpacket->getheader( projectsippacket::CSeq ) );
-    unavail.addheader( projectsippacket::Contact,
-                projectsippacket::contact( this->lastpacket->getuser().strptr(), 
-                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                0, 
-                projectsipconfig::getsipport() ) );
-    unavail.addheader( projectsippacket::Allow,
-                "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-    unavail.addheader( projectsippacket::Content_Length,
-                        "0" );
+  unavail.addheader( projectsippacket::To,
+              this->lastpacket->getheader( projectsippacket::To ) );
+  unavail.addheader( projectsippacket::From,
+              this->lastpacket->getheader( projectsippacket::From ) );
+  unavail.addheader( projectsippacket::Call_ID,
+              this->lastpacket->getheader( projectsippacket::Call_ID ) );
+  unavail.addheader( projectsippacket::CSeq,
+              this->lastpacket->getheader( projectsippacket::CSeq ) );
+  unavail.addheader( projectsippacket::Contact,
+              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
+              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              0, 
+              projectsipconfig::getsipport() ) );
+  unavail.addheader( projectsippacket::Allow,
+              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  unavail.addheader( projectsippacket::Content_Length,
+                      "0" );
 
-    this->lastpacket->respond( unavail.strptr() );
+  this->lastpacket->respond( unavail.strptr() );
+
+  // We should receive a ACK - at that point the dialog can be closed.
+  this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
+
+  if( 0 == this->retries-- )
+  {
+    this->timerstate = std::bind( &projectsipdialog::untrack, this );
+  }
+  else
+  {
+    this->timerstate = std::bind( &projectsipdialog::temporaryunavailable, this );
+  }
+  this->waitfortimer( std::chrono::seconds( 3 ) );
+}
+
+/*******************************************************************************
+Function: waitforackanddie
+Purpose: 
+Updated: 30.01.2019
+*******************************************************************************/
+void projectsipdialog::waitforackanddie( projectsippacketptr pk )
+{
+  // When we get an ACK to the last message we can die.
+  if( projectsippacket::ACK == pk->getmethod() )
+  {
+    this->untrack();
+  }
 }
 
 /*******************************************************************************
@@ -359,12 +426,31 @@ Updated: 29.01.2019
 *******************************************************************************/
 void projectsipdialog::untrack( void )
 {
+  this->timer.cancel();
+
   projectsipdialogs::index< projectsipdialogcallid >::type::iterator it;
   it = dialogs.get< projectsipdialogcallid >().find( this->callid );
   if( dialogs.get< projectsipdialogcallid >().end() != it )
   {
     dialogs.erase( it );
   }
+}
+
+/*******************************************************************************
+Function: registrarhttpreq
+Purpose: Handle a request from our web server.
+Updated: 22.01.2019
+*******************************************************************************/
+void projectsipdialog::httpget( stringvector &path, projectwebdocument &response )
+{
+  JSON::Object v;
+  v[ "count" ] = ( JSON::Integer ) dialogs.size();
+  std::string t = JSON::to_string( v );
+
+  response.setstatusline( 200, "Ok" );
+  response.addheader( projectwebdocument::Content_Length, t.length() );
+  response.addheader( projectwebdocument::Content_Type, "text/json" );
+  response.setbody( t.c_str() );
 }
 
 

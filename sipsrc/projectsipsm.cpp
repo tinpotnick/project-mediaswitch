@@ -33,6 +33,7 @@ void projectsipsm::handlesippacket( projectsippacketptr pk )
       sipsm.handleregister( pk );
       break;
     }
+    case projectsippacket::CANCEL:
     case projectsippacket::INVITE:
     {
       sipsm.handleinvite( pk );
@@ -43,19 +44,9 @@ void projectsipsm::handlesippacket( projectsippacketptr pk )
       sipsm.handleoptions( pk );
       break;
     }
-    case projectsippacket::ACK:
-    {
-      break;
-    }
-    case projectsippacket::CANCEL:
-    {
-      break;
-    }
     case projectsippacket::BYE:
-    {
-      break;
-    }
     case projectsippacket::RESPONSE:
+    case projectsippacket::ACK:
     {
       sipsm.handleresponse( pk );
       break;

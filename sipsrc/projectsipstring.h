@@ -11,6 +11,9 @@
 typedef boost::shared_ptr< std::string > stringptr;
 typedef std::vector<std::string> stringvector;
 
+#define CHARARRAYLENGTH 8096
+typedef std::array<char, CHARARRAYLENGTH> chararray;
+
 
 /*******************************************************************************
 Function: moveonbyn

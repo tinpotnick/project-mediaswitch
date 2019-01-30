@@ -131,7 +131,7 @@ void projecthttpclient::handlewrite( boost::system::error_code errorcode, std::s
   }
 
   this->socket.async_read_some(
-    boost::asio::buffer( this->inbounddata, 16384 ),
+    boost::asio::buffer( this->inbounddata, this->inbounddata.size() ),
     boost::bind( &projecthttpclient::handleread, shared_from_this(),
       boost::asio::placeholders::error,
       boost::asio::placeholders::bytes_transferred ) );
@@ -158,7 +158,7 @@ void projecthttpclient::handleread( boost::system::error_code errorcode, std::si
   }
 
   this->inbounddata[ bytestransferred ] = 0;
-  stringptr p( new std::string( (const char*)this->inbounddata.c_array() ) );
+  stringptr p( new std::string( (const char*)this->inbounddata.data() ) );
   this->response = projectwebdocumentptr( new projectwebdocument( p ) );
   
   this->timer.cancel();

@@ -13,8 +13,6 @@
 #ifndef PROJECTHTTPSERVER_H
 #define PROJECTHTTPSERVER_H
 
-#define CHARARRAYLENGTH 8096
-typedef std::array<char, CHARARRAYLENGTH> chararray;
 
 /*******************************************************************************
 Class: projecthttpconnection

@@ -14,10 +14,9 @@
 #include <boost/asio/placeholders.hpp>
 
 #include "projectwebdocument.h"
+#include "projectsipstring.h"
 
 #define HTTPCLIENTDEFAULTTIMEOUT 10
-
-typedef boost::array< char*, 16384 > chararray;
 
 /*
 TODO 

@@ -34,6 +34,7 @@ public:
   typedef boost::shared_ptr< projectsipdialog > pointer;
   static pointer create();
   static bool invitesippacket( projectsippacketptr pk );
+  static void httpget( stringvector &path, projectwebdocument &response );
 
   std::string callid;
 
@@ -41,24 +42,34 @@ public:
   void invitestart( projectsippacketptr pk );
   void inviteauth( projectsippacketptr pk  );
   void donetrying( projectsippacketptr pk );
+  void waitforackanddie( projectsippacketptr pk );
   std::function<void ( projectsippacketptr pk ) > laststate;
   std::function<void ( projectsippacketptr pk ) > nextstate;
+  std::function<void ( void ) > timerstate;
 
   /* non state function */
   void passtocontrol( projectsippacketptr pk );
   void httpcallback( int errorcode );
 
+  void waitfortimer( std::chrono::seconds s );
   void timerhandler( const boost::system::error_code& error );
 private:
 
+  /* responses */
   void temporaryunavailable( void );
+  void trying( void );
+
+  /* clean up */
   void untrack( void );
+
   projecthttpclient::pointer controlrequest;
 
   projectsippacketptr authrequest;
   projectsippacketptr lastpacket;
 
   boost::asio::steady_timer timer;
+
+  int retries;
 };
 
 

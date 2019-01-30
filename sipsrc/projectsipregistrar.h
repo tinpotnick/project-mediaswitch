@@ -61,7 +61,7 @@ public:
   std::function<void ( projectsippacketptr pk ) > laststate;
 
   static void registrarsippacket( projectsippacketptr pk );
-  static void registrarhttpget( stringvector &path, projectwebdocument &response );
+  static void httpget( stringvector &path, projectwebdocument &response );
 
 private:
   void expire( void );

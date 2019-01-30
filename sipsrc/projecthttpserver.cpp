@@ -3,6 +3,7 @@
 #include "projecthttpserver.h"
 #include "projectwebdocument.h"
 #include "projectsipregistrar.h"
+#include "projectsipdialog.h"
 
 #include <iostream>
 
@@ -131,7 +132,7 @@ void projecthttpconnection::handleread(
 
     if( "reg" == pathparts[ 0 ] )
     {
-      projectsipregistration::registrarhttpget( pathparts, response );
+      projectsipregistration::httpget( pathparts, response );
     }
     else if( "dir" == pathparts[ 0 ] )
     {
@@ -140,6 +141,10 @@ void projecthttpconnection::handleread(
       std::string body( "dir" );
       response.addheader( projectwebdocument::Content_Length, body.length() );
       response.setbody( body.c_str() );
+    }
+    else if( "dialog" == pathparts[ 0 ] )
+    {
+      projectsipdialog::httpget( pathparts, response );
     }
     else
     {
