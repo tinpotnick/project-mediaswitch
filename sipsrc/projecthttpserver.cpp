@@ -5,6 +5,8 @@
 #include "projectsipregistrar.h"
 #include "projectsipdialog.h"
 
+#include "json.hpp"
+
 #include <iostream>
 
 /*******************************************************************************
@@ -144,7 +146,21 @@ void projecthttpconnection::handleread(
     }
     else if( "dialog" == pathparts[ 0 ] )
     {
-      projectsipdialog::httpget( pathparts, response );
+      switch( d.getmethod() )
+      {
+        case projectwebdocument::GET:
+        {
+          projectsipdialog::httpget( pathparts, response );
+          break;
+        }
+        case projectwebdocument::POST:
+        {
+          JSON::Value body = JSON::parse( *( d.getbody().strptr() ) );
+          
+          projectsipdialog::httppost( pathparts, body, response );
+          break;
+        }
+      }
     }
     else
     {

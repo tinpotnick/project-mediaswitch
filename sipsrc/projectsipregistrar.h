@@ -100,12 +100,6 @@ typedef boost::multi_index::multi_index_container<
   >
 > projectsipregistrations;
 
-#ifdef TESTCODE
-
-void testregs( void );
-
-#endif /* TESTCODE */
-
 #endif  /* PROJECTSIPREGISTRAR_H */
 
 

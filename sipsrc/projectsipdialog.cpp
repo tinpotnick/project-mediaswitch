@@ -4,8 +4,6 @@
 #include "projectsipconfig.h"
 #include "projectsipdirectory.h"
 
-#include "json.hpp"
-
 
 static projectsipdialogs dialogs;
 
@@ -108,6 +106,16 @@ void projectsipdialog::waitfortimer( std::chrono::seconds s )
   this->timer.cancel();
   this->timer.expires_after( s );
   this->timer.async_wait( std::bind( &projectsipdialog::timerhandler, this, std::placeholders::_1 ) );
+}
+
+/*******************************************************************************
+Function: canceltimer
+Purpose: Set the timer back to the default.
+Updated: 30.01.2019
+*******************************************************************************/
+void projectsipdialog::canceltimer( void )
+{
+  this->timer.cancel();
 }
 
 /*******************************************************************************
@@ -265,6 +273,7 @@ void projectsipdialog::httpcallback( int errorcode )
     this->temporaryunavailable();
     return;
   }
+  /* We are now idle until we receive our next instruction. */
 }
 
 /*******************************************************************************
@@ -298,15 +307,7 @@ void projectsipdialog::trying( void )
 
   this->lastpacket->respond( trying.strptr() );
 
-  if( 0 == this->retries-- )
-  {
-    this->timerstate = std::bind( &projectsipdialog::untrack, this );
-  }
-  else
-  {
-    this->timerstate = std::bind( &projectsipdialog::trying, this );
-  }
-  this->waitfortimer( std::chrono::seconds( 3 ) );
+  this->canceltimer();
 }
 
 /*******************************************************************************
@@ -344,15 +345,7 @@ void projectsipdialog::temporaryunavailable( void )
   // We should receive a ACK - at that point the dialog can be closed.
   this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
-  if( 0 == this->retries-- )
-  {
-    this->timerstate = std::bind( &projectsipdialog::untrack, this );
-  }
-  else
-  {
-    this->timerstate = std::bind( &projectsipdialog::temporaryunavailable, this );
-  }
-  this->waitfortimer( std::chrono::seconds( 3 ) );
+  this->canceltimer();
 }
 
 /*******************************************************************************
@@ -420,6 +413,92 @@ void projectsipdialog::donetrying( projectsippacketptr pk )
 }
 
 /*******************************************************************************
+Function: ringing
+Purpose: Send a 180 ringing
+Updated: 29.01.2019
+*******************************************************************************/
+void projectsipdialog::ringing( void )
+{
+  projectsippacket ringing;
+
+  ringing.setstatusline( 180, "Ringing" );
+  ringing.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
+
+  ringing.addheader( projectsippacket::To,
+              this->lastpacket->getheader( projectsippacket::To ) );
+  ringing.addheader( projectsippacket::From,
+              this->lastpacket->getheader( projectsippacket::From ) );
+  ringing.addheader( projectsippacket::Call_ID,
+              this->lastpacket->getheader( projectsippacket::Call_ID ) );
+  ringing.addheader( projectsippacket::CSeq,
+              this->lastpacket->getheader( projectsippacket::CSeq ) );
+  ringing.addheader( projectsippacket::Contact,
+              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
+              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              0, 
+              projectsipconfig::getsipport() ) );
+  ringing.addheader( projectsippacket::Allow,
+              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  ringing.addheader( projectsippacket::Content_Length,
+                      "0" );
+
+  if( 0 != this->alertinfo.size() )
+  {
+    ringing.addheader( projectsippacket::Alert_Info,
+              this->alertinfo );
+  }
+
+  this->lastpacket->respond( ringing.strptr() );
+
+  this->canceltimer();
+}
+
+/*******************************************************************************
+Function: answer
+Purpose: Send a 200 answer
+Updated: 30.01.2019
+*******************************************************************************/
+void projectsipdialog::answer( void )
+{
+  #warning
+  /*  */
+  projectsippacket ok;
+
+  ok.setstatusline( 200, "Ok" );
+  ok.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
+
+  ok.addheader( projectsippacket::To,
+              this->lastpacket->getheader( projectsippacket::To ) );
+  ok.addheader( projectsippacket::From,
+              this->lastpacket->getheader( projectsippacket::From ) );
+  ok.addheader( projectsippacket::Call_ID,
+              this->lastpacket->getheader( projectsippacket::Call_ID ) );
+  ok.addheader( projectsippacket::CSeq,
+              this->lastpacket->getheader( projectsippacket::CSeq ) );
+  ok.addheader( projectsippacket::Contact,
+              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
+              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              0, 
+              projectsipconfig::getsipport() ) );
+  ok.addheader( projectsippacket::Allow,
+              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  ok.addheader( projectsippacket::Content_Length,
+                      "0" );
+
+  this->lastpacket->respond( ok.strptr() );
+
+  if( 0 == this->retries-- )
+  {
+    this->timerstate = std::bind( &projectsipdialog::untrack, this );
+  }
+  else
+  {
+    this->timerstate = std::bind( &projectsipdialog::answer, this );
+  }
+  this->waitfortimer( std::chrono::seconds( 3 ) );
+}
+
+/*******************************************************************************
 Function: untrack
 Purpose: Remove from our container so we can clean up.
 Updated: 29.01.2019
@@ -451,6 +530,56 @@ void projectsipdialog::httpget( stringvector &path, projectwebdocument &response
   response.addheader( projectwebdocument::Content_Length, t.length() );
   response.addheader( projectwebdocument::Content_Type, "text/json" );
   response.setbody( t.c_str() );
+}
+
+/*******************************************************************************
+Function: httppost
+Purpose: Handle a request from our web server.
+Updated: 30.01.2019
+*******************************************************************************/
+void projectsipdialog::httppost( stringvector &path, JSON::Value &body, projectwebdocument &response )
+{
+  JSON::Object b = JSON::as_object( body );
+
+  if( !b.has_key( "callid" ) )
+  {
+    response.setstatusline( 404, "Not found" );
+  }
+
+  projectsipdialogs::index< projectsipdialogcallid >::type::iterator it;
+  it = dialogs.get< projectsipdialogcallid >().find( JSON::as_string( b[ "callid" ] ) );
+  if( dialogs.get< projectsipdialogcallid >().end() == it )
+  {
+    response.setstatusline( 404, "Not found" );
+  }
+  else
+  {
+    if ( !b.has_key( "action" ) )
+    {
+      response.setstatusline( 404, "Not found" );
+    }
+    else if( JSON::as_string( b[ "action" ] ) == "ringing" )
+    {
+      response.setstatusline( 200, "Ok" );
+      (*it)->alertinfo = "";
+      if ( b.has_key( "alertinfo" ) )
+      {
+        (*it)->alertinfo = JSON::as_string( b[ "alertinfo" ] );
+      }
+      (*it)->ringing();
+    }
+    else if( JSON::as_string( b[ "action" ] ) == "answer" )
+    {
+      response.setstatusline( 200, "Ok" );
+
+      // need to add sdp info.
+      (*it)->retries = 3;
+      (*it)->answer();
+    }
+  }
+
+  response.addheader( projectwebdocument::Content_Length, 0 );
+  response.addheader( projectwebdocument::Content_Type, "text/json" );
 }
 
 

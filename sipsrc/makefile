@@ -11,21 +11,14 @@ CSOURCES:=$(shell ls *.c)
 # Make targets out of them
 ALLOBJS=$(CPPSOURCES:%.cpp=../Debug/%.o) $(CSOURCES:%.c=../Debug/%.o)
 
-TESTOBJECTS = $(filter-out %main.o, $(ALLOBJS))
-SOBJECTS = $(filter-out %tests.o, $(ALLOBJS))
-
-../Debug/project-sip: $(SOBJECTS)
-	g++ $(SOBJECTS) -o ../Debug/project-sip $(LL)
+../Debug/project-sip: $(ALLOBJS)
+	g++ $(ALLOBJS) -o ../Debug/project-sip $(LL)
 
 clean:
 	rm ../Debug/* -f
 
 debug:
 	mkdir -p ../Debug
-
-test: CCOPTS += -DTESTCODE
-test: $(TESTOBJECTS)
-	g++ $(TESTOBJECTS) -o ../Debug/siptest $(LL)
 
 ../Debug/%.o: %.cpp
 	g++ -c $(CCOPTS) $(INCLUDE) $(DEFINE) $< -o $@

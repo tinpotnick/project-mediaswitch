@@ -99,10 +99,10 @@ bool operator != ( const substring& lhs, const char *rhs );
 bool operator == ( const substring& lhs, const substring &rhs );
 bool operator != ( const substring& lhs, const substring &rhs );
 
-#ifdef TESTCODE
+
 /*******************************************************************************
 Function: operator << ostream, substring
-Purpose: For use with our tests, out put the result of a comparison. Not for live.
+Purpose: For use with our tests, out put the result of a comparison.
 Updated: 30.12.2018
 *******************************************************************************/
 inline std::ostream & operator << ( std::ostream& os, substring obj )
@@ -110,7 +110,6 @@ inline std::ostream & operator << ( std::ostream& os, substring obj )
   os << obj.str();
   return os;
 }
-#endif /* TESTCODE */
 
 stringptr urldecode( stringptr str );
 stringptr urlencode( stringptr str );

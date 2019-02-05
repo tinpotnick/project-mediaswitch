@@ -10,10 +10,8 @@
 #define STATUSUNKNOWN -1
 #define DEFAULTHEADERLINELENGTH 200
 
-#ifdef TESTCODE
 #include <iostream>
 #include <stdio.h>
-#endif
 
 #include <boost/shared_ptr.hpp>
 

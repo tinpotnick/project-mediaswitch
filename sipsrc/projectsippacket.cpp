@@ -676,6 +676,10 @@ int projectsippacket::getheaderfromcrc( int crc )
     {
       return Allow;
     }
+    case 0xc72b507c:   /* alert-info */
+    {
+      return Alert_Info;
+    }
     case 0x7dd2712:   /* call-id */
     {
       return Call_ID;
@@ -773,6 +777,8 @@ const char *projectsippacket::getheaderstr( int header )
       return "Authorization";
     case Allow:
       return "Allow";
+    case Alert_Info:   
+      return "Alert-Info";
     case Call_ID:
       return "Call-ID";
     case Content_Length:

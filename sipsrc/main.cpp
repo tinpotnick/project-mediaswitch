@@ -17,6 +17,8 @@
 #include "projectsipserver.h"
 #include "projecthttpserver.h"
 
+#include "test.h"
+
 boost::asio::io_service io_service;
 
 /*******************************************************************************
@@ -124,7 +126,8 @@ int main( int argc, const char* argv[] )
 {
   srand( time( NULL ) );
 
-	bool debug = false;
+	bool fg = false;
+  bool tests = false;
 
 	for ( int i = 1; i < argc ; i++ )
 	{
@@ -132,9 +135,13 @@ int main( int argc, const char* argv[] )
 		{
 			std::string argvstr = argv[i];
 
-			if ( "--debug" == argvstr)
+			if ( "--fg" == argvstr)
 			{
-				debug = true;
+				fg = true;
+			}
+      else if ( "--test" == argvstr)
+			{
+				tests = true;
 			}
 		}
 	}
@@ -146,7 +153,13 @@ int main( int argc, const char* argv[] )
 	core_limits.rlim_cur = core_limits.rlim_max = RLIM_INFINITY;
 	setrlimit( RLIMIT_CORE, &core_limits );
 
-	if ( !debug )
+  if( tests )
+  {
+    runtests();
+    return 0;
+  }
+
+	if ( !fg )
 	{
 		daemonize();
 	}

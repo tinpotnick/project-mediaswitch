@@ -19,6 +19,7 @@
 #include "projectsipstring.h"
 #include "projectsippacket.h"
 #include "projecthttpclient.h"
+#include "json.hpp"
 
 /*******************************************************************************
 Class: projectsipdialog
@@ -35,8 +36,10 @@ public:
   static pointer create();
   static bool invitesippacket( projectsippacketptr pk );
   static void httpget( stringvector &path, projectwebdocument &response );
+  static void httppost( stringvector &path, JSON::Value &body, projectwebdocument &response );
 
   std::string callid;
+  std::string alertinfo;
 
   /* our state functions */
   void invitestart( projectsippacketptr pk );
@@ -53,11 +56,14 @@ public:
 
   void waitfortimer( std::chrono::seconds s );
   void timerhandler( const boost::system::error_code& error );
+  void canceltimer( void );
 private:
 
   /* responses */
   void temporaryunavailable( void );
   void trying( void );
+  void ringing( void );
+  void answer( void );
 
   /* clean up */
   void untrack( void );

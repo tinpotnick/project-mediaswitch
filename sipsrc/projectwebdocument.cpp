@@ -1005,7 +1005,7 @@ httpuri::httpuri( substring s )
   substring protopos = s.find( "://" );
   if( 0 != protopos.end() )
   {
-    this->protocol = substring( s, 0, protopos.start() - 1 );
+    this->protocol = substring( s, 0, protopos.start() );
   }
 
   size_t hostpos = this->protocol.end();
@@ -1015,7 +1015,7 @@ httpuri::httpuri( substring s )
   }
 
   this->host = s.find( '/', hostpos );
-  this->host.start( hostpos + 1 );
+  this->host.start( hostpos );
   if( 0 == this->host.end() )
   {
     this->host.end( s.length() );

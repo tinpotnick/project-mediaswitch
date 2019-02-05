@@ -93,6 +93,7 @@ public:
 
   enum { Authorization,
         Allow,
+        Alert_Info,
         Call_ID,
         Content_Length,
         CSeq,

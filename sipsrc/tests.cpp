@@ -32,6 +32,7 @@ Updated: 30.12.2018
 #include "projectsipregistrar.h"
 #include "projectsipsm.h"
 #include "projectsipstring.h"
+#include "projectsipsdp.h"
 
 /*******************************************************************************
 Function: readfile
@@ -531,53 +532,49 @@ void authtest( void )
 }
 
 /*******************************************************************************
-Function: main
+Function: sdptest
+Purpose: Test our SDP convertion routines.
+Updated: 31.01.2019
+*******************************************************************************/
+void sdptest( void )
+{
+  std::string testdata = readfile( "../testfiles/siptest1.txt" );
+  {
+    stringptr sdp = gettestchunk( testdata, "SDP1" );
+
+    JSON::Value val;
+    sdptojson( substring( sdp ), val );
+    std::cout << JSON::to_string( val ) << std::endl;
+  }
+
+  {
+    stringptr sdp = gettestchunk( testdata, "SDP2" );
+
+    JSON::Value val;
+    sdptojson( substring( sdp ), val );
+
+    std::cout << JSON::to_string( val ) << std::endl;
+
+    std::cout << "===========================================================" << std::endl;
+    stringptr generated = jsontosdp( JSON::as_object( val ) );
+    std::cout << *generated << std::endl;
+    std::cout << "===========================================================" << std::endl;
+  }
+}
+
+/*******************************************************************************
+Function: runtests
 Purpose: Run our tests
 Updated: 12.12.2018
 *******************************************************************************/
-int main( int argc, const char* argv[] )
+int runtests( void )
 {
-
-  
-  // echo -n "1003:bling.babblevoice.com:123654789" | md5sum
-  // 5f4c92ab75d915b278f953a51a1c9fba
-  // echo -n "REGISTER:sip:bling.babblevoice.com" | md5sum
-  // 40fb13f699461fb10e32df00daa901e5
-  // echo -n "5f4c92ab75d915b278f953a51a1c9fba:dbb93832-9090-4763-b9f1-49f0ee8b0b4a:40fb13f699461fb10e32df00daa901e5" | md5sum
-  std::string user = "1003";
-  std::string password = "123654789";
-  std::string realm = "bling.babblevoice.com";
-  std::string method = "REGISTER";
-  std::string uri = "sip:bling.babblevoice.com";
-  std::string nonce = "dbb93832-9090-4763-b9f1-49f0ee8b0b4a";
-  std::string cnonce = "NwppxHEoHM8cIGF";
-  std::string nc = "00000001";
-  std::string qop = "auth";
-  //response="cd1748aebcbc01c47270acab477e0e56"
-  char buf[ 33 ];
-
-  requestdigest( user.c_str(), user.length(), 
-                  realm.c_str(), realm.length(), 
-                  password.c_str(), password.length(),
-                  nonce.c_str(), nonce.length(), 
-                  nc.c_str(), nc.length(),
-                  cnonce.c_str(), cnonce.length(),
-                  method.c_str(), method.length(), 
-                  uri.c_str(), uri.length(),
-                  qop.c_str(), qop.length(),
-                  "MD5",
-                  buf );
-
-  std::cout << "Got: " << buf << std::endl;
-  std::cout << "Should be: " << "cd1748aebcbc01c47270acab477e0e56" << std::endl;
-
-
+  sdptest();
   authtest();
   optionstest();
   stringtest();
   testurl();
   testsippacket();
-  testregs();
 
   return 0;
 }
