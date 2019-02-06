@@ -126,7 +126,7 @@ Function: waitfortimer
 Purpose: Async wait for timer.
 Updated: 30.01.2019
 *******************************************************************************/
-void projectsipdialog::waitfortimer( std::chrono::seconds s, 
+void projectsipdialog::waitfortimer( std::chrono::milliseconds s, 
       std::function<void ( const boost::system::error_code& error ) > f )
 {
   this->timer.cancel();
@@ -153,9 +153,9 @@ void projectsipdialog::handlebye( projectsippacketptr pk )
 {
   this->callhungup = true;
   this->lastpacket = pk;
+  this->retries = 3;
   this->send200();
-  this->passtocontrol( pk );
-  this->untrack();
+  this->updatecontrol( pk );
 }
 
 /*******************************************************************************
@@ -208,7 +208,7 @@ void projectsipdialog::invitestart( projectsippacketptr pk )
     return;
   }
 
-  this->passtocontrol( pk );
+  this->updatecontrol( pk );
   this->nextstate = std::bind( &projectsipdialog::waitfornextinstruction, this, std::placeholders::_1 );
   this->trying();
 }
@@ -246,7 +246,7 @@ void projectsipdialog::inviteauth( projectsippacketptr pk )
     failedauth.addheader( projectsippacket::Contact,
                 projectsippacket::contact( pk->getuser().strptr(), 
                 stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                0, 
+                0,
                 projectsipconfig::getsipport() ) );
     failedauth.addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -262,7 +262,7 @@ void projectsipdialog::inviteauth( projectsippacketptr pk )
 
   this->authenticated = true;
   this->trying();
-  this->passtocontrol( pk );
+  this->updatecontrol( pk );
 }
 
 /*******************************************************************************
@@ -287,7 +287,7 @@ void projectsipdialog::trying( void )
   trying.addheader( projectsippacket::Contact,
               projectsippacket::contact( this->lastpacket->getuser().strptr(), 
               stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-              0, 
+              0,
               projectsipconfig::getsipport() ) );
   trying.addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -320,7 +320,7 @@ void projectsipdialog::temporaryunavailable( void )
   unavail.addheader( projectsippacket::Contact,
               projectsippacket::contact( this->lastpacket->getuser().strptr(), 
               stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-              0, 
+              0,
               projectsipconfig::getsipport() ) );
   unavail.addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -348,7 +348,7 @@ void projectsipdialog::waitforack( projectsippacketptr pk )
     case projectsippacket::ACK:
     {
       this->canceltimer();
-      this->passtocontrol( pk );
+      this->updatecontrol( pk );
       break;
     }
   }
@@ -390,7 +390,7 @@ void projectsipdialog::waitfornextinstruction( projectsippacketptr pk )
   }
 
   /* Wait up to 60 seconds before we close this dialog */
-  this->waitfortimer( std::chrono::seconds( 60 ), 
+  this->waitfortimer( std::chrono::milliseconds( 60000 ), 
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
 }
 
@@ -419,7 +419,7 @@ void projectsipdialog::ringing( void )
     ringing.addheader( projectsippacket::Contact,
                 projectsippacket::contact( this->lastpacket->getuser().strptr(), 
                 stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                0, 
+                0,
                 projectsipconfig::getsipport() ) );
     ringing.addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -448,12 +448,13 @@ void projectsipdialog::answer( void )
 {
   if( !this->callanswered )
   {
+    this->retries = 3;
     this->send200();
     this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
     this->callanswered = true;
 
       /* Wait up to 60 seconds before we close this dialog */
-    this->waitfortimer( std::chrono::seconds( 60 ), 
+    this->waitfortimer( std::chrono::milliseconds( 60000 ), 
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
   }
 }
@@ -463,7 +464,7 @@ Function: send200
 Purpose: Send a 200
 Updated: 06.02.2019
 *******************************************************************************/
-void projectsipdialog::send200( void )
+void projectsipdialog::send200( bool final )
 {
   projectsippacket ok;
 
@@ -481,7 +482,7 @@ void projectsipdialog::send200( void )
   ok.addheader( projectsippacket::Contact,
               projectsippacket::contact( this->lastpacket->getuser().strptr(), 
               stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-              0, 
+              0,
               projectsipconfig::getsipport() ) );
   ok.addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -489,6 +490,42 @@ void projectsipdialog::send200( void )
                       "0" );
 
   this->lastpacket->respond( ok.strptr() );
+
+  if( final )
+  {
+    this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
+  }
+  else
+  {
+    this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
+  }
+
+  this->waitfortimer( std::chrono::milliseconds( 2000 ), 
+      std::bind( &projectsipdialog::resend200, this, std::placeholders::_1 ) );
+}
+
+
+/*******************************************************************************
+Function: resend200
+Purpose: Send a 200
+Updated: 06.02.2019
+*******************************************************************************/
+void projectsipdialog::resend200( const boost::system::error_code& error )
+{
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    if( 0 == this->retries )
+    {
+      this->untrack();
+      return;
+    }
+
+    this->send200();
+    this->retries--;
+
+    this->waitfortimer( std::chrono::milliseconds( 2000 ), 
+        std::bind( &projectsipdialog::resend200, this, std::placeholders::_1 ) );
+  }
 }
 
 /*******************************************************************************
@@ -513,11 +550,11 @@ Control/HTTP functions.
 *******************************************************************************/
 
 /*******************************************************************************
-Function: passtocontrol
+Function: updatecontrol
 Purpose: Pass information to our control server.
 Updated: 25.01.2019
 *******************************************************************************/
-void projectsipdialog::passtocontrol( projectsippacketptr pk )
+void projectsipdialog::updatecontrol( projectsippacketptr pk )
 {
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
   d->setrequestline( projectwebdocument::POST, "http://127.0.0.1/call" );

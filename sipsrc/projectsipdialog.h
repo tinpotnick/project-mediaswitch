@@ -52,15 +52,16 @@ public:
 
   /* non state function */
   void handlebye( projectsippacketptr pk );
-  void passtocontrol( projectsippacketptr pk );
+  void updatecontrol( projectsippacketptr pk );
   void httpcallback( int errorcode );
 
   /* timer functions */
-  void waitfortimer( std::chrono::seconds s, std::function<void ( const boost::system::error_code& error ) > );
+  void waitfortimer( std::chrono::milliseconds s, std::function<void ( const boost::system::error_code& error ) > );
   void canceltimer( void );
 
   /*timer handlers */
   void ontimeoutenddialog( const boost::system::error_code& error );
+  void resend200( const boost::system::error_code& error );
 
 private:
 
@@ -69,7 +70,7 @@ private:
   void trying( void );
   void ringing( void );
   void answer( void );
-  void send200( void );
+  void send200( bool final = false );
 
   /* clean up */
   void untrack( void );
