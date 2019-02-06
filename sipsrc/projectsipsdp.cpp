@@ -129,7 +129,7 @@ bool sdptojson( substring in, JSON::Value &out )
 
   const char *it = in.c_str();
   size_t instrlength = in.length();
-  for( size_t i = 0; i < instrlength; )
+  for( size_t i = in.start(); i < in.end(); )
   {
     char type = *it;
     char typestr[ 2 ];
@@ -147,8 +147,7 @@ bool sdptojson( substring in, JSON::Value &out )
     i += endofline + 2;
     it += endofline + 2;
 
-    substring value = substring( in.get(), startofline + 2, i - 2 );
-
+    substring value = substring( in, startofline + 2, i - 2 );
     switch( type )
     {
       case 'v':
@@ -474,7 +473,11 @@ bool sdptojson( substring in, JSON::Value &out )
     }
   }
 
-  sdp[ "a" ] = a;
+  if( a.values.size() > 0 )
+  {
+    sdp[ "a" ] = a;
+  }
+  
   out = sdp;
   return true;
 }

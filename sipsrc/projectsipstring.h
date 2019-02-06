@@ -48,7 +48,7 @@ class substring
 public:
   substring();
   substring( char * s );
-  substring( substring ss, size_t start, size_t end ){ this->s = ss.get(); this->startpos = start; this->endpos = end; };
+  substring( substring ss, size_t start, size_t end );
   substring( stringptr s );
   substring( stringptr s, size_t start, size_t end );
 

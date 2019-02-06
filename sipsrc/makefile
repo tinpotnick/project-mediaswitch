@@ -1,4 +1,4 @@
-CCOPTS:=-Wall -g -O0
+CCOPTS:=-Wall -g -O0 -fstack-protector-all
 LL:=-lboost_system -lpthread -lcrypto
 
 default: ../Debug/project-sip

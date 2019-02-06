@@ -38,6 +38,17 @@ Updated: 29.01.2019
 *******************************************************************************/
 projecthttpclient::~projecthttpclient()
 {
+}
+
+
+/*******************************************************************************
+Function: asynccancel
+Purpose: Cancel any requests
+Updated: 06.02.2019
+*******************************************************************************/
+void projecthttpclient::asynccancel( void )
+{
+  this->callback = std::bind( &projecthttpclient::nullfunction, this, std::placeholders::_1 );
   this->timer.cancel();
   this->socket.close();
 }
@@ -63,7 +74,6 @@ void projecthttpclient::asyncrequest( projectwebdocumentptr request,
   boost::asio::ip::tcp::resolver resolver( this->ioservice );
   #warning
   // TODO - add a port number to the host.
-
   boost::asio::ip::tcp::resolver::query query( uri.host.str(), "3000");
   this->resolver.async_resolve( query,
       boost::bind( &projecthttpclient::handleresolve, shared_from_this(),
@@ -102,8 +112,7 @@ Updated: 29.01.2019
 *******************************************************************************/
 void projecthttpclient::handleconnect( boost::system::error_code errorcode )
 {
-
-  if( errorcode )
+  if( errorcode != boost::asio::error::already_connected && errorcode )
   {
     this->callback( FAIL_CONNECT );
     return;
@@ -173,7 +182,7 @@ Updated: 29.01.2019
 *******************************************************************************/
 void projecthttpclient::handletimeout( const boost::system::error_code& error )
 {
-  if ( !error )
+  if ( error != boost::asio::error::operation_aborted )
   {
     this->callback( FAIL_TIMEOUT );
   }

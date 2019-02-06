@@ -258,6 +258,17 @@ void testurl( void )
   }
 
   {
+    stringptr u( new std::string( "rubbishhttp://myhost/my/big/path?myquerystring" ) );
+    substring t = substring( u, 7, u->length() );
+    httpuri s( t );
+
+    projecttest( s.protocol, "http", "Bad protocol." );
+    projecttest( s.host, "myhost", "Bad host." );
+    projecttest( s.path, "/my/big/path", "Bad path." );
+    projecttest( s.query, "myquerystring", "Bad query." );
+  }
+
+  {
     stringptr u( new std::string( "\"Bob\" <sips:bob@biloxi.com> ;tag=a48s" ) );
     sipuri s( u );
 
@@ -552,6 +563,21 @@ void sdptest( void )
 
     JSON::Value val;
     sdptojson( substring( sdp ), val );
+
+    std::cout << JSON::to_string( val ) << std::endl;
+
+    std::cout << "===========================================================" << std::endl;
+    stringptr generated = jsontosdp( JSON::as_object( val ) );
+    std::cout << *generated << std::endl;
+    std::cout << "===========================================================" << std::endl;
+  }
+
+  {
+    stringptr sdp = gettestchunk( testdata, "SDP3" );
+    substring s( sdp, 7, sdp->length() );
+
+    JSON::Value val;
+    sdptojson( s, val );
 
     std::cout << JSON::to_string( val ) << std::endl;
 

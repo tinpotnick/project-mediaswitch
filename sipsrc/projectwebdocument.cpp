@@ -756,7 +756,8 @@ void projectwebdocument::parseheaders( void )
           goto exit_loop;
         }
 
-        headername = substring( this->document, hval.end() + 2, hval.end() + 2 );
+        headername.start( hval.end() + 2 );
+        headername.end( hval.end() + 2 );
         crccheck.reset();
         this->headercount++;
         break;
@@ -1005,17 +1006,17 @@ httpuri::httpuri( substring s )
   substring protopos = s.find( "://" );
   if( 0 != protopos.end() )
   {
-    this->protocol = substring( s, 0, protopos.start() );
+    this->protocol = substring( s, this->s.start(), protopos.start() );
   }
 
-  size_t hostpos = this->protocol.end();
+  size_t hostpos = this->protocol.length();
   if( hostpos != 0 )
   {
     hostpos += 3;
   }
 
-  this->host = s.find( '/', hostpos );
-  this->host.start( hostpos );
+  this->host = s.find( '/', hostpos + 1 );
+  this->host.start( this->protocol.end() + 3 );
   if( 0 == this->host.end() )
   {
     this->host.end( s.length() );
@@ -1025,12 +1026,12 @@ httpuri::httpuri( substring s )
 
   this->path = substring( s, this->host.end(), s.length() );
 
-  this->query = s.find( '?', this->host.end() );
+  this->query = s.find( '?' );
   if( 0 != this->query.end() )
   {
     this->path.end( this->query.start() );
     this->query.start( this->query.start() + 1 );
-    this->query.end( s.length() );
+    this->query.end( this->s.end() );
   }
 }
 

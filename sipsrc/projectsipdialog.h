@@ -44,19 +44,24 @@ public:
   /* our state functions */
   void invitestart( projectsippacketptr pk );
   void inviteauth( projectsippacketptr pk  );
-  void donetrying( projectsippacketptr pk );
+  void waitfornextinstruction( projectsippacketptr pk );
+  void waitforack( projectsippacketptr pk );
   void waitforackanddie( projectsippacketptr pk );
   std::function<void ( projectsippacketptr pk ) > laststate;
   std::function<void ( projectsippacketptr pk ) > nextstate;
-  std::function<void ( void ) > timerstate;
 
   /* non state function */
+  void handlebye( projectsippacketptr pk );
   void passtocontrol( projectsippacketptr pk );
   void httpcallback( int errorcode );
 
-  void waitfortimer( std::chrono::seconds s );
-  void timerhandler( const boost::system::error_code& error );
+  /* timer functions */
+  void waitfortimer( std::chrono::seconds s, std::function<void ( const boost::system::error_code& error ) > );
   void canceltimer( void );
+
+  /*timer handlers */
+  void ontimeoutenddialog( const boost::system::error_code& error );
+
 private:
 
   /* responses */
@@ -64,6 +69,7 @@ private:
   void trying( void );
   void ringing( void );
   void answer( void );
+  void send200( void );
 
   /* clean up */
   void untrack( void );
@@ -76,6 +82,11 @@ private:
   boost::asio::steady_timer timer;
 
   int retries;
+  bool authenticated;
+
+  bool callringing;
+  bool callanswered;
+  bool callhungup;
 };
 
 

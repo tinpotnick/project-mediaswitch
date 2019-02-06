@@ -3,10 +3,11 @@
 #include "projectsipdialog.h"
 #include "projectsipconfig.h"
 #include "projectsipdirectory.h"
+#include "projectsipsdp.h"
 
 
 static projectsipdialogs dialogs;
-
+static unsigned int projectsipdialogcounter = 0;
 extern boost::asio::io_service io_service;
 
 /*******************************************************************************
@@ -17,10 +18,15 @@ Updated: 23.01.2019
 projectsipdialog::projectsipdialog() :
   laststate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
   nextstate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
-  timerstate( std::bind( &projectsipdialog::untrack, this ) ),
+  controlrequest( projecthttpclient::create( io_service ) ),
   timer( io_service ),
-  retries( 3 )
+  retries( 3 ),
+  authenticated( false ),
+  callringing( false ),
+  callanswered( false ),
+  callhungup( false )
 {
+  projectsipdialogcounter++;
 }
 
 /*******************************************************************************
@@ -30,6 +36,7 @@ Updated: 23.01.2019
 *******************************************************************************/
 projectsipdialog::~projectsipdialog()
 {
+  this->controlrequest->asynccancel();
 }
 
 /*******************************************************************************
@@ -79,20 +86,38 @@ bool projectsipdialog::invitesippacket( projectsippacketptr pk )
     ptr = *it;
   }
 
-  ptr->nextstate( pk );
+  switch( pk->getmethod() )
+  {
+    case projectsippacket::BYE:
+    {
+      /* we always have to handle a BYE. */
+      ptr->handlebye( pk );
+      break;
+    }
+    default:
+    {
+      ptr->nextstate( pk );
+      break;
+    }
+  }
+  
   return true;
 }
 
 /*******************************************************************************
-Function: timerhandler
-Purpose: Timer handler
-Updated: 29.01.2019
+Timer functions.
 *******************************************************************************/
-void projectsipdialog::timerhandler( const boost::system::error_code& error )
+
+/*******************************************************************************
+Function: ontimeoutenddialog
+Purpose: Timer handler to end this dialog on timeout.
+Updated: 06.02.2019
+*******************************************************************************/
+void projectsipdialog::ontimeoutenddialog( const boost::system::error_code& error )
 {
   if ( error != boost::asio::error::operation_aborted )
   {
-    this->timerstate();
+    this->untrack();
   }
 }
 
@@ -101,11 +126,12 @@ Function: waitfortimer
 Purpose: Async wait for timer.
 Updated: 30.01.2019
 *******************************************************************************/
-void projectsipdialog::waitfortimer( std::chrono::seconds s )
+void projectsipdialog::waitfortimer( std::chrono::seconds s, 
+      std::function<void ( const boost::system::error_code& error ) > f )
 {
   this->timer.cancel();
   this->timer.expires_after( s );
-  this->timer.async_wait( std::bind( &projectsipdialog::timerhandler, this, std::placeholders::_1 ) );
+  this->timer.async_wait( f );
 }
 
 /*******************************************************************************
@@ -119,6 +145,24 @@ void projectsipdialog::canceltimer( void )
 }
 
 /*******************************************************************************
+Function: handlebye
+Purpose: We have received a BYE - clean up.
+Updated: 06.02.2019
+*******************************************************************************/
+void projectsipdialog::handlebye( projectsippacketptr pk )
+{
+  this->callhungup = true;
+  this->lastpacket = pk;
+  this->send200();
+  this->passtocontrol( pk );
+  this->untrack();
+}
+
+/*******************************************************************************
+State functions.
+*******************************************************************************/
+
+/*******************************************************************************
 Function: invitestart
 Purpose: The start of a dialog state machine. We check we have a valid INVITE
 and if we need to authenticate the user.
@@ -127,10 +171,6 @@ Updated: 23.01.2019
 void projectsipdialog::invitestart( projectsippacketptr pk )
 {
   this->lastpacket = pk;
-
-  /* TODO - this timer needs to be removed. */
-  #warning
-  this->waitfortimer( std::chrono::seconds( 3600 ) );
 
   // Do we need authenticating?
   if ( 0 /* do we need authenticating */ )
@@ -169,48 +209,19 @@ void projectsipdialog::invitestart( projectsippacketptr pk )
   }
 
   this->passtocontrol( pk );
-  this->nextstate =  std::bind( &projectsipdialog::donetrying, this, std::placeholders::_1 );
-}
-
-/*******************************************************************************
-Function: passtocontrol
-Purpose: Send a 100 Trying and tell control.
-Updated: 25.01.2019
-*******************************************************************************/
-void projectsipdialog::passtocontrol( projectsippacketptr pk )
-{
-  this->lastpacket = pk;
-  this->retries = 3;
+  this->nextstate = std::bind( &projectsipdialog::waitfornextinstruction, this, std::placeholders::_1 );
   this->trying();
-
-  this->controlrequest = projecthttpclient::create( io_service );
-  projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument );
-
-  d->setrequestline( projectwebdocument::POST, "http://127.0.0.1/invite" );
-
-  JSON::Object v;
-
-  v[ "callid" ] = pk->getheader( projectsippacket::Call_ID ).str();
-  v[ "realm" ] = pk->geturihost().str();
-  v[ "to" ] = pk->getuser( projectsippacket::To ).str();
-  v[ "from" ] = pk->getuser( projectsippacket::From ).str();
-  v[ "authenticated" ] = ( JSON::Bool ) false;
-
-  std::string t = JSON::to_string( v );
-  d->addheader( projectwebdocument::Content_Length, t.length() );
-  d->addheader( projectwebdocument::Content_Type, "text/json" );
-  d->setbody( t.c_str() );
-
-  this->controlrequest->asyncrequest( d, std::bind( &projectsipdialog::httpcallback, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
 Function: inviteauth
-Purpose: We have requested authenticaation.
+Purpose: We have requested authentication.
 Updated: 23.01.2019
 *******************************************************************************/
 void projectsipdialog::inviteauth( projectsippacketptr pk )
 {
+  this->lastpacket = pk;
+
   stringptr password = projectsipdirectory::lookuppassword( 
                 pk->geturihost(), 
                 pk->getuser() );
@@ -249,31 +260,9 @@ void projectsipdialog::inviteauth( projectsippacketptr pk )
     return;
   }
 
+  this->authenticated = true;
+  this->trying();
   this->passtocontrol( pk );
-}
-
-/*******************************************************************************
-Function: httpcallback
-Purpose: We have made a request to our control server.
-Updated: 23.01.2019
-*******************************************************************************/
-void projectsipdialog::httpcallback( int errorcode )
-{
-  this->retries = 3;
-  if( 0 != errorcode )
-  {
-    this->temporaryunavailable();
-    return;
-  }
-
-  projectwebdocumentptr r = this->controlrequest->getresponse();
-
-  if( !r || 200 != r->getstatuscode() )
-  {
-    this->temporaryunavailable();
-    return;
-  }
-  /* We are now idle until we receive our next instruction. */
 }
 
 /*******************************************************************************
@@ -306,8 +295,6 @@ void projectsipdialog::trying( void )
                       "0" );
 
   this->lastpacket->respond( trying.strptr() );
-
-  this->canceltimer();
 }
 
 /*******************************************************************************
@@ -349,12 +336,32 @@ void projectsipdialog::temporaryunavailable( void )
 }
 
 /*******************************************************************************
+Function: waitforack
+Purpose: 
+Updated: 05.02.2019
+*******************************************************************************/
+void projectsipdialog::waitforack( projectsippacketptr pk )
+{
+  this->lastpacket = pk;
+  switch( pk->getmethod() )
+  {
+    case projectsippacket::ACK:
+    {
+      this->canceltimer();
+      this->passtocontrol( pk );
+      break;
+    }
+  }
+}
+
+/*******************************************************************************
 Function: waitforackanddie
 Purpose: 
 Updated: 30.01.2019
 *******************************************************************************/
 void projectsipdialog::waitforackanddie( projectsippacketptr pk )
 {
+  this->lastpacket = pk;
   // When we get an ACK to the last message we can die.
   if( projectsippacket::ACK == pk->getmethod() )
   {
@@ -363,53 +370,28 @@ void projectsipdialog::waitforackanddie( projectsippacketptr pk )
 }
 
 /*******************************************************************************
-Function: donetrying
-Purpose: We have sent a trying - so what happens next. We should send a proceeding
-or a 200 ok.
-Updated: 25.01.2019
+Function: waitfornextinstruction
+Purpose: We have received an INVITE and sent a trying, if the client has 
+not recevieved the trying then we will get another INVITE. So send trying again
+whilst we wait for our next control instruction.
+Updated: 06.02.2019
 *******************************************************************************/
-void projectsipdialog::donetrying( projectsippacketptr pk )
+void projectsipdialog::waitfornextinstruction( projectsippacketptr pk )
 {
+  this->lastpacket = pk;
+
   switch( pk->getmethod() )
   {
     case projectsippacket::INVITE:
     {
-      // Send a 100 again?
-      break;
-    }
-    case projectsippacket::BYE:
-    {
-      projectsippacket p;
-
-      p.setstatusline( 200, "Ok" );
-
-      p.addviaheader( projectsipconfig::gethostname(), pk.get() );
-      p.addheader( projectsippacket::To,
-                  pk->getheader( projectsippacket::To ) );
-      p.addheader( projectsippacket::From,
-                  pk->getheader( projectsippacket::From ) );
-      p.addheader( projectsippacket::Call_ID,
-                  pk->getheader( projectsippacket::Call_ID ) );
-      p.addheader( projectsippacket::CSeq,
-                  pk->getheader( projectsippacket::CSeq ) );
-
-      p.addheader( projectsippacket::Contact,
-                  projectsippacket::contact( pk->getuser().strptr(), 
-                    stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                    0, 
-                    projectsipconfig::getsipport() ) );
-      p.addheader( projectsippacket::Allow,
-                  "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-      p.addheader( projectsippacket::Content_Length,
-                  "0" );
-
-      pk->respond( p.strptr() );
-
-      this->untrack();
-      
+      this->trying();
       break;
     }
   }
+
+  /* Wait up to 60 seconds before we close this dialog */
+  this->waitfortimer( std::chrono::seconds( 60 ), 
+      std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
@@ -419,38 +401,42 @@ Updated: 29.01.2019
 *******************************************************************************/
 void projectsipdialog::ringing( void )
 {
-  projectsippacket ringing;
-
-  ringing.setstatusline( 180, "Ringing" );
-  ringing.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
-
-  ringing.addheader( projectsippacket::To,
-              this->lastpacket->getheader( projectsippacket::To ) );
-  ringing.addheader( projectsippacket::From,
-              this->lastpacket->getheader( projectsippacket::From ) );
-  ringing.addheader( projectsippacket::Call_ID,
-              this->lastpacket->getheader( projectsippacket::Call_ID ) );
-  ringing.addheader( projectsippacket::CSeq,
-              this->lastpacket->getheader( projectsippacket::CSeq ) );
-  ringing.addheader( projectsippacket::Contact,
-              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
-              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-              0, 
-              projectsipconfig::getsipport() ) );
-  ringing.addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-  ringing.addheader( projectsippacket::Content_Length,
-                      "0" );
-
-  if( 0 != this->alertinfo.size() )
+  if( !this->callringing )
   {
-    ringing.addheader( projectsippacket::Alert_Info,
-              this->alertinfo );
+    projectsippacket ringing;
+
+    ringing.setstatusline( 180, "Ringing" );
+    ringing.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
+
+    ringing.addheader( projectsippacket::To,
+                this->lastpacket->getheader( projectsippacket::To ) );
+    ringing.addheader( projectsippacket::From,
+                this->lastpacket->getheader( projectsippacket::From ) );
+    ringing.addheader( projectsippacket::Call_ID,
+                this->lastpacket->getheader( projectsippacket::Call_ID ) );
+    ringing.addheader( projectsippacket::CSeq,
+                this->lastpacket->getheader( projectsippacket::CSeq ) );
+    ringing.addheader( projectsippacket::Contact,
+                projectsippacket::contact( this->lastpacket->getuser().strptr(), 
+                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+                0, 
+                projectsipconfig::getsipport() ) );
+    ringing.addheader( projectsippacket::Allow,
+                "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+    ringing.addheader( projectsippacket::Content_Length,
+                        "0" );
+
+    if( 0 != this->alertinfo.size() )
+    {
+      ringing.addheader( projectsippacket::Alert_Info,
+                this->alertinfo );
+    }
+
+    this->lastpacket->respond( ringing.strptr() );
+
+    this->canceltimer();
+    this->callringing = true;
   }
-
-  this->lastpacket->respond( ringing.strptr() );
-
-  this->canceltimer();
 }
 
 /*******************************************************************************
@@ -460,8 +446,25 @@ Updated: 30.01.2019
 *******************************************************************************/
 void projectsipdialog::answer( void )
 {
-  #warning
-  /*  */
+  if( !this->callanswered )
+  {
+    this->send200();
+    this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
+    this->callanswered = true;
+
+      /* Wait up to 60 seconds before we close this dialog */
+    this->waitfortimer( std::chrono::seconds( 60 ), 
+      std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
+  }
+}
+
+/*******************************************************************************
+Function: send200
+Purpose: Send a 200
+Updated: 06.02.2019
+*******************************************************************************/
+void projectsipdialog::send200( void )
+{
   projectsippacket ok;
 
   ok.setstatusline( 200, "Ok" );
@@ -486,16 +489,6 @@ void projectsipdialog::answer( void )
                       "0" );
 
   this->lastpacket->respond( ok.strptr() );
-
-  if( 0 == this->retries-- )
-  {
-    this->timerstate = std::bind( &projectsipdialog::untrack, this );
-  }
-  else
-  {
-    this->timerstate = std::bind( &projectsipdialog::answer, this );
-  }
-  this->waitfortimer( std::chrono::seconds( 3 ) );
 }
 
 /*******************************************************************************
@@ -516,6 +509,74 @@ void projectsipdialog::untrack( void )
 }
 
 /*******************************************************************************
+Control/HTTP functions.
+*******************************************************************************/
+
+/*******************************************************************************
+Function: passtocontrol
+Purpose: Pass information to our control server.
+Updated: 25.01.2019
+*******************************************************************************/
+void projectsipdialog::passtocontrol( projectsippacketptr pk )
+{
+  projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
+  d->setrequestline( projectwebdocument::POST, "http://127.0.0.1/call" );
+
+  JSON::Object v;
+
+  v[ "callid" ] = pk->getheader( projectsippacket::Call_ID ).str();
+  v[ "realm" ] = pk->geturihost().str();
+  v[ "to" ] = pk->getuser( projectsippacket::To ).str();
+  v[ "from" ] = pk->getuser( projectsippacket::From ).str();
+  v[ "authenticated" ] = ( JSON::Bool ) this->authenticated;
+  v[ "ringing" ] = ( JSON::Bool ) this->callringing;
+  v[ "answered" ] = ( JSON::Bool ) this->callanswered;
+  v[ "hangup" ] = ( JSON::Bool ) this->callhungup;
+  
+
+  if( pk->getheader( projectsippacket::Content_Length ).toint() > 0 &&
+      0 != pk->getheader( projectsippacket::Content_Type ).find( "sdp" ).end() )
+  {
+    JSON::Value sdpv;
+    if( sdptojson( pk->getbody(), sdpv ) )
+    {
+      v[ "sdp" ] = sdpv;
+    }
+  }
+
+  std::string t = JSON::to_string( v );
+  d->addheader( projectwebdocument::Content_Length, t.length() );
+  d->addheader( projectwebdocument::Content_Type, "text/json" );
+  d->setbody( t.c_str() );
+
+  this->controlrequest->asyncrequest( d, std::bind( &projectsipdialog::httpcallback, this, std::placeholders::_1 ) );
+}
+
+/*******************************************************************************
+Function: httpcallback
+Purpose: We have made a request to our control server. This is a do nothing if
+no error occurred.
+Updated: 23.01.2019
+*******************************************************************************/
+void projectsipdialog::httpcallback( int errorcode )
+{
+  if( 0 != errorcode )
+  {
+    this->temporaryunavailable();
+    return;
+  }
+
+  projectwebdocumentptr r = this->controlrequest->getresponse();
+
+  if( !r || 200 != r->getstatuscode() )
+  {
+    this->temporaryunavailable();
+    return;
+  }
+  /* We are now idle until we receive our next instruction. */
+}
+
+/*******************************************************************************
 Function: registrarhttpreq
 Purpose: Handle a request from our web server.
 Updated: 22.01.2019
@@ -524,6 +585,7 @@ void projectsipdialog::httpget( stringvector &path, projectwebdocument &response
 {
   JSON::Object v;
   v[ "count" ] = ( JSON::Integer ) dialogs.size();
+  v[ "counter" ] = ( JSON::Integer ) projectsipdialogcounter;
   std::string t = JSON::to_string( v );
 
   response.setstatusline( 200, "Ok" );

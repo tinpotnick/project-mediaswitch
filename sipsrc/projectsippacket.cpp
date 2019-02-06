@@ -732,6 +732,10 @@ int projectsippacket::getheaderfromcrc( int crc )
     {
       return Retry_After;
     }
+    case 0x3bb8880c:   /* reason */
+    {
+      return Reason;
+    }
     case 0xf724db04:   /* supported */
     {
       return Supported;
@@ -805,6 +809,8 @@ const char *projectsippacket::getheaderstr( int header )
       return "Route";
     case Retry_After:
       return "Retry-After";
+    case Reason:
+      return "Reason";
     case Supported:
       return "Supported";
     case To:

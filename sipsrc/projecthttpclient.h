@@ -46,6 +46,7 @@ public:
 
   enum{ FAIL_RESOLVE = 1, FAIL_CONNECT, FAIL_READ, FAIL_WRITE, FAIL_TIMEOUT };
 
+  void asynccancel( void );
   void asyncrequest( projectwebdocumentptr request, 
       std::function< void ( int errorcode ) > );
 
@@ -58,6 +59,8 @@ public:
   void handleread( boost::system::error_code errorcode, std::size_t bytestransferred );
   void handlewrite( boost::system::error_code errorcode, std::size_t bytestransferred );
   void handletimeout( const boost::system::error_code& error );
+
+  void nullfunction( int ){};
 
 private:
   boost::asio::io_service &ioservice;

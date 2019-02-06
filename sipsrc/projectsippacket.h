@@ -107,6 +107,7 @@ public:
         Record_Route,
         Route,
         Retry_After,
+        Reason,
         Supported,
         To,
         Via,

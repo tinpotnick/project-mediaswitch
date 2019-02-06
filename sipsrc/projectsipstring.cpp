@@ -391,6 +391,18 @@ substring::substring( stringptr s )
 /*******************************************************************************
 Function: substring constructor
 Purpose: As it say.
+Updated: 05.02.2019
+*******************************************************************************/
+substring::substring( substring s, size_t start, size_t end )
+{
+  this->s = s.s;
+  this->startpos = start;
+  this->endpos = end;
+}
+
+/*******************************************************************************
+Function: substring constructor
+Purpose: As it say.
 Updated: 08.01.2019
 *******************************************************************************/
 substring::substring( stringptr s, size_t start, size_t end )
@@ -881,7 +893,7 @@ stringvector splitstring( std::string strtosplit, char delim )
 	{
 		if ( *it == delim )
 		{
-			strlist.push_back(stritem);
+			strlist.push_back( stritem );
 			stritem = "";
 			continue;
 		}
@@ -892,8 +904,14 @@ stringvector splitstring( std::string strtosplit, char delim )
 	// the final item - which doesn't have to have a delim...
 	if ( stritem != "" )
 	{
-		strlist.push_back(stritem);
+		strlist.push_back( stritem );
 	}
+
+  if( 0 == strlist.size() )
+  {
+    // Make sure we are an empty string.
+    strlist.push_back( "" );
+  }
 
 	return strlist;
 }
