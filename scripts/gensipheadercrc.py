@@ -9,6 +9,7 @@ import string
 sipheaders = [ # SIP Headers
           "Authorization",
           "Allow",
+          "Alert-Info",
           "Call-ID",
           "Content-Length",
           "CSeq",
@@ -22,6 +23,7 @@ sipheaders = [ # SIP Headers
           "Record-Route",
           "Route",
           "Retry-After",
+          "Reason",
           "Supported",
           "To",
           "Via",
@@ -121,6 +123,49 @@ for header in httpheaders:
   print "    case " + c + ":   /* " + lowerheader + " */"
   print "    {"
   print "      return " + string.replace( header, '-', '_') + ";"
+  print "    }"
+
+  if c in crcvalues:
+    print "Error duplicate found - need a different CRC"
+
+  crcvalues.append( c )
+
+
+print "SDP attributes"
+print "================================================================"
+
+sdpa = [
+    "sendrecv",
+    "recvonly",
+    "sendonly",
+    "inactive",
+    "ptime",
+    "maxptime",
+    "rtpmap",
+    "cat",
+    "keywds",
+    "tool",
+    "orient",
+    "type",
+    "charset",
+    "sdplang",
+    "lang",
+    "framerate",
+    "quality",
+    "fmtp",
+    # Non standard json index
+    "direction"
+]
+
+crcvalues = []
+for header in sdpa:
+
+  lowerheader = header.lower()
+  c = hex(zlib.crc32(lowerheader) & 0xffffffff )
+
+  print "    case " + c + ":   /* " + lowerheader + " */"
+  print "    {"
+  print "      break;"
   print "    }"
 
   if c in crcvalues:
