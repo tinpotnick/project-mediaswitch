@@ -33,7 +33,7 @@ var projectcontrol = function()
     Function: ring
     Purpose: Send a ringing signal.
     ***************************************************************************/
-    ring: function()
+    ring: function( alertinfo )
     {
       if( this.s.ring || this.s.answered )
       {
@@ -44,6 +44,11 @@ var projectcontrol = function()
         callid: this.s.callid,
         action: "ring"
       } );
+
+      if( undefined != alertinfo )
+      {
+        postdata.alertinfo = alertinfo;
+      }
       postrequest( postdata );
     },
     /***************************************************************************
