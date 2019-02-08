@@ -124,6 +124,8 @@ public:
 
   /* To be overridden by the (udp/tcp/test etc) server */
   virtual void respond( stringptr doc ) {};
+  virtual std::string getremotehost( void ) { return std::string(); }
+  virtual unsigned short getremoteport( void ) { return 0; }
 
   /* By default return our underlying document, however can be
   ovveridden to generate protocol specific document from headers etc */

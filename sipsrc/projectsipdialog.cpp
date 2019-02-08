@@ -1,5 +1,7 @@
 
 
+#include <boost/lexical_cast.hpp>
+
 #include "projectsipdialog.h"
 #include "projectsipconfig.h"
 #include "projectsipdirectory.h"
@@ -24,7 +26,11 @@ projectsipdialog::projectsipdialog() :
   authenticated( false ),
   callringing( false ),
   callanswered( false ),
-  callhungup( false )
+  callhungup( false ),
+  startat( std::time(nullptr) ),
+  ringingat( 0 ),
+  answerat( 0 ),
+  endat( 0 )
 {
   projectsipdialogcounter++;
 }
@@ -152,6 +158,7 @@ Updated: 06.02.2019
 void projectsipdialog::handlebye( projectsippacketptr pk )
 {
   this->callhungup = true;
+  this->endat = std::time( nullptr );
   this->lastpacket = pk;
   this->retries = 3;
   this->send200();
@@ -436,8 +443,16 @@ void projectsipdialog::ringing( void )
 
     this->canceltimer();
     this->callringing = true;
+    this->ringingat = std::time( nullptr );
   }
 }
+
+#warning TODO
+/*******************************************************************************
+Function: preanswer
+Purpose: Send a 183 with SDP - early media (media before answer i.e. fake ringing)
+Updated: 07.02.2019
+*******************************************************************************/
 
 /*******************************************************************************
 Function: answer
@@ -452,6 +467,7 @@ void projectsipdialog::answer( void )
     this->send200();
     this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
     this->callanswered = true;
+    this->answerat = std::time( nullptr );
 
       /* Wait up to 60 seconds before we close this dialog */
     this->waitfortimer( std::chrono::milliseconds( 60000 ), 
@@ -565,11 +581,24 @@ void projectsipdialog::updatecontrol( projectsippacketptr pk )
   v[ "realm" ] = pk->geturihost().str();
   v[ "to" ] = pk->getuser( projectsippacket::To ).str();
   v[ "from" ] = pk->getuser( projectsippacket::From ).str();
+  v[ "contact" ] = pk->getheader( projectsippacket::Contact ).str();
   v[ "authenticated" ] = ( JSON::Bool ) this->authenticated;
-  v[ "ringing" ] = ( JSON::Bool ) this->callringing;
+  v[ "ring" ] = ( JSON::Bool ) this->callringing;
   v[ "answered" ] = ( JSON::Bool ) this->callanswered;
   v[ "hangup" ] = ( JSON::Bool ) this->callhungup;
-  
+
+  JSON::Object rh;
+  rh[ "host" ] = pk->getremotehost();
+  rh[ "port" ] = boost::numeric_cast< JSON::Integer >( pk->getremoteport() );
+  v[ "remote" ] = rh;
+
+  JSON::Object epochs;
+  epochs[ "start" ] = boost::numeric_cast< JSON::Integer >( this->startat );
+  epochs[ "ring" ] = boost::numeric_cast< JSON::Integer >( this->ringingat );
+  epochs[ "answer" ] = boost::numeric_cast< JSON::Integer >( this->answerat );
+  epochs[ "end" ] = boost::numeric_cast< JSON::Integer >( this->endat );
+
+  v[ "epochs" ] = epochs;
 
   if( pk->getheader( projectsippacket::Content_Length ).toint() > 0 &&
       0 != pk->getheader( projectsippacket::Content_Type ).find( "sdp" ).end() )
@@ -653,27 +682,31 @@ void projectsipdialog::httppost( stringvector &path, JSON::Value &body, projectw
   }
   else
   {
-    if ( !b.has_key( "action" ) )
+    if ( b.has_key( "action" ) )
+    {
+      std::string action = JSON::as_string( b[ "action" ] );
+      if( action == "ring" )
+      {
+        response.setstatusline( 200, "Ok" );
+        (*it)->alertinfo = "";
+        if ( b.has_key( "alertinfo" ) )
+        {
+          (*it)->alertinfo = JSON::as_string( b[ "alertinfo" ] );
+        }
+        (*it)->ringing();
+      }
+      else if( action == "answer" )
+      {
+        response.setstatusline( 200, "Ok" );
+
+        // need to add sdp info.
+        (*it)->retries = 3;
+        (*it)->answer();
+      }
+    }
+    else 
     {
       response.setstatusline( 404, "Not found" );
-    }
-    else if( JSON::as_string( b[ "action" ] ) == "ringing" )
-    {
-      response.setstatusline( 200, "Ok" );
-      (*it)->alertinfo = "";
-      if ( b.has_key( "alertinfo" ) )
-      {
-        (*it)->alertinfo = JSON::as_string( b[ "alertinfo" ] );
-      }
-      (*it)->ringing();
-    }
-    else if( JSON::as_string( b[ "action" ] ) == "answer" )
-    {
-      response.setstatusline( 200, "Ok" );
-
-      // need to add sdp info.
-      (*it)->retries = 3;
-      (*it)->answer();
     }
   }
 

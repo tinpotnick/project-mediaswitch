@@ -53,6 +53,9 @@ public:
 
   virtual void respond( stringptr doc );
 
+  virtual std::string getremotehost( void ) { return this->sender_endpoint.address().to_string(); }
+  virtual unsigned short getremoteport( void ) { return this->sender_endpoint.port(); }
+
   void handlesend( boost::shared_ptr<std::string>,
       const boost::system::error_code&,
       std::size_t );

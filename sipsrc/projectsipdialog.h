@@ -16,6 +16,8 @@
 #include <boost/shared_ptr.hpp>
 #include <functional>
 
+#include <ctime>
+
 #include "projectsipstring.h"
 #include "projectsippacket.h"
 #include "projecthttpclient.h"
@@ -88,6 +90,11 @@ private:
   bool callringing;
   bool callanswered;
   bool callhungup;
+
+  std::time_t startat;
+  std::time_t ringingat;
+  std::time_t answerat;
+  std::time_t endat;
 };
 
 
