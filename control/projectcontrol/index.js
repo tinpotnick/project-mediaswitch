@@ -20,14 +20,13 @@ var projectcontrol = function()
     ***************************************************************************/
     answer: function( onanswer )
     {
-      var postdata = JSON.stringify( {
-        callid: this.s.callid,
+      var postdata = {
         action: "answer"
-      } );
+      };
     
       this._onanswer = onanswer;
     
-      postrequest( postdata );
+      this.postrequest( postdata );
     },
     /***************************************************************************
     Function: ring
@@ -40,16 +39,32 @@ var projectcontrol = function()
         return;
       }
 
-      var postdata = JSON.stringify( {
-        callid: this.s.callid,
+      var postdata = {
         action: "ring"
-      } );
+      };
 
       if( undefined != alertinfo )
       {
         postdata.alertinfo = alertinfo;
       }
-      postrequest( postdata );
+      this.postrequest( postdata );
+    },
+    /***************************************************************************
+    Function: ring
+    Purpose: Send a ringing signal.
+    ***************************************************************************/
+    busy: function( alertinfo )
+    {
+      if( this.s.answered )
+      {
+        return;
+      }
+
+      var postdata = {
+        action: "busy"
+      };
+
+      this.postrequest( postdata );
     },
     /***************************************************************************
     Function: hangup
@@ -62,13 +77,12 @@ var projectcontrol = function()
         return;
       }
 
-      var postdata = JSON.stringify( {
-        callid: this.s.callid,
+      var postdata = {
         action: "hangup",
         reason: reason
-      } );
+      };
     
-      postrequest( postdata );
+      this.postrequest( postdata );
     },
     /***************************************************************************
     Function: onhangup
@@ -77,6 +91,30 @@ var projectcontrol = function()
     onhangup: function( onhangup )
     {
       this._onhangup = onhangup;
+    },
+    /***************************************************************************
+    Function: postrequest
+    Purpose: Post a request to a sip or rtp server.
+    ***************************************************************************/
+    postrequest: function( data )
+    {
+      data.callid = this.s.callid;
+
+      data = JSON.stringify( data );
+      var post_options = {
+        host: "127.0.0.1",
+        port: "8080",
+        path: "/dialog",
+        method: "POST",
+        headers: {
+            "Content-Type": "text/json",
+            "Content-Length": Buffer.byteLength( data )
+        }
+      };
+
+      var post_req = http.request( post_options );
+      post_req.write( data );
+      post_req.end();
     }
   }
 
@@ -137,28 +175,6 @@ projectcontrol.prototype.onnewcall = function( callback )
 }
 
 /***************************************************************************
-Function: postrequest
-Purpose: Post a request to a sip or rtp server.
-***************************************************************************/
-var postrequest = function( data )
-{
-  var post_options = {
-    host: "127.0.0.1",
-    port: "8080",
-    path: "/dialog",
-    method: "POST",
-    headers: {
-        "Content-Type": "text/json",
-        "Content-Length": Buffer.byteLength( data )
-    }
-  };
-
-  var post_req = http.request( post_options );
-  post_req.write( data );
-  post_req.end();
-}
-
-/***************************************************************************
 Function: listen
 Purpose: Create a new server and listen.
 ***************************************************************************/
@@ -183,6 +199,13 @@ projectcontrol.prototype.listen = function( port, hostname )
       if( path in this.handlers )
       {
         this.handlers[ path ]( req, res, Buffer.concat( body ).toString() );
+        res.writeHead( 200, { "Content-Length": "0" } );
+        res.end();
+      }
+      else
+      {
+        res.writeHead( 404, { "Content-Length": "0" } );
+        res.end();
       }
     } );
 

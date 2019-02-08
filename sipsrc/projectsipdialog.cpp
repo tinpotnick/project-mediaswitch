@@ -78,14 +78,54 @@ bool projectsipdialog::invitesippacket( projectsippacketptr pk )
 
   if( dialogs.get< projectsipdialogcallid >().end() == it )
   {
-    if( projectsippacket::RESPONSE == pk->getmethod() )
+    switch( pk->getmethod() )
     {
-      return false;
+      case projectsippacket::RESPONSE:
+      {
+        return false;
+        break;
+      }
+      case projectsippacket::INVITE:
+      {
+        // New dialog
+        ptr = projectsipdialog::create();
+        ptr->callid = callid;
+        dialogs.insert( ptr );
+        break;
+      }
+      default:
+      {
+        projectsippacketptr response = projectsippacketptr( new projectsippacket() );
+
+        response->setstatusline( 481, "Call Leg/Transaction Does Not Exist" );
+        response->addviaheader( projectsipconfig::gethostname(), pk.get() );
+
+        response->addwwwauthenticateheader( pk.get() );
+
+        response->addheader( projectsippacket::To,
+                            pk->getheader( projectsippacket::To ) );
+        response->addheader( projectsippacket::From,
+                            pk->getheader( projectsippacket::From ) );
+        response->addheader( projectsippacket::Call_ID,
+                            pk->getheader( projectsippacket::Call_ID ) );
+        response->addheader( projectsippacket::CSeq,
+                            pk->getheader( projectsippacket::CSeq ) );
+        response->addheader( projectsippacket::Contact,
+                            projectsippacket::contact( pk->getuser().strptr(), 
+                            stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+                            0, 
+                            projectsipconfig::getsipport() ) );
+        response->addheader( projectsippacket::Allow,
+                            "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+        response->addheader( projectsippacket::Content_Type,
+                            "application/sdp" );
+        response->addheader( projectsippacket::Content_Length,
+                            "0" );
+
+        pk->respond( response->strptr() );
+        return false;
+      }
     }
-    // New dialog
-    ptr = projectsipdialog::create();
-    ptr->callid = callid;
-    dialogs.insert( ptr );
   }
   else
   {
@@ -124,6 +164,19 @@ void projectsipdialog::ontimeoutenddialog( const boost::system::error_code& erro
   if ( error != boost::asio::error::operation_aborted )
   {
     this->untrack();
+  }
+}
+
+/*******************************************************************************
+Function: ontimeout486andenddialog
+Purpose: Timer handler to end this dialog on timeout.
+Updated: 06.02.2019
+*******************************************************************************/
+void projectsipdialog::ontimeout486andenddialog( const boost::system::error_code& error )
+{
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    this->temporaryunavailable();
   }
 }
 
@@ -268,8 +321,8 @@ void projectsipdialog::inviteauth( projectsippacketptr pk )
   }
 
   this->authenticated = true;
-  this->trying();
   this->updatecontrol( pk );
+  this->trying();
 }
 
 /*******************************************************************************
@@ -302,6 +355,9 @@ void projectsipdialog::trying( void )
                       "0" );
 
   this->lastpacket->respond( trying.strptr() );
+
+  this->waitfortimer( std::chrono::milliseconds( DIALOGSETUPTIMEOUT ), 
+      std::bind( &projectsipdialog::ontimeout486andenddialog, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
@@ -339,7 +395,8 @@ void projectsipdialog::temporaryunavailable( void )
   // We should receive a ACK - at that point the dialog can be closed.
   this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
-  this->canceltimer();
+  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+      std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
@@ -396,8 +453,8 @@ void projectsipdialog::waitfornextinstruction( projectsippacketptr pk )
     }
   }
 
-  /* Wait up to 60 seconds before we close this dialog */
-  this->waitfortimer( std::chrono::milliseconds( 60000 ), 
+  /* Wait up to DIALOGSETUPTIMEOUT seconds before we close this dialog */
+  this->waitfortimer( std::chrono::milliseconds( DIALOGSETUPTIMEOUT ), 
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
 }
 
@@ -444,6 +501,9 @@ void projectsipdialog::ringing( void )
     this->canceltimer();
     this->callringing = true;
     this->ringingat = std::time( nullptr );
+
+    this->waitfortimer( std::chrono::milliseconds( DIALOGSETUPTIMEOUT ), 
+      std::bind( &projectsipdialog::ontimeout486andenddialog, this, std::placeholders::_1 ) );
   }
 }
 
@@ -470,7 +530,7 @@ void projectsipdialog::answer( void )
     this->answerat = std::time( nullptr );
 
       /* Wait up to 60 seconds before we close this dialog */
-    this->waitfortimer( std::chrono::milliseconds( 60000 ), 
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
   }
 }
@@ -516,7 +576,7 @@ void projectsipdialog::send200( bool final )
     this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
   }
 
-  this->waitfortimer( std::chrono::milliseconds( 2000 ), 
+  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
       std::bind( &projectsipdialog::resend200, this, std::placeholders::_1 ) );
 }
 
@@ -539,8 +599,90 @@ void projectsipdialog::resend200( const boost::system::error_code& error )
     this->send200();
     this->retries--;
 
-    this->waitfortimer( std::chrono::milliseconds( 2000 ), 
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
         std::bind( &projectsipdialog::resend200, this, std::placeholders::_1 ) );
+  }
+}
+
+/*******************************************************************************
+Function: answer
+Purpose: Send a 200 answer
+Updated: 30.01.2019
+*******************************************************************************/
+void projectsipdialog::busy( void )
+{
+  if( !this->callanswered )
+  {
+    this->retries = 3;
+    this->send486();
+    this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
+    this->callanswered = true;
+    this->answerat = std::time( nullptr );
+
+      /* Wait up to 60 seconds before we close this dialog */
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+      std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
+  }
+}
+
+/*******************************************************************************
+Function: send486
+Purpose: Send a 486 Busy here
+Updated: 06.02.2019
+*******************************************************************************/
+void projectsipdialog::send486( void )
+{
+  projectsippacket ok;
+
+  ok.setstatusline( 486, "Busy here" );
+  ok.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
+
+  ok.addheader( projectsippacket::To,
+              this->lastpacket->getheader( projectsippacket::To ) );
+  ok.addheader( projectsippacket::From,
+              this->lastpacket->getheader( projectsippacket::From ) );
+  ok.addheader( projectsippacket::Call_ID,
+              this->lastpacket->getheader( projectsippacket::Call_ID ) );
+  ok.addheader( projectsippacket::CSeq,
+              this->lastpacket->getheader( projectsippacket::CSeq ) );
+  ok.addheader( projectsippacket::Contact,
+              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
+              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              0,
+              projectsipconfig::getsipport() ) );
+  ok.addheader( projectsippacket::Allow,
+              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  ok.addheader( projectsippacket::Content_Length,
+                      "0" );
+
+  this->lastpacket->respond( ok.strptr() );
+
+  this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
+
+  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+      std::bind( &projectsipdialog::resend486, this, std::placeholders::_1 ) );
+}
+
+/*******************************************************************************
+Function: resend486
+Purpose: Send a 200
+Updated: 06.02.2019
+*******************************************************************************/
+void projectsipdialog::resend486( const boost::system::error_code& error )
+{
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    if( 0 == this->retries )
+    {
+      this->untrack();
+      return;
+    }
+
+    this->send486();
+    this->retries--;
+
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+        std::bind( &projectsipdialog::resend486, this, std::placeholders::_1 ) );
   }
 }
 
@@ -702,6 +844,14 @@ void projectsipdialog::httppost( stringvector &path, JSON::Value &body, projectw
         // need to add sdp info.
         (*it)->retries = 3;
         (*it)->answer();
+      }
+      else if( action == "busy" )
+      {
+        response.setstatusline( 200, "Ok" );
+
+        // need to add sdp info.
+        (*it)->retries = 3;
+        (*it)->busy();
       }
     }
     else 

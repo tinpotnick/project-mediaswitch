@@ -19,7 +19,7 @@ var onanswer = function()
 projectcontrol.onnewcall( function( call )
 {
   call.onhangup( onhangup );
-  
+
   setTimeout( function()
   {
     call.ring();

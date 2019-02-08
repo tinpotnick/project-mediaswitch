@@ -23,6 +23,9 @@
 #include "projecthttpclient.h"
 #include "json.hpp"
 
+#define DIALOGSETUPTIMEOUT 180000  /* 3 minutes */
+#define DIALOGACKTIMEOUT 3000  /* 3 seconds */
+
 /*******************************************************************************
 Class: projectsipdialog
 Purpose: Class to hold details about a specific dialog (INVITE).
@@ -63,7 +66,9 @@ public:
 
   /*timer handlers */
   void ontimeoutenddialog( const boost::system::error_code& error );
+  void ontimeout486andenddialog( const boost::system::error_code& error );
   void resend200( const boost::system::error_code& error );
+  void resend486( const boost::system::error_code& error );
 
 private:
 
@@ -72,7 +77,9 @@ private:
   void trying( void );
   void ringing( void );
   void answer( void );
+  void busy( void );
   void send200( bool final = false );
+  void send486( void );
 
   /* clean up */
   void untrack( void );
