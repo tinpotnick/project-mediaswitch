@@ -69,6 +69,7 @@ public:
   void ontimeout486andenddialog( const boost::system::error_code& error );
   void resend200( const boost::system::error_code& error );
   void resend486( const boost::system::error_code& error );
+  void resendbye( const boost::system::error_code& error );
 
 private:
 
@@ -80,6 +81,9 @@ private:
   void busy( void );
   void send200( bool final = false );
   void send486( void );
+
+  /* Verbs */
+  void sendbye( void );
 
   /* clean up */
   void untrack( void );
@@ -102,6 +106,8 @@ private:
   std::time_t ringingat;
   std::time_t answerat;
   std::time_t endat;
+
+  bool finished;
 };
 
 

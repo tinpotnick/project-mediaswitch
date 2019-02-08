@@ -30,7 +30,8 @@ projectsipdialog::projectsipdialog() :
   startat( std::time(nullptr) ),
   ringingat( 0 ),
   answerat( 0 ),
-  endat( 0 )
+  endat( 0 ),
+  finished( false )
 {
   projectsipdialogcounter++;
 }
@@ -213,8 +214,8 @@ void projectsipdialog::handlebye( projectsippacketptr pk )
   this->callhungup = true;
   this->endat = std::time( nullptr );
   this->lastpacket = pk;
-  this->retries = 3;
   this->send200();
+  this->finished = true;
   this->updatecontrol( pk );
 }
 
@@ -615,13 +616,15 @@ void projectsipdialog::busy( void )
   {
     this->retries = 3;
     this->send486();
-    this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
-    this->callanswered = true;
-    this->answerat = std::time( nullptr );
+    this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
-      /* Wait up to 60 seconds before we close this dialog */
+      /* Wait up to DIALOGACKTIMEOUT seconds before we close this dialog */
     this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
+  }
+  else
+  {
+    this->sendbye();
   }
 }
 
@@ -683,6 +686,67 @@ void projectsipdialog::resend486( const boost::system::error_code& error )
 
     this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
         std::bind( &projectsipdialog::resend486, this, std::placeholders::_1 ) );
+  }
+}
+
+/*******************************************************************************
+Function: sendbye
+Purpose: Send a BYE
+Updated: 08.02.2019
+*******************************************************************************/
+void projectsipdialog::sendbye( void )
+{
+  projectsippacket bye;
+
+  bye.setrequestline( projectsippacket::BYE, "" );
+  bye.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
+
+  bye.addheader( projectsippacket::To,
+              this->lastpacket->getheader( projectsippacket::To ) );
+  bye.addheader( projectsippacket::From,
+              this->lastpacket->getheader( projectsippacket::From ) );
+  bye.addheader( projectsippacket::Call_ID,
+              this->lastpacket->getheader( projectsippacket::Call_ID ) );
+  bye.addheader( projectsippacket::CSeq,
+              this->lastpacket->getheader( projectsippacket::CSeq ) );
+  bye.addheader( projectsippacket::Contact,
+              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
+              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              0,
+              projectsipconfig::getsipport() ) );
+  bye.addheader( projectsippacket::Allow,
+              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  bye.addheader( projectsippacket::Content_Length,
+                      "0" );
+
+  this->lastpacket->respond( bye.strptr() );
+
+  this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
+
+  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+      std::bind( &projectsipdialog::resendbye, this, std::placeholders::_1 ) );
+}
+
+/*******************************************************************************
+Function: resendbye
+Purpose: Send a 200
+Updated: 08.02.2019
+*******************************************************************************/
+void projectsipdialog::resendbye( const boost::system::error_code& error )
+{
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    if( 0 == this->retries )
+    {
+      this->untrack();
+      return;
+    }
+
+    this->sendbye();
+    this->retries--;
+
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+        std::bind( &projectsipdialog::resendbye, this, std::placeholders::_1 ) );
   }
 }
 
@@ -768,6 +832,12 @@ Updated: 23.01.2019
 *******************************************************************************/
 void projectsipdialog::httpcallback( int errorcode )
 {
+  if( finished )
+  {
+    this->untrack();
+    return;
+  }
+  
   if( 0 != errorcode )
   {
     this->temporaryunavailable();
