@@ -1,0 +1,11 @@
+{
+  "name": "projectcontrol",
+  "version": "1.0.0",
+  "description": "Project media switch's main control library. Provides libary functions to write scripts to manage calls within the switch.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Nick Knight",
+  "license": "ISC"
+}
