@@ -83,6 +83,7 @@ private:
   void send486( void );
 
   /* Verbs */
+  static void sendinvite( JSON::Object &request, projectwebdocument &response );
   void sendbye( void );
 
   /* clean up */
@@ -90,6 +91,7 @@ private:
 
   projecthttpclient::pointer controlrequest;
 
+  projectsippacketptr invitepacket;
   projectsippacketptr authrequest;
   projectsippacketptr lastpacket;
 

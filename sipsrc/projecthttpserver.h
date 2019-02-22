@@ -5,6 +5,7 @@
 #include <boost/bind.hpp>
 
 #include "projectsipstring.h"
+#include "projectwebdocument.h"
 
 
 // test
@@ -32,6 +33,7 @@ public:
   void start( void );
   void handleread( const boost::system::error_code& error, std::size_t bytes_transferred );
   void handlewrite( const boost::system::error_code& error, std::size_t bytes_transferred );
+  void handletimeout( const boost::system::error_code& error );
 
 private:
   boost::asio::io_service &ioservice;
@@ -39,6 +41,10 @@ private:
 
   chararray inbuffer;
   stringptr outbuffer;
+
+  projectwebdocument request;
+
+  boost::asio::steady_timer timer;
 };
 
 

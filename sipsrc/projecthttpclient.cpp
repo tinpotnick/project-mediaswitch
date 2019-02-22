@@ -72,9 +72,14 @@ void projecthttpclient::asyncrequest( projectwebdocumentptr request,
                                         boost::asio::placeholders::error ) );
 
   boost::asio::ip::tcp::resolver resolver( this->ioservice );
-  #warning
-  // TODO - add a port number to the host.
-  boost::asio::ip::tcp::resolver::query query( uri.host.str(), "3000");
+
+  std::string port = "80";
+  if( 0 != uri.port.end() )
+  {
+    port = uri.port.str();
+  }
+
+  boost::asio::ip::tcp::resolver::query query( uri.host.str(), port.c_str() );
   this->resolver.async_resolve( query,
       boost::bind( &projecthttpclient::handleresolve, shared_from_this(),
         boost::asio::placeholders::error,

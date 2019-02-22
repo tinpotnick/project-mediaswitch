@@ -4,7 +4,7 @@
 #ifndef PROJECTWEBDOCUMENT_H
 #define PROJECTWEBDOCUMENT_H
 
-#define MAX_HEADERS 20
+#define MAX_HEADERS 50
 #define MAX_DUPLICATEHEADERS 3
 #define METHODBADFORMAT -2
 #define STATUSUNKNOWN -1
@@ -31,6 +31,7 @@ public:
   substring s;
   substring protocol;
   substring host;
+  substring port;
   substring path;
   substring query;
 };
@@ -97,6 +98,9 @@ public:
   virtual ~projectwebdocument();
 
   virtual const char* getversion( void );
+
+  bool iscomplete( void );
+  void append( chararray &in, size_t length );
   
   /*
     Get functions.

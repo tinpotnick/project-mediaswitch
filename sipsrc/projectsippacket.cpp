@@ -150,14 +150,19 @@ substring projectsippacket::getheaderparam( int header, const char *param )
 
   if( 0 == ppos.end() )
   {
-    searchfor[ 0 ] = ',';
+    searchfor[ 0 ] = ' ';
     ppos = h.rfind( searchfor );
     if( 0 == ppos.end() )
     {
-      ppos = h.rfind( &searchfor[ 1 ] );
+      searchfor[ 0 ] = ',';
+      ppos = h.rfind( searchfor );
       if( 0 == ppos.end() )
       {
-        return substring( document, 0, 0 );
+        ppos = h.rfind( &searchfor[ 1 ] );
+        if( 0 == ppos.end() )
+        {
+          return substring( document, 0, 0 );
+        }
       }
     }
   }
@@ -180,6 +185,76 @@ substring projectsippacket::getheaderparam( int header, const char *param )
 }
 
 /*******************************************************************************
+Function: addremotepartid
+Purpose: Add a remotepatyid header:
+setheaderparam( "server10.biloxi.com" "z9hG4bK4b43c2ff8.1" );
+Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
+Updated: 09.01.2019
+*******************************************************************************/
+bool projectsippacket::addremotepartyid( const char *realm, 
+                                          const char *calleridname, 
+                                          const char *callerid,
+                                          bool hide )
+{
+  char paramvalue[ DEFAULTHEADERLINELENGTH ];
+  char *ptr = paramvalue;
+
+  if( NULL != calleridname )
+  {
+    size_t calleridnamelen = strlen( calleridname );
+    if( calleridnamelen > 0 )
+    {
+      memcpy( ptr, "\"", 1 );
+      ptr++;
+      memcpy( ptr, calleridname, calleridnamelen );
+      ptr += calleridnamelen;
+      memcpy( ptr, "\"", 1 );
+      ptr++;
+    }
+  }
+
+  memcpy( ptr, "<sip:", 5 );
+  ptr += 5;
+
+  if( NULL != callerid )
+  {
+    size_t calleridlen = strlen( callerid );
+    if( calleridlen > 0 )
+    {
+      memcpy( ptr, callerid, calleridlen );
+      ptr += calleridlen;
+    }
+  }
+
+  memcpy( ptr, "@", 1 );
+  ptr ++;
+
+  if( NULL != realm )
+  {
+    size_t realmlen = strlen( realm );
+    if( realmlen > 0 )
+    {
+      memcpy( ptr, realm, realmlen );
+      ptr += realmlen;
+    }
+  }
+
+  memcpy( ptr, ">", 1 );
+  ptr ++;
+
+  if( hide )
+  {
+    memcpy( ptr, ";privacy=full", 13 );
+    ptr += 13;
+  }
+
+  *ptr = 0;
+
+  this->addheader( projectsippacket::Remote_Party_ID, ptr );
+  return true;
+}
+
+/*******************************************************************************
 Function: addviaheader
 Purpose: Add a via header:
 setheaderparam( "server10.biloxi.com" "z9hG4bK4b43c2ff8.1" );
@@ -188,37 +263,41 @@ Updated: 09.01.2019
 *******************************************************************************/
 bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
 {
-
-  substring branch = ref->getheaderparam( projectsippacket::Via, "branch" );
-
   size_t lh = strlen( host );
-  size_t lb = branch.end() - branch.start();
-
-  if( ( lh + lb ) > DEFAULTHEADERLINELENGTH )
-  {
-    return false;
-  }
-
   char paramvalue[ DEFAULTHEADERLINELENGTH ];
   memcpy( &paramvalue[ 0 ], "SIP/2.0/UDP ", 12 );
   memcpy( &paramvalue[ 12 ], host, lh );
   paramvalue[ lh + 12 ] = ';';
 
-  if( 0 != lb )
+  stringptr br;
+  if( NULL == ref )
   {
-    memcpy( &paramvalue[ lh + 12 + 1 ], "branch=", 7 );
-    const char *branchsrc = branch.c_str();
-    memcpy( &paramvalue[ lh + 12 + 1 + 7 ], branchsrc, lb );
-    paramvalue[ lh + 12 + 1 + 7 + lb ] = 0;
-  }
-  else
-  {
+    br = projectsippacket::branch();
     stringptr bptr = projectsippacket::branch();
     memcpy( &paramvalue[ lh + 12 + 1 ], bptr->c_str(), bptr->length() );
     paramvalue[ lh + 12 + 1 + 1 + bptr->length() ] = 0;
   }
+  else
+  {
+    substring branch = ref->getheaderparam( projectsippacket::Via, "branch" );
+    
+    size_t lb = branch.end() - branch.start();
 
-  this->addheader( projectsippacket::Via, paramvalue );
+    if( ( lh + lb ) > DEFAULTHEADERLINELENGTH )
+    {
+      return false;
+    }
+      
+    if( 0 != lb )
+    {
+      memcpy( &paramvalue[ lh + 12 + 1 ], "branch=", 7 );
+      const char *branchsrc = branch.c_str();
+      memcpy( &paramvalue[ lh + 12 + 1 + 7 ], branchsrc, lb );
+      paramvalue[ lh + 12 + 1 + 7 + lb ] = 0;
+
+      this->addheader( projectsippacket::Via, paramvalue );
+    }
+  }
 
   return true;
 }
@@ -724,6 +803,10 @@ int projectsippacket::getheaderfromcrc( int crc )
     {
       return Record_Route;
     }
+    case 0x7b8e3878:   /* remote-party-id */
+    {
+      return Remote_Party_ID;
+    }
     case 0x2c42079:   /* route */
     {
       return Route;
@@ -805,6 +888,8 @@ const char *projectsippacket::getheaderstr( int header )
       return "Proxy-Authorization";
     case Record_Route:
       return "Record-Route";
+    case Remote_Party_ID:
+      return "Remote-Party-ID";
     case Route:
       return "Route";
     case Retry_After:

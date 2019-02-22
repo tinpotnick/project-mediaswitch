@@ -33,6 +33,7 @@ Updated: 30.12.2018
 #include "projectsipsm.h"
 #include "projectsipstring.h"
 #include "projectsipsdp.h"
+#include "projectsipdirectory.h"
 
 /*******************************************************************************
 Function: readfile
@@ -266,6 +267,18 @@ void testurl( void )
     projecttest( s.host, "myhost", "Bad host." );
     projecttest( s.path, "/my/big/path", "Bad path." );
     projecttest( s.query, "myquerystring", "Bad query." );
+  }
+
+  {
+    stringptr u( new std::string( "http://myhost:9000/my/big/path?myquerystring" ) );
+    substring t = substring( u );
+    httpuri s( t );
+
+    projecttest( s.protocol, "http", "Bad protocol." );
+    projecttest( s.host, "myhost", "Bad host." );
+    projecttest( s.path, "/my/big/path", "Bad path." );
+    projecttest( s.query, "myquerystring", "Bad query." );
+    projecttest( s.port, "9000", "Bad Port." );
   }
 
   {
@@ -517,29 +530,54 @@ void optionstest( void )
   std::cout << "===========================================" << std::endl;
 }
 
+/*******************************************************************************
+Function: authtest
+Purpose: Test authenticating a SIP packet. Adds user to directory then looks 
+up and checks authentication.
+Updated: 20.02.2019
+*******************************************************************************/
 void authtest( void )
 {
+  std::string dom = "bling.babblevoice.com";
+  std::string u = "1003";
+  std::string s = "123654789";
+  projectsipdirdomain::pointer domentry = projectsipdirdomain::adddomain( dom );
+  domentry->adduser( u, s );
+  
   std::string testdata = readfile( "../testfiles/siptest1.txt" );
 
-  projectsipservertestpacket *p = new projectsipservertestpacket( gettestchunk( testdata, "TEST1" ) );
+  projectsipservertestpacket *p = new projectsipservertestpacket( gettestchunk( testdata, "AUTHREGISTER3" ) );
   projectsippacketptr request( p );
-  
-  projectsipsm::handlesippacket( request );
 
-  std::cout << "Packet size: " << p->response->length() << std::endl;
-  std::cout << "===========================================" << std::endl;
-  std::cout << *( p->response ) << std::endl;
-  std::cout << "===========================================" << std::endl;
-
-
-  projectsipservertestpacket *auth = new projectsipservertestpacket( gettestchunk( testdata, "AUTHREGISTER1" ) );
+  projectsipservertestpacket *auth = new projectsipservertestpacket( gettestchunk( testdata, "AUTHREGISTER4" ) );
   projectsippacketptr authrequest( auth );
 
+  projecttest( authrequest->getmethod(), projectsippacket::REGISTER , "Invalid method");
+
+  projecttest( authrequest->getheader( projectsippacket::Call_ID ),
+            "f87f4505d3431a912cf5e72c778131fe",
+            "Wrong Call ID." );
+
+  projecttest( authrequest->getheader( projectsippacket::To ),
+            "<sip:1003@bling.babblevoice.com>",
+            "Wrong To header field." );
+
+  projecttest( authrequest->getheaderparam( projectsippacket::Authorization, "nonce" ),
+            "dbb93832-9090-4763-b9f1-49f0ee8b0b4a",
+            "Wrong nonce." );
+
+  projecttest( request->getheaderparam( projectsippacket::WWW_Authenticate, "nonce" ),
+            "dbb93832-9090-4763-b9f1-49f0ee8b0b4a",
+            "Wrong nonce." );
+
+
+  if( !authrequest->checkauth( request.get(), projectsipdirdomain::lookuppassword( dom, u ) ) )
+  {
+    std::cout << "Failed authentication - that should not have happened" << std::endl;
+  }
+
   projectsipsm::handlesippacket( authrequest );
-/*
-  1002@bling.babblevoice.com
-  dijwvc
-*/
+
 }
 
 /*******************************************************************************

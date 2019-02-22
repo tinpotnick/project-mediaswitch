@@ -27,7 +27,8 @@ projectsipregistration::projectsipregistration( std::string u ) :
   nextstate( std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 ) ),
   laststate( std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 ) ),
   timer( io_service ),
-  optionscseq( 0 )
+  optionscseq( 0 ),
+  controlrequest( projecthttpclient::create( io_service ) )
 {
 }
 
@@ -145,7 +146,7 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
   this->currentpacket = pk;
 
-  stringptr password = projectsipdirectory::lookuppassword( 
+  stringptr password = projectsipdirdomain::lookuppassword( 
                 pk->geturihost(), 
                 pk->getuser() );
 
@@ -257,6 +258,46 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
   this->timer.expires_after( std::chrono::seconds( OPTIONSPINGFREQUENCY ) );
   this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, this, std::placeholders::_1 ) );
+
+  /* update control */
+  projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( pk->geturihost() );
+  std::string controluri = ptr->geturiforcontrol( "reg" );
+  
+  projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
+  d->setrequestline( projectwebdocument::POST, controluri );
+
+  JSON::Object v;
+  v[ "domain" ] = pk->geturihost().str();
+  v[ "user" ] = this->user;
+
+  std::string t = JSON::to_string( v );
+  d->addheader( projectwebdocument::Content_Length, t.length() );
+  d->addheader( projectwebdocument::Content_Type, "text/json" );
+  d->setbody( t.c_str() );
+
+  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, this, std::placeholders::_1 ) );
+
+}
+
+/*******************************************************************************
+Function: httpcallback
+Purpose: May be look into more detail failures.
+Updated: 22.02.2019
+*******************************************************************************/
+void projectsipregistration::httpcallback( int errorcode )
+{
+
+}
+
+void projectsipregistration::httpcallbackanddie( int errorcode )
+{
+  projectsipregistrations::index< regindexuser >::type::iterator userit;
+  userit = regs.get< regindexuser >().find( this->user );
+
+  if( regs.get< regindexuser >().end() != userit )
+  {
+    regs.get< regindexuser >().erase( userit );
+  }
 }
 
 /*******************************************************************************
@@ -266,13 +307,23 @@ Updated: 17.01.2019
 *******************************************************************************/
 void projectsipregistration::expire( void )
 {
-  projectsipregistrations::index< regindexuser >::type::iterator userit;
-  userit = regs.get< regindexuser >().find( this->user );
+  /* update control */
+  projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->authacceptpacket->geturihost() );
+  std::string controluri = ptr->geturiforcontrol( "reg" );
+  
+  projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
+  d->setrequestline( projectwebdocument::DELETE, controluri );
 
-  if( regs.get< regindexuser >().end() != userit )
-  {
-    regs.get< regindexuser >().erase( userit );
-  }
+  JSON::Object v;
+  v[ "domain" ] = this->authacceptpacket->geturihost().str();
+  v[ "user" ] = this->user;
+
+  std::string t = JSON::to_string( v );
+  d->addheader( projectwebdocument::Content_Length, t.length() );
+  d->addheader( projectwebdocument::Content_Type, "text/json" );
+  d->setbody( t.c_str() );
+
+  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
@@ -342,11 +393,16 @@ void projectsipregistration::sendoptions( void )
 /*******************************************************************************
 Function: handleresponse
 Purpose: We received a SIP 200 OK in response to our OPTIONS request. We only 
-(at the moment) send out options.
+(at the moment) senauthrequestd out options.
 Updated: 17.01.2019
 *******************************************************************************/
 void projectsipregistration::handleresponse( projectsippacketptr pk )
 {
+  if( !this->authacceptpacket )
+  {
+    return;
+  }
+  
   if( 0 != this->authacceptpacket->getheader( projectsippacket::CSeq )
                 .find( "OPTIONS" ).length() )
   {
@@ -408,7 +464,25 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
   response.setbody( t.c_str() );
 }
 
+/*******************************************************************************
+Function: sendtoregisteredclient
+Purpose: Forward a packet onto a registered client
+Updated: 20.02.2019
+*******************************************************************************/
+bool projectsipregistration::sendtoregisteredclient( std::string &user, projectsippacketptr pk )
+{
+  projectsipregistrations::index< regindexuser >::type::iterator it = regs.get< regindexuser >().find( user );
+  if( it != regs.get< regindexuser >().end() )
+  {
+    projectsipregistrationptr r = *it;
+    if( r->authacceptpacket )
+    {
+      r->authacceptpacket->respond( pk->strptr() );
+      return true;
+    }
+  }
 
-
+  return false;
+}
 
 

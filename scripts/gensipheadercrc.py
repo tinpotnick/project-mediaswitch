@@ -21,6 +21,7 @@ sipheaders = [ # SIP Headers
           "Proxy-Authenticate",
           "Proxy-Authorization",
           "Record-Route",
+          "Remote-Party-ID",
           "Route",
           "Retry-After",
           "Reason",

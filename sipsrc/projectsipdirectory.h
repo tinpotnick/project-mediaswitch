@@ -3,13 +3,15 @@
 #ifndef PROJECTSIPDIRECTORY_H
 #define PROJECTSIPDIRECTORY_H
 
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "projectsipstring.h"
 #include "projectwebdocument.h"
 #include "projectsipstring.h"
+
+#include "json.hpp"
 
 /*******************************************************************************
 File: projectsipdirectory.h/cpp.
@@ -28,7 +30,7 @@ public:
   stringptr secret;
 };
 
-typedef boost::unordered_map< std::string, projectsipdiruser::pointer > projectsipdirusers;
+typedef std::unordered_map< std::string, projectsipdiruser::pointer > projectsipdirusers;
 
 
 /*******************************************************************************
@@ -43,30 +45,35 @@ class projectsipdirdomain :
 public:
   projectsipdirdomain();
   typedef boost::shared_ptr< projectsipdirdomain > pointer;
-  typedef boost::unordered_map< std::string, pointer > map;
+  typedef std::unordered_map< std::string, pointer > map;
   static pointer create();
 
   map subdomains;
   stringptr domain;
+
+  stringptr controlhost;
+  short controlport;
+
   projectsipdirusers users;
-};
 
-
-
-/*******************************************************************************
-Class: projectsipdirectory
-Purpose: Lookup and store domain, username and password information for our UACs.
-Updated: 09.01.2019
-*******************************************************************************/
-class projectsipdirectory 
-{
-public:
-  projectsipdirectory( void );
+  static bool userexist( std::string &domain, std::string &user );
   static stringptr lookuppassword( substring domain, substring user );
+  static stringptr lookuppassword( std::string &domain, std::string &user );
   static projectsipdirdomain::pointer lookupdomain( substring domain );
+  static projectsipdirdomain::pointer lookupdomain( std::string &domain );
 
-  projectsipdirdomain::map domains;
+  /* Addng entries to the directory */
+  static projectsipdirdomain::pointer adddomain( std::string &domain );
+  void adduser( std::string &user, std::string &secret );
+
+  std::string geturiforcontrol( std::string path );
+
+  static void httpget( stringvector &path, projectwebdocument &response );
+  static void httppost( stringvector &path, JSON::Value &body, projectwebdocument &response );
 };
+
+
+
 
 #endif /* PROJECTSIPDIRECTORY_H */
 

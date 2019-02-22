@@ -23,6 +23,7 @@
 #include <functional>
 
 #include "projectsippacket.h"
+#include "projecthttpclient.h"
 
 /*******************************************************************************
 Class: projectsipregistration
@@ -62,13 +63,17 @@ public:
 
   static void registrarsippacket( projectsippacketptr pk );
   static void httpget( stringvector &path, projectwebdocument &response );
+  static bool sendtoregisteredclient( std::string &user, projectsippacketptr pk );
+
+  void httpcallback( int errorcode );
+  void httpcallbackanddie( int errorcode );
 
 private:
   void expire( void );
   void sendoptions( void );
   boost::asio::steady_timer timer;
-
   unsigned int optionscseq;
+  projecthttpclient::pointer controlrequest;
 };
 
 typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;

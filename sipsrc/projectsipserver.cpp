@@ -50,9 +50,17 @@ void projectsipserver::handledata( void )
   //std::cout << "Peer IP: " << this->sender_endpoint.address().to_string() << std::endl;
   //std::cout << "Peer Port: " << this->sender_endpoint.port() << std::endl;
 
-  stringptr pk( new std::string( this->data, this->bytesreceived ) );
-  projectsippacketptr packet( new projectsipserverpacket( this, this->sender_endpoint, pk ) );
-  projectsipsm::handlesippacket( packet );
+  try
+  {
+    stringptr pk( new std::string( this->data, this->bytesreceived ) );
+    projectsippacketptr packet( new projectsipserverpacket( this, this->sender_endpoint, pk ) );
+    projectsipsm::handlesippacket( packet );
+  }
+  catch(...)
+  {
+    std::cerr << "Unhandled exception in SIP server." << std::endl;
+  }
+
 }
 
 /*******************************************************************************

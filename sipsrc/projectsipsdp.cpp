@@ -128,7 +128,7 @@ bool sdptojson( substring in, JSON::Value &out )
   JSON::Object *atributes = &a;
 
   const char *it = in.c_str();
-  size_t instrlength = in.length();
+
   for( size_t i = in.start(); i < in.end(); )
   {
     char type = *it;
@@ -143,7 +143,7 @@ bool sdptojson( substring in, JSON::Value &out )
       return false;
     }
 
-    size_t endofline = findendofline( it, instrlength - i );
+    size_t endofline = findendofline( it, in.end() - i );
     i += endofline + 2;
     it += endofline + 2;
 
@@ -337,7 +337,8 @@ bool sdptojson( substring in, JSON::Value &out )
       case 'a':
       {
         JSON::Object &at = *atributes;
-        stringvector parts = splitstring( value.str(), ':' );
+        std::string strtosplit = value.str();
+        stringvector parts = splitstring( strtosplit, ':' );
 
         boost::crc_32_type crccheck;
         for( std::string::iterator crcit = parts[ 0 ].begin(); 

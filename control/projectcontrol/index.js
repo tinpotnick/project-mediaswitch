@@ -39,15 +39,14 @@ var projectcontrol = function()
         return;
       }
 
-      var postdata = {
-        action: "ring"
-      };
+      var postdata = {};
 
       if( undefined != alertinfo )
       {
         postdata.alertinfo = alertinfo;
       }
-      this.postrequest( postdata );
+
+      this.postrequest( "ring", postdata );
     },
     /***************************************************************************
     Function: ring
@@ -60,11 +59,7 @@ var projectcontrol = function()
         return;
       }
 
-      var postdata = {
-        action: "busy"
-      };
-
-      this.postrequest( postdata );
+      this.postrequest( "busy", {} );
     },
     /***************************************************************************
     Function: hangup
@@ -78,11 +73,10 @@ var projectcontrol = function()
       }
 
       var postdata = {
-        action: "hangup",
         reason: reason
       };
     
-      this.postrequest( postdata );
+      this.postrequest( "hangup", postdata );
     },
     /***************************************************************************
     Function: onhangup
@@ -96,7 +90,7 @@ var projectcontrol = function()
     Function: postrequest
     Purpose: Post a request to a sip or rtp server.
     ***************************************************************************/
-    postrequest: function( data )
+    postrequest: function( action, data )
     {
       data.callid = this.s.callid;
 
@@ -104,7 +98,7 @@ var projectcontrol = function()
       var post_options = {
         host: "127.0.0.1",
         port: "8080",
-        path: "/dialog",
+        path: "/dialog/" + action,
         method: "POST",
         headers: {
             "Content-Type": "text/json",
@@ -119,10 +113,9 @@ var projectcontrol = function()
   }
 
   /***************************************************************************
-  Function: onhangup
-  Purpose: Set the callback of this call when the call is hung up.
+  Purpose: HTTP Handlers
   ***************************************************************************/
-  this.handlers[ "call" ] = function( req, res, body )
+  this.handlers[ "invite" ] = function( req, res, body )
   {
     try
     {
@@ -172,6 +165,30 @@ Purpose: Register event handler for a new call.
 projectcontrol.prototype.onnewcall = function( callback )
 {
   this.onnewcallcallback = callback;
+}
+
+/***************************************************************************
+Function: invite
+Purpose: New call.
+***************************************************************************/
+projectcontrol.prototype.invite = function( request, callback )
+{
+
+  var data = JSON.stringify( request );
+  var post_options = {
+    host: "127.0.0.1",
+    port: "8080",
+    path: "/dialog/invite",
+    method: "POST",
+    headers: {
+      "Content-Type": "text/json",
+      "Content-Length": Buffer.byteLength( data )
+    }
+  };
+
+  var post_req = http.request( post_options );
+  post_req.write( data );
+  post_req.end();
 }
 
 /***************************************************************************

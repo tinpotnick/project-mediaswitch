@@ -31,5 +31,10 @@ projectcontrol.onnewcall( function( call )
 
 } );
 
+setTimeout( function()
+{
+  projectcontrol.invite( { realm: "bling.babblevoice.com", to: "1003", from: "1001", maxforwards: 1, callerid: { number: "1001", name: "", private: false } } );
+}, 1000 );
+
 projectcontrol.listen( port, hostname );
 

@@ -411,6 +411,58 @@ int projectwebdocument::getheaderfromcrc( int crc )
 
 
 /*******************************************************************************
+Function: iscomplete
+Purpose: Is the document complete, i.e. we may have received a partial xfer 
+to us so we need to wait for more.
+Updated: 22.02.2019
+*******************************************************************************/
+bool projectwebdocument::iscomplete( void )
+{
+  // We have to terminate the headers.
+  if( std::string::npos != this->document->find( "\r\n\r\n" ) )
+  {
+    size_t doclength = 0;
+    try
+    {
+      substring cl = this->getheader( projectwebdocument::Content_Length );
+      if( 0 == cl.end() )
+      {
+        return true;
+      }
+
+      doclength = boost::lexical_cast< size_t >( cl.str() );
+      if( this->body.length() >= doclength )
+      {
+        return true;
+      }
+    }
+    catch( boost::bad_lexical_cast &e )
+    {
+
+    }
+  }
+  return false;
+}
+
+
+/*******************************************************************************
+Function: append
+Purpose: Add more data to the document. We NULL terminate the input array so 
+there must be space to do this.
+Updated: 22.02.2019
+*******************************************************************************/
+void projectwebdocument::append( chararray &in, size_t length )
+{
+  in[ length ] = 0;
+  (* this->document ) += in.data();
+
+  if( this->headersparsed )
+  {
+    this->body.end( this->body.end() + length );
+  }
+}
+
+/*******************************************************************************
 Function: getstatus
 Purpose: Gets the response code if a response packet.
 Updated: 13.12.2018
@@ -1024,7 +1076,18 @@ httpuri::httpuri( substring s )
   }
   this->host--;
 
-  this->path = substring( s, this->host.end(), s.length() );
+  substring subhost = this->host.find( ':' );
+  if( 0 != subhost.end() )
+  {
+    this->port = substring( s, subhost.end(), this->host.end() );
+    this->host = substring( s, this->host.start(), subhost.start() );
+
+    this->path = substring( s, this->port.end(), s.length() );
+  }
+  else
+  {
+    this->path = substring( s, this->host.end(), s.length() );
+  }
 
   this->query = s.find( '?' );
   if( 0 != this->query.end() )

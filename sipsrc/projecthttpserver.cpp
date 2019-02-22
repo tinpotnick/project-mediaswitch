@@ -4,6 +4,7 @@
 #include "projectwebdocument.h"
 #include "projectsipregistrar.h"
 #include "projectsipdialog.h"
+#include "projectsipdirectory.h"
 
 #include "json.hpp"
 
@@ -62,7 +63,8 @@ projecthttpconnection::projecthttpconnection( boost::asio::io_service& ioservice
   ioservice( ioservice ),
   tcpsocket( ioservice ),
   //inbuffer( new std::string() ),
-  outbuffer( new std::string() )
+  outbuffer( new std::string() ),
+  timer( ioservice )
 {
 
 }
@@ -94,9 +96,11 @@ Updated: 22.01.2019
 *******************************************************************************/
 void projecthttpconnection::start( void )
 {
-  #warning TODO
-  /* How to make this more dynamic. Whilst the HTTP server part of this project is 
-  low frequency it could have larger documents. */
+  this->timer.expires_after( std::chrono::seconds( HTTPCLIENTDEFAULTTIMEOUT ) );
+  this->timer.async_wait( boost::bind( &projecthttpconnection::handletimeout, 
+                                        shared_from_this(), 
+                                        boost::asio::placeholders::error ) );
+
   this->tcpsocket.async_read_some(
     boost::asio::buffer( this->inbuffer, this->inbuffer.size() - 1 ),
     boost::bind(&projecthttpconnection::handleread, shared_from_this(),
@@ -106,7 +110,8 @@ void projecthttpconnection::start( void )
 
 /*******************************************************************************
 Function: handleread
-Purpose: Wait for data
+Purpose: Wait for data then parses and acts. We must be able to handle multiple
+writes to our socket.
 Updated: 22.01.2019
 *******************************************************************************/
 void projecthttpconnection::handleread( 
@@ -114,66 +119,101 @@ void projecthttpconnection::handleread(
     std::size_t bytes_transferred )
 {
 
-  if( !error )
+  projectwebdocument response;
+
+  try
   {
-    stringptr s( new std::string( this->inbuffer.data(), bytes_transferred ) ); 
-    /* Do stuff */
-    projectwebdocument d( s );
-
-    std::string path = d.getrequesturi().str();
-
-    if( path.length() < 1 )
+    if( !error )
     {
-      // 404?
-      return;
-    }
 
-    path.erase( 0, 1 ); /* remove the leading / */
-    stringvector pathparts = splitstring( path, '/' );
-    projectwebdocument response;
-
-    if( "reg" == pathparts[ 0 ] )
-    {
-      projectsipregistration::httpget( pathparts, response );
-    }
-    else if( "dir" == pathparts[ 0 ] )
-    {
-      response.setstatusline( 200, "Ok" );
-
-      std::string body( "dir" );
-      response.addheader( projectwebdocument::Content_Length, body.length() );
-      response.setbody( body.c_str() );
-    }
-    else if( "dialog" == pathparts[ 0 ] )
-    {
-      switch( d.getmethod() )
+      this->request.append( this->inbuffer, bytes_transferred );
+      if( !this->request.iscomplete() )
       {
-        case projectwebdocument::GET:
+        this->tcpsocket.async_read_some(
+          boost::asio::buffer( this->inbuffer, this->inbuffer.size() - 1 ),
+          boost::bind(&projecthttpconnection::handleread, shared_from_this(),
+            boost::asio::placeholders::error,
+            boost::asio::placeholders::bytes_transferred) );
+        return;
+      }
+
+      std::string path = this->request.getrequesturi().str();
+
+      if( path.length() < 1 )
+      {
+        // 404?
+        return;
+      }
+
+      path.erase( 0, 1 ); /* remove the leading / */
+      stringvector pathparts = splitstring( path, '/' );
+      
+
+      if( "reg" == pathparts[ 0 ] )
+      {
+        projectsipregistration::httpget( pathparts, response );
+      }
+      else if( "dir" == pathparts[ 0 ] )
+      {
+        switch( this->request.getmethod() )
         {
-          projectsipdialog::httpget( pathparts, response );
-          break;
-        }
-        case projectwebdocument::POST:
-        {
-          JSON::Value body = JSON::parse( *( d.getbody().strptr() ) );
-          
-          projectsipdialog::httppost( pathparts, body, response );
-          break;
+          case projectwebdocument::GET:
+          {
+            
+            projectsipdirdomain::httpget( pathparts, response );
+            break;
+          }
+          case projectwebdocument::POST:
+          {
+            JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
+            projectsipdirdomain::httppost( pathparts, body, response );
+            break;
+          }
         }
       }
-    }
-    else
-    {
-      response.setstatusline( 404, "Not found" );
-    }
+      else if( "dialog" == pathparts[ 0 ] )
+      {
+        switch( this->request.getmethod() )
+        {
+          case projectwebdocument::GET:
+          {
+            projectsipdialog::httpget( pathparts, response );
+            break;
+          }
+          case projectwebdocument::POST:
+          {
+            JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
+            
+            projectsipdialog::httppost( pathparts, body, response );
+            break;
+          }
+        }
+      }
+      else
+      {
+        response.setstatusline( 404, "Not found" );
+      }
 
-    this->outbuffer = response.strptr();
+      this->outbuffer = response.strptr();
+    }
 
     boost::asio::async_write( this->tcpsocket,
       boost::asio::buffer( *this->outbuffer ),
       boost::bind(&projecthttpconnection::handlewrite, shared_from_this(),
 			boost::asio::placeholders::error,
 			boost::asio::placeholders::bytes_transferred) );
+  }
+  catch(...)
+  {
+    response.setstatusline( 500, "Bad request" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    this->outbuffer = response.strptr();
+
+    boost::asio::async_write( this->tcpsocket,
+        boost::asio::buffer( *this->outbuffer ),
+        boost::bind(&projecthttpconnection::handlewrite, shared_from_this(),
+        boost::asio::placeholders::error,
+        boost::asio::placeholders::bytes_transferred) );
   }
 }
 
@@ -189,6 +229,17 @@ void projecthttpconnection::handlewrite(
   this->tcpsocket.close();
 }
 
-
+/*******************************************************************************
+Function: handletimeout
+Purpose: Our timer callback.
+Updated: 29.01.2019
+*******************************************************************************/
+void projecthttpconnection::handletimeout( const boost::system::error_code& error )
+{
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    this->tcpsocket.close();
+  }
+}
 
 

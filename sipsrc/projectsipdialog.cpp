@@ -2,8 +2,11 @@
 
 #include <boost/lexical_cast.hpp>
 
+#include <stdexcept> // out of range
+
 #include "projectsipdialog.h"
 #include "projectsipconfig.h"
+#include "projectsipregistrar.h"
 #include "projectsipdirectory.h"
 #include "projectsipsdp.h"
 
@@ -269,6 +272,7 @@ void projectsipdialog::invitestart( projectsippacketptr pk )
     return;
   }
 
+  this->invitepacket = pk;
   this->updatecontrol( pk );
   this->nextstate = std::bind( &projectsipdialog::waitfornextinstruction, this, std::placeholders::_1 );
   this->trying();
@@ -283,7 +287,7 @@ void projectsipdialog::inviteauth( projectsippacketptr pk )
 {
   this->lastpacket = pk;
 
-  stringptr password = projectsipdirectory::lookuppassword( 
+  stringptr password = projectsipdirdomain::lookuppassword( 
                 pk->geturihost(), 
                 pk->getuser() );
 
@@ -696,6 +700,12 @@ Updated: 08.02.2019
 *******************************************************************************/
 void projectsipdialog::sendbye( void )
 {
+  if( !this->lastpacket )
+  {
+    /* We must have a previous packet to send a BYE */
+    return;
+  }
+
   projectsippacket bye;
 
   bye.setrequestline( projectsippacket::BYE, "" );
@@ -725,6 +735,111 @@ void projectsipdialog::sendbye( void )
 
   this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
       std::bind( &projectsipdialog::resendbye, this, std::placeholders::_1 ) );
+}
+
+/*******************************************************************************
+Function: sendinvite
+Purpose: Send an INVITE. We will need to make a couple of decisions on how
+and where to send the INVITE. For a registered INVITE this will be simpler. 
+Updated: 08.02.2019
+*******************************************************************************/
+void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &response )
+{
+  std::string realm, to, from, callerid, calleridname;
+  JSON::Integer maxforwards;
+  bool hide = false;
+
+  try{
+    realm = JSON::as_string( request[ "realm" ] );
+    to = JSON::as_string( request[ "to" ] );
+    from = JSON::as_string( request[ "from" ] );
+
+    maxforwards = JSON::as_int64( request[ "maxforwards" ] );
+
+    JSON::Object &cid =  JSON::as_object( request[ "callerid" ] );
+    callerid = JSON::as_string( cid[ "number" ] );
+    calleridname = JSON::as_string( cid[ "name" ] );
+    hide = ( bool )JSON::as_boolean( cid[ "private" ] );
+  }
+  catch( const std::out_of_range& oor )
+  {
+    // We have not got enough params.
+    response.setstatusline( 500, "Error not enough params" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    response.addheader( projectwebdocument::Content_Type, "text/json" );
+    return;
+  }
+
+  stringptr callid = projectsippacket::callid();
+
+  projectsippacketptr invite = projectsippacketptr( new projectsippacket() );
+
+  // Generate SIP URI i.e. sip:realm
+  invite->setrequestline( projectsippacket::INVITE, std::string( "sip:" ) + realm );
+  invite->addviaheader( projectsipconfig::gethostip() );
+
+  invite->addremotepartyid( realm.c_str(), calleridname.c_str(), callerid.c_str(), hide );
+
+  invite->addheader( projectsippacket::To, to );
+  invite->addheader( projectsippacket::From, from );
+  invite->addheader( projectsippacket::Call_ID, *callid );
+  invite->addheader( projectsippacket::CSeq, "1 INVITE" );
+  invite->addheader( projectsippacket::Max_Forwards, maxforwards );
+
+  invite->addheader( projectsippacket::Contact,
+              projectsippacket::contact( stringptr( new std::string( from ) ), 
+              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              0,
+              projectsipconfig::getsipport() ) );
+  
+  invite->addheader( projectsippacket::Allow,
+              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  invite->addheader( projectsippacket::Content_Length,
+                      "0" );
+
+  // Now, where do we send this request?
+  // 1) are we a locally registered user
+  // 2) are we a local domain - but user doesn't exist or isn't registered
+  // 3) are we an external destination, i.e. we have to dns lookup.
+
+  std::string useratdom = to;
+  useratdom += "@";
+  useratdom += realm;
+  if( !projectsipregistration::sendtoregisteredclient( useratdom, invite ) )
+  {
+    projectsipdirdomain::pointer dom = projectsipdirdomain::lookupdomain( realm );
+    if ( dom )
+    {
+      if( projectsipdirdomain::userexist( realm, to ) )
+      {
+        response.setstatusline( 480, "Temporarily Unavailable" );
+        response.addheader( projectwebdocument::Content_Length, 0 );
+        response.addheader( projectwebdocument::Content_Type, "text/json" );
+        return;
+      }
+              
+      response.setstatusline( 404, "User not found" );
+      response.addheader( projectwebdocument::Content_Length, 0 );
+      response.addheader( projectwebdocument::Content_Type, "text/json" );
+      return;
+    }
+
+    // TODO - external call - now need to dns lookup etc.
+  }
+
+  // Respond to the web request.
+  JSON::Object v;
+  v[ "callid" ] = *callid;
+  std::string t = JSON::to_string( v );
+
+  response.setstatusline( 200, "Ok" );
+  response.addheader( projectwebdocument::Content_Length, t.size() );
+  response.addheader( projectwebdocument::Content_Type, "text/json" );
+  response.setbody( t.c_str() );
+
+  // TODO - sotre this new dialog
+  //this->invitepacket = invite;
+  
 }
 
 /*******************************************************************************
@@ -779,7 +894,7 @@ Updated: 25.01.2019
 void projectsipdialog::updatecontrol( projectsippacketptr pk )
 {
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
-  d->setrequestline( projectwebdocument::POST, "http://127.0.0.1/call" );
+  d->setrequestline( projectwebdocument::POST, "http://127.0.0.1/invite" );
 
   JSON::Object v;
 
@@ -837,7 +952,7 @@ void projectsipdialog::httpcallback( int errorcode )
     this->untrack();
     return;
   }
-  
+
   if( 0 != errorcode )
   {
     this->temporaryunavailable();
@@ -881,9 +996,26 @@ void projectsipdialog::httppost( stringvector &path, JSON::Value &body, projectw
 {
   JSON::Object b = JSON::as_object( body );
 
+  if( path.size() < 1 )
+  {
+    response.setstatusline( 404, "Not found" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    return;
+  }
+
+  std::string action = path[ 1 ];
+
+  if( action == "invite" )
+  {
+    projectsipdialog::sendinvite( b, response );
+    return;
+  }
+
   if( !b.has_key( "callid" ) )
   {
     response.setstatusline( 404, "Not found" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    return;
   }
 
   projectsipdialogs::index< projectsipdialogcallid >::type::iterator it;
@@ -891,47 +1023,39 @@ void projectsipdialog::httppost( stringvector &path, JSON::Value &body, projectw
   if( dialogs.get< projectsipdialogcallid >().end() == it )
   {
     response.setstatusline( 404, "Not found" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    return;
   }
-  else
+
+  if( action == "ring" )
   {
-    if ( b.has_key( "action" ) )
+    response.setstatusline( 200, "Ok" );
+    (*it)->alertinfo = "";
+    if ( b.has_key( "alertinfo" ) )
     {
-      std::string action = JSON::as_string( b[ "action" ] );
-      if( action == "ring" )
-      {
-        response.setstatusline( 200, "Ok" );
-        (*it)->alertinfo = "";
-        if ( b.has_key( "alertinfo" ) )
-        {
-          (*it)->alertinfo = JSON::as_string( b[ "alertinfo" ] );
-        }
-        (*it)->ringing();
-      }
-      else if( action == "answer" )
-      {
-        response.setstatusline( 200, "Ok" );
-
-        // need to add sdp info.
-        (*it)->retries = 3;
-        (*it)->answer();
-      }
-      else if( action == "busy" )
-      {
-        response.setstatusline( 200, "Ok" );
-
-        // need to add sdp info.
-        (*it)->retries = 3;
-        (*it)->busy();
-      }
+      (*it)->alertinfo = JSON::as_string( b[ "alertinfo" ] );
     }
-    else 
-    {
-      response.setstatusline( 404, "Not found" );
-    }
+    (*it)->ringing();
+  }
+  else if( action == "answer" )
+  {
+    response.setstatusline( 200, "Ok" );
+
+    // need to add sdp info.
+    (*it)->retries = 3;
+    (*it)->answer();
+  }
+  else if( action == "busy" )
+  {
+    response.setstatusline( 200, "Ok" );
+
+    // need to add sdp info.
+    (*it)->retries = 3;
+    (*it)->busy();
   }
 
+  response.setstatusline( 404, "Not found" );
   response.addheader( projectwebdocument::Content_Length, 0 );
-  response.addheader( projectwebdocument::Content_Type, "text/json" );
 }
 
 

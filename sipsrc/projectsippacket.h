@@ -80,8 +80,12 @@ public:
   int getexpires( void );
 
   /* specific headers */
-  bool addviaheader( const char *host, projectsippacket *ref );
+  bool addviaheader( const char *host, projectsippacket *ref = NULL );
   bool addwwwauthenticateheader( projectsippacket *ref );
+  bool addremotepartyid( const char * realm, 
+                          const char *calleridname, 
+                          const char * callerid,
+                          bool hide );
   bool checkauth( projectsippacket *ref, stringptr password );
 
   /*
@@ -105,6 +109,7 @@ public:
         Proxy_Authenticate,
         Proxy_Authorization,
         Record_Route,
+        Remote_Party_ID,
         Route,
         Retry_After,
         Reason,
