@@ -48,7 +48,7 @@ projectsipdirdomain::pointer projectsipdirdomain::create( void )
 
 /*******************************************************************************
 Function: adduser
-Purpose: Add a user to this domain. If hte user exists then replace.
+Purpose: Add a user to this domain. If the user exists then replace.
 Updated: 20.02.2019
 *******************************************************************************/
 void projectsipdirdomain::adduser( std::string &user, std::string &secret )
@@ -261,7 +261,7 @@ std::string projectsipdirdomain::geturiforcontrol( std::string path )
 
   std::string controluri = "http://";
   controluri += *this->controlhost;
-  
+
   if( 80 != this->controlport )
   {
     controluri += ":";
@@ -279,7 +279,7 @@ std::string projectsipdirdomain::geturiforcontrol( std::string path )
 
 /*******************************************************************************
 Function: httpget
-Purpose: Report on directoru information
+Purpose: Report on directory information
 Updated: 20.02.2019
 *******************************************************************************/
 void projectsipdirdomain::httpget( stringvector &path, projectwebdocument &response )

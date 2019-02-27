@@ -20,6 +20,10 @@ All services communicate with each other via HTTP. The following section defines
 
 ### POST http://control/invite
 
+Similar to the sip server invite this call will originate a new call - but it will go through the call processing first (compared to the SIP interface which will blindly call the SIP endpoint).
+
+
+
 ### POST http://control/reg
 
 Notify the control server of a SIP registration.
@@ -55,9 +59,19 @@ Returns JSON listing this domains entry in the directory.
 
 ### GET http://sip/reg
 
+Returns the number of registered clients.
+
+### POST http://sip/reg
+
+TODO - register (outbound) with a SIP service.
+
 ### POST http://sip/dialog/invite
 
-Create a new call.
+Originate a new call.
+
+curl -X POST --data-raw '[{ "domain": "bling.babblevoice.com", "to: "", "from": "", "maxforwards": 70, "callerid": { "number": "123", "name": "123", "private": false }, "control": { "host": "127.0.0.1", "port": 9001 } }]' -H "Content-Type:application/json" http://127.0.0.1/invite
+
+The control option is optional. If it is in this is the server which will receive updates regarding the call flow. If not, the default one listed in the "to" field will be used. If not this, then no updates will be sent.
 
 ### POST http://sip/dialog/ring
 
@@ -66,9 +80,7 @@ curl -X  POST --data-raw '{ "callid": "<callid>", "alertinfo": "somealertinfo" }
 
 If the call is not in a ringing or answered state it will send a 180 ringing along with alert info if sent.
 
-### POST http://sip/dialog/invite
 
-This interface is used to manage dialogs. 
 ### GET http://sip/dialog
 
 

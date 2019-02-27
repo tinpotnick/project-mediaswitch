@@ -47,11 +47,17 @@ public:
   std::string alertinfo;
 
   /* our state functions */
+
+  /* inbound invite */
   void invitestart( projectsippacketptr pk );
   void inviteauth( projectsippacketptr pk  );
   void waitfornextinstruction( projectsippacketptr pk );
   void waitforack( projectsippacketptr pk );
   void waitforackanddie( projectsippacketptr pk );
+
+  /* outbound invite */
+  void waitforinviteprogress( projectsippacketptr pk );
+
   std::function<void ( projectsippacketptr pk ) > laststate;
   std::function<void ( projectsippacketptr pk ) > nextstate;
 
@@ -83,7 +89,7 @@ private:
   void send486( void );
 
   /* Verbs */
-  static void sendinvite( JSON::Object &request, projectwebdocument &response );
+  void sendinvite( JSON::Object &request, projectwebdocument &response );
   void sendbye( void );
 
   /* clean up */
@@ -99,6 +105,9 @@ private:
 
   int retries;
   bool authenticated;
+
+  std::string controlhost;
+  int controlport;
 
   bool callringing;
   bool callanswered;

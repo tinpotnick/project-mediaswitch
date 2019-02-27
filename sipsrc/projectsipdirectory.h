@@ -15,7 +15,7 @@
 
 /*******************************************************************************
 File: projectsipdirectory.h/cpp.
-Purpose: Store and lookup actualy username and passwords. Cache the results
+Purpose: Store and lookup actually username and passwords. Cache the results
 in a fast lookup memory structure.
 *******************************************************************************/
 class projectsipdiruser :
@@ -36,7 +36,7 @@ typedef std::unordered_map< std::string, projectsipdiruser::pointer > projectsip
 /*******************************************************************************
 Class: projectsipdirdomain
 Purpose: Store information about a domains. For example, com would point to a 
-subdomain or pottentially users.
+subdomain or potentially users.
 Updated: 22.01.2019
 *******************************************************************************/
 class projectsipdirdomain :

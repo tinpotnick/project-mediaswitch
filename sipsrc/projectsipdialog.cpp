@@ -750,7 +750,7 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
   bool hide = false;
 
   try{
-    realm = JSON::as_string( request[ "realm" ] );
+    realm = JSON::as_string( request[ "domain" ] );
     to = JSON::as_string( request[ "to" ] );
     from = JSON::as_string( request[ "from" ] );
 
@@ -759,19 +759,25 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
     JSON::Object &cid =  JSON::as_object( request[ "callerid" ] );
     callerid = JSON::as_string( cid[ "number" ] );
     calleridname = JSON::as_string( cid[ "name" ] );
+
+    JSON::Object control = JSON::as_object( request[ "control" ] );
+
+    this->controlhost = JSON::as_string( control[ "host" ] );
+    this->controlport = JSON::as_int64( control[ "port" ] );
+
     hide = ( bool )JSON::as_boolean( cid[ "private" ] );
   }
   catch( const std::out_of_range& oor )
   {
     // We have not got enough params.
+    this->untrack();
     response.setstatusline( 500, "Error not enough params" );
     response.addheader( projectwebdocument::Content_Length, 0 );
     response.addheader( projectwebdocument::Content_Type, "text/json" );
     return;
   }
 
-  stringptr callid = projectsippacket::callid();
-
+  this->callid = *projectsippacket::callid();
   projectsippacketptr invite = projectsippacketptr( new projectsippacket() );
 
   // Generate SIP URI i.e. sip:realm
@@ -782,7 +788,7 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
 
   invite->addheader( projectsippacket::To, to );
   invite->addheader( projectsippacket::From, from );
-  invite->addheader( projectsippacket::Call_ID, *callid );
+  invite->addheader( projectsippacket::Call_ID, this->callid );
   invite->addheader( projectsippacket::CSeq, "1 INVITE" );
   invite->addheader( projectsippacket::Max_Forwards, maxforwards );
 
@@ -812,12 +818,14 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
     {
       if( projectsipdirdomain::userexist( realm, to ) )
       {
+        this->untrack();
         response.setstatusline( 480, "Temporarily Unavailable" );
         response.addheader( projectwebdocument::Content_Length, 0 );
         response.addheader( projectwebdocument::Content_Type, "text/json" );
         return;
       }
               
+      this->untrack();
       response.setstatusline( 404, "User not found" );
       response.addheader( projectwebdocument::Content_Length, 0 );
       response.addheader( projectwebdocument::Content_Type, "text/json" );
@@ -829,7 +837,7 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
 
   // Respond to the web request.
   JSON::Object v;
-  v[ "callid" ] = *callid;
+  v[ "callid" ] = this->callid;
   std::string t = JSON::to_string( v );
 
   response.setstatusline( 200, "Ok" );
@@ -837,9 +845,21 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
   response.addheader( projectwebdocument::Content_Type, "text/json" );
   response.setbody( t.c_str() );
 
-  // TODO - sotre this new dialog
-  //this->invitepacket = invite;
+  this->invitepacket = invite;
+
+  this->laststate = std::bind( &projectsipdialog::waitforinviteprogress, this, std::placeholders::_1 );
+  this->nextstate = std::bind( &projectsipdialog::waitforinviteprogress, this, std::placeholders::_1 );
   
+}
+
+
+/*******************************************************************************
+Function: waitforinviteprogress
+Purpose: We have sent an invite - wait for something to come back.
+Updated: 27.02.2019
+*******************************************************************************/
+void projectsipdialog::waitforinviteprogress( projectsippacketptr pk )
+{
 }
 
 /*******************************************************************************
@@ -1007,7 +1027,10 @@ void projectsipdialog::httppost( stringvector &path, JSON::Value &body, projectw
 
   if( action == "invite" )
   {
-    projectsipdialog::sendinvite( b, response );
+    projectsipdialog::pointer ptr;
+    ptr = projectsipdialog::create();
+    dialogs.insert( ptr );
+    ptr->sendinvite( b, response );
     return;
   }
 
