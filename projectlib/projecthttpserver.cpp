@@ -1,12 +1,9 @@
 
 
 #include "projecthttpserver.h"
+#include "projecthttpclient.h"
 #include "projectwebdocument.h"
-#include "projectsipregistrar.h"
-#include "projectsipdialog.h"
-#include "projectsipdirectory.h"
 
-#include "json.hpp"
 
 #include <iostream>
 
@@ -15,8 +12,11 @@ Function: projecthttpserver
 Purpose: Constructor
 Updated: 22.01.2019
 *******************************************************************************/
-projecthttpserver::projecthttpserver( boost::asio::io_service& io_service, short port ) :
-		httpacceptor( io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port ) )
+projecthttpserver::projecthttpserver( boost::asio::io_service& io_service, 
+                                        short port, 
+                                        std::function<void ( projectwebdocument &request, projectwebdocument &response )> callback ) :
+		httpacceptor( io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port ) ),
+    callback( callback )
 {
   this->waitaccept();
 }
@@ -48,7 +48,7 @@ void projecthttpserver::handleaccept(
 {
   if ( !error )
   {
-    newconnection->start();
+    newconnection->start( this->callback );
     this->waitaccept();
   }
 }
@@ -62,7 +62,6 @@ Updated: 22.01.2019
 projecthttpconnection::projecthttpconnection( boost::asio::io_service& ioservice ) :
   ioservice( ioservice ),
   tcpsocket( ioservice ),
-  //inbuffer( new std::string() ),
   outbuffer( new std::string() ),
   timer( ioservice )
 {
@@ -94,8 +93,10 @@ Function: start
 Purpose: Starts our read for http.
 Updated: 22.01.2019
 *******************************************************************************/
-void projecthttpconnection::start( void )
+void projecthttpconnection::start( std::function<void ( projectwebdocument &request, projectwebdocument &response )> callback )
 {
+  this->callback = callback;
+
   this->timer.expires_after( std::chrono::seconds( HTTPCLIENTDEFAULTTIMEOUT ) );
   this->timer.async_wait( boost::bind( &projecthttpconnection::handletimeout, 
                                         shared_from_this(), 
@@ -137,62 +138,7 @@ void projecthttpconnection::handleread(
         return;
       }
 
-      std::string path = this->request.getrequesturi().str();
-
-      if( path.length() < 1 )
-      {
-        // 404?
-        return;
-      }
-
-      path.erase( 0, 1 ); /* remove the leading / */
-      stringvector pathparts = splitstring( path, '/' );
-      
-
-      if( "reg" == pathparts[ 0 ] )
-      {
-        projectsipregistration::httpget( pathparts, response );
-      }
-      else if( "dir" == pathparts[ 0 ] )
-      {
-        switch( this->request.getmethod() )
-        {
-          case projectwebdocument::GET:
-          {
-            
-            projectsipdirdomain::httpget( pathparts, response );
-            break;
-          }
-          case projectwebdocument::POST:
-          {
-            JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
-            projectsipdirdomain::httppost( pathparts, body, response );
-            break;
-          }
-        }
-      }
-      else if( "dialog" == pathparts[ 0 ] )
-      {
-        switch( this->request.getmethod() )
-        {
-          case projectwebdocument::GET:
-          {
-            projectsipdialog::httpget( pathparts, response );
-            break;
-          }
-          case projectwebdocument::POST:
-          {
-            JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
-            
-            projectsipdialog::httppost( pathparts, body, response );
-            break;
-          }
-        }
-      }
-      else
-      {
-        response.setstatusline( 404, "Not found" );
-      }
+      this->callback( this->request, response );
 
       this->outbuffer = response.strptr();
     }

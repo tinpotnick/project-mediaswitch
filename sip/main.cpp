@@ -17,6 +17,11 @@
 #include "projectsipserver.h"
 #include "projecthttpserver.h"
 
+#include "projectsipregistrar.h"
+#include "projectsipdialog.h"
+#include "projectsipdirectory.h"
+#include "json.hpp"
+
 #include "test.h"
 
 boost::asio::io_service io_service;
@@ -95,6 +100,71 @@ static void killserver( int signum )
 }
 
 /*******************************************************************************
+Function: handlewebrequest
+Purpose: As it says...
+Updated: 28.02.2019
+*******************************************************************************/
+static void handlewebrequest( projectwebdocument &request, projectwebdocument &response )
+{
+  std::string path = request.getrequesturi().str();
+
+  if( path.length() < 1 )
+  {
+    response.setstatusline( 404, "Not found" );
+    return;
+  }
+
+  path.erase( 0, 1 ); /* remove the leading / */
+  stringvector pathparts = splitstring( path, '/' );
+  
+
+  if( "reg" == pathparts[ 0 ] )
+  {
+    projectsipregistration::httpget( pathparts, response );
+  }
+  else if( "dir" == pathparts[ 0 ] )
+  {
+    switch( request.getmethod() )
+    {
+      case projectwebdocument::GET:
+      {
+        
+        projectsipdirdomain::httpget( pathparts, response );
+        break;
+      }
+      case projectwebdocument::POST:
+      {
+        JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
+        projectsipdirdomain::httppost( pathparts, body, response );
+        break;
+      }
+    }
+  }
+  else if( "dialog" == pathparts[ 0 ] )
+  {
+    switch( request.getmethod() )
+    {
+      case projectwebdocument::GET:
+      {
+        projectsipdialog::httpget( pathparts, response );
+        break;
+      }
+      case projectwebdocument::POST:
+      {
+        JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
+        
+        projectsipdialog::httppost( pathparts, body, response );
+        break;
+      }
+    }
+  }
+  else
+  {
+    response.setstatusline( 404, "Not found" );
+  }
+}
+
+/*******************************************************************************
 Function: startserver
 Purpose: As it says...
 Updated: 12.12.2018
@@ -104,7 +174,7 @@ void startserver( void )
 	try
 	{
     projectsipserver s( io_service, 5060 );
-    projecthttpserver h( io_service, 8080 );
+    projecthttpserver h( io_service, 8080, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
 		io_service.run();
 	}
 	catch( std::exception& e )

@@ -3,6 +3,8 @@
 #include <iostream>
 #include <string>
 
+#include <boost/bind.hpp>
+
 #include "projectsipserver.h"
 #include "projectsipsm.h"
 #include "projectsipdirectory.h"

@@ -8,9 +8,6 @@
 #include "projectwebdocument.h"
 
 
-// test
-#include <array>
-
 #ifndef PROJECTHTTPSERVER_H
 #define PROJECTHTTPSERVER_H
 
@@ -30,7 +27,7 @@ public:
 	static pointer create( boost::asio::io_service& io_service );
 	boost::asio::ip::tcp::socket& socket();
 
-  void start( void );
+  void start( std::function<void ( projectwebdocument &request, projectwebdocument &response )> callback );
   void handleread( const boost::system::error_code& error, std::size_t bytes_transferred );
   void handlewrite( const boost::system::error_code& error, std::size_t bytes_transferred );
   void handletimeout( const boost::system::error_code& error );
@@ -45,6 +42,7 @@ private:
   projectwebdocument request;
 
   boost::asio::steady_timer timer;
+  std::function<void ( projectwebdocument &request, projectwebdocument &response )> callback;
 };
 
 
@@ -56,7 +54,7 @@ Updated: 22.01.2019
 class projecthttpserver
 {
 public:
-	projecthttpserver( boost::asio::io_service& io_service, short port );
+	projecthttpserver( boost::asio::io_service& io_service, short port, std::function<void ( projectwebdocument &request, projectwebdocument &response )> callback );
 
 private:
   void waitaccept( void );
@@ -64,6 +62,7 @@ private:
 		      const boost::system::error_code& error);
 
 	boost::asio::ip::tcp::acceptor httpacceptor;
+  std::function<void ( projectwebdocument &request, projectwebdocument &response )> callback;
 };
 
 #endif /* PROJECTHTTPSERVER_H */
