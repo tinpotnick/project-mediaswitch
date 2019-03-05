@@ -4,6 +4,10 @@
 #include <vector>
 #include <boost/shared_ptr.hpp>
 
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/random_generator.hpp>
+
 #ifndef PROJECTSIPSTRING_H
 #define PROJECTSIPSTRING_H
 
@@ -99,6 +103,17 @@ bool operator != ( const substring& lhs, const char *rhs );
 bool operator == ( const substring& lhs, const substring &rhs );
 bool operator != ( const substring& lhs, const substring &rhs );
 
+/*******************************************************************************
+Function: uuid
+Purpose: Generate a uuid.
+Updated: 05.03.2019
+*******************************************************************************/
+inline std::string uuid()
+{
+  boost::uuids::basic_random_generator<boost::mt19937> gen;
+  boost::uuids::uuid u = gen();
+  return boost::lexical_cast< std::string >( u );
+}
 
 /*******************************************************************************
 Function: operator << ostream, substring
