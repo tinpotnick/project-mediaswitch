@@ -3,10 +3,6 @@
 #include <stdio.h>
 #include <signal.h>
 
-#include <unistd.h>
-#include <sys/stat.h>
-#include <stdlib.h>
-
 #include <sys/resource.h>
 
 #include <boost/asio.hpp>
@@ -21,62 +17,11 @@
 #include "projectsipdialog.h"
 #include "projectsipdirectory.h"
 #include "json.hpp"
+#include "projectdaemon.h"
 
 #include "test.h"
 
 boost::asio::io_service io_service;
-
-/*******************************************************************************
-Function: daemonize
-Purpose: As it says...
-Updated: 12.12.2018
-*******************************************************************************/
-static void daemonize( void )
-{
-  pid_t pid, sid;
-
-  /* already a daemon */
-  if ( getppid() == 1 )
-  {
-    return;
-  }
-
-  /* Fork off the parent process */
-  pid = fork();
-  if (pid < 0)
-  {
-    exit( EXIT_FAILURE );
-  }
-  /* If we got a good PID, then we can exit the parent process. */
-  if ( pid > 0 )
-  {
-    exit( EXIT_SUCCESS );
-  }
-
-  /* At this point we are executing as the child process */
-
-  /* Change the file mode mask */
-  umask( 0 );
-
-  /* Create a new SID for the child process */
-  sid = setsid();
-  if ( sid < 0 )
-  {
-    exit( EXIT_FAILURE );
-  }
-
-  /* Change the current working directory.  This prevents the current
-     directory from being locked; hence not being able to remove it. */
-  if ( ( chdir( "/" ) ) < 0 )
-  {
-    exit( EXIT_FAILURE );
-  }
-
-  /* Redirect standard files to /dev/null */
-  freopen( "/dev/null", "r", stdin );
-  freopen( "/dev/null", "w", stdout );
-  freopen( "/dev/null", "w", stderr );
-}
 
 /*******************************************************************************
 Function: stopserver
@@ -169,12 +114,12 @@ Function: startserver
 Purpose: As it says...
 Updated: 12.12.2018
 *******************************************************************************/
-void startserver( void )
+void startserver( short port )
 {
 	try
 	{
     projectsipserver s( io_service, 5060 );
-    projecthttpserver h( io_service, 8080, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
+    projecthttpserver h( io_service, BOOST_ASIO_HAS_SERIAL_PORT, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
 		io_service.run();
 	}
 	catch( std::exception& e )
@@ -194,6 +139,7 @@ Updated: 12.12.2018
 *******************************************************************************/
 int main( int argc, const char* argv[] )
 {
+  short port = 9000;
   srand( time( NULL ) );
 
 	bool fg = false;
@@ -213,6 +159,23 @@ int main( int argc, const char* argv[] )
 			{
 				tests = true;
 			}
+      else if( "--port" == argvstr )
+      {
+        try
+        {
+          if( argc > ( i + 1 ) )
+          {
+            port = boost::lexical_cast< int >( argv[ i + 1 ] );
+            i++;
+            continue;
+          }
+        }
+        catch( boost::bad_lexical_cast &e )
+        {
+        }
+        std::cerr << "What port was that?" << std::endl;
+        return -1;
+      }
 		}
 	}
 
@@ -229,12 +192,14 @@ int main( int argc, const char* argv[] )
     return 0;
   }
 
+  std::cout << "Starting Project SIP server with control port listening on port " << port << std::endl;
+
 	if ( !fg )
 	{
 		daemonize();
 	}
 
-	startserver();
+	startserver( port );
 
 	return 0;
 }

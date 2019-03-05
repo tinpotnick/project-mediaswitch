@@ -37,7 +37,11 @@ void projectsipserver::handlereadsome( void )
           this->bytesreceived = bytes_recvd;
           this->handledata();
         }
-        this->handlereadsome();
+        
+        if( !ec )
+        {
+          this->handlereadsome();
+        }
       } );
 }
 
