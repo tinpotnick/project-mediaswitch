@@ -1,6 +1,6 @@
 
 
-all: ./Debug/project-sip
+all: ./Debug/project-sip ./Debug/project-rtp
 
 ./Debug/libproject.a:
 	$(MAKE) -C projectlib
@@ -8,3 +8,5 @@ all: ./Debug/project-sip
 ./Debug/project-sip: ./Debug/libproject.a
 	$(MAKE) -C sip
 
+./Debug/project-rtp: ./Debug/libproject.a
+	$(MAKE) -C rtp
