@@ -10,9 +10,17 @@
 
 #include <boost/shared_ptr.hpp>
 
-#define RTPBUFFERLENGTH 50
-#define RTPD
+#define RTPMAXLENGTH 1500
+#define RTCPMAXLENGTH 1500
 
+/* The number of bytes in a packet */
+#define G711PAYLOADBYTES 80
+#define G722PAYLOADBYTES 80
+#define ILBC20PAYLOADBYTES 38
+#define ILBC30PAYLOADBYTES 50
+
+/* The number of packets we will keep in a buffer */
+#define BUFFERPACKETCOUNT 20
 
 /*******************************************************************************
 Class: projectrtpchannel
@@ -33,13 +41,14 @@ class projectrtpchannel :
 {
 
 public:
-  enum{ PCMA, PCMU, ILBC20, ILBC30, G722 };
   projectrtpchannel( boost::asio::io_service &io_service, short port );
+  ~projectrtpchannel( void );
 
   typedef boost::shared_ptr< projectrtpchannel > pointer;
   static pointer create( boost::asio::io_service &io_service, short port );
 
-  void open( void );
+  enum{ PCMA, PCMU, ILBC20, ILBC30, G722 };
+  void open( int codec );
   void close( void );
 
 private:
@@ -50,16 +59,34 @@ private:
   boost::asio::ip::udp::endpoint rtpsenderendpoint;
   boost::asio::ip::udp::endpoint rtcpsenderendpoint;
 
-  enum { max_length = 1500 };
-  char data[ max_length ];
-  char rtcpdata[ max_length ];
-  int bytesreceived;
+  char *rtpdata;
+  char *rtcpdata;
+
+  int rtpindex;
 
   void readsomertp( void );
   void readsomertcp( void );
 
   void handlertpdata( void );
   void handlertcpdata( void );
+
+  /*
+    For the following to works:
+    char = 8 bits
+    short = 16 bits
+    int= 32 bits
+  */
+  inline unsigned char getpacketversion( unsigned char *pk );
+  inline unsigned char getpacketpadding( unsigned char *pk );
+  inline unsigned char getpacketextension( unsigned char *pk );
+  inline unsigned char getpacketcsrccount( unsigned char *pk );
+  inline unsigned char getpacketmarker( unsigned char *pk );
+  inline unsigned char getpayloadtype( unsigned char *pk );
+  inline unsigned short getsequencenumber( unsigned char *pk );
+  inline unsigned int gettimestamp( unsigned char *pk );
+  inline unsigned int getssrc( unsigned char *pk );
+  inline unsigned int getcsrc( unsigned char *pk, unsigned char index );
+
 };
 
 #endif

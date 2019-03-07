@@ -12,6 +12,14 @@ var projectcontrol = function()
   this.calls = {};
   var projectcontrolobj = this;
 
+  this.sip = {};
+  this.sip.host = "127.0.0.1";
+  this.sip.port = 9000;
+
+  this.us = {};
+  this.us.host = "127.0.0.1";
+  this.us.port = 9001;
+
   var callobj =
   {
     /***************************************************************************
@@ -93,22 +101,7 @@ var projectcontrol = function()
     postrequest: function( action, data )
     {
       data.callid = this.s.callid;
-
-      data = JSON.stringify( data );
-      var post_options = {
-        host: "127.0.0.1",
-        port: "8080",
-        path: "/dialog/" + action,
-        method: "POST",
-        headers: {
-            "Content-Type": "text/json",
-            "Content-Length": Buffer.byteLength( data )
-        }
-      };
-
-      var post_req = http.request( post_options );
-      post_req.write( data );
-      post_req.end();
+      projectcontrol.sipserver( data, "/dialog/" + action );
     }
   }
 
@@ -168,34 +161,49 @@ projectcontrol.prototype.onnewcall = function( callback )
 }
 
 /***************************************************************************
+Function: sipserver
+Purpose: Communicate with sip server.
+***************************************************************************/
+projectcontrol.prototype.sipserver = function( request, path )
+{
+  try
+  {
+    var data = JSON.stringify( request );
+    var post_options = {
+      "host": this.sip.host,
+      "port": this.sip.port,
+      "path": path,
+      "method": "POST",
+      "headers": {
+        "Content-Type": "text/json",
+        "Content-Length": Buffer.byteLength( data )
+      }
+    };
+
+    var post_req = http.request( post_options );
+    post_req.write( data );
+    post_req.end();
+  }
+  catch( error )
+  {
+    console.log( "Error communicating with SIP server." )
+  }
+}
+
+/***************************************************************************
 Function: invite
 Purpose: New call.
 ***************************************************************************/
 projectcontrol.prototype.invite = function( request, callback )
 {
-
-  var data = JSON.stringify( request );
-  var post_options = {
-    host: "127.0.0.1",
-    port: "8080",
-    path: "/dialog/invite",
-    method: "POST",
-    headers: {
-      "Content-Type": "text/json",
-      "Content-Length": Buffer.byteLength( data )
-    }
-  };
-
-  var post_req = http.request( post_options );
-  post_req.write( data );
-  post_req.end();
+  this.sipserver( request, "/dialog/invite" );
 }
 
 /***************************************************************************
 Function: listen
 Purpose: Create a new server and listen.
 ***************************************************************************/
-projectcontrol.prototype.listen = function( port, hostname )
+projectcontrol.prototype.listen = function()
 {
   this.httpserver = http.createServer( ( req, res ) => 
   {
@@ -228,10 +236,41 @@ projectcontrol.prototype.listen = function( port, hostname )
 
   } );
 
-  this.httpserver.listen( port, hostname, () => 
+  this.httpserver.listen( this.us.port, this.us.host, () => 
   {
-    console.log( `Server running at http://${hostname}:${port}/` );
+    console.log( `Project Control Server is running on ${this.us.host} port ${this.us.port}` );
   } );
+}
+
+/***************************************************************************
+Function: directory
+Purpose: Register users with our SIP server and let it know we are the 
+control server for them.
+[
+  { 
+    "domain": "bling.babblevoice.com", 
+    "control": 
+    { 
+      "host": "127.0.0.1", 
+      "port": 9001 
+    }, 
+    "users": 
+    [ 
+      { "username": "1003", "secret": "mysecret"}
+    ]
+  }
+]
+***************************************************************************/
+projectcontrol.prototype.directory = function( domain, users )
+{
+  var request = {};
+  request.domain = domain;
+  request.control = {};
+  request.control.host = this.us.host;
+  request.control.port = this.us.port;
+  request.users = users;
+
+  this.sipserver( request, "/dir" );
 }
 
 

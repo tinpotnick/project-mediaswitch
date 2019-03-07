@@ -100,19 +100,35 @@ The server will return a JSON document. Including stats regarding the workload o
 * RFC 2617: HTTP Authentication: Basic and Digest Access Authentication
 * RFC 3261: SIP: Session Initiation Protocol
 * RFC 4566: SDP: Session Description Protocol
+* RFC 3550: RTP: A Transport Protocol for Real-Time Applications
+* RFC 3551: RTP Profile for Audio and Video Conferences with Minimal Control
 
 # Testing
 
-The SIP server can be built with the test flag:
+The SIP server can be run with the test flag:
 
-make test
-
-Which will build siptest which will run through a bunch of internal testing
-to try and ensure nothing is broken.
+project-sip --test
 
 In the folder testfiles there are also other test files.
 
-The defult ports for the server are 8080 for the web server and 5060 for the SIP server.
+The default ports for the server are 9000 for the web server and 5060 for the SIP server.
+
+## Memory
+
+Some notes on using valgrind for memory testing.
+
+### Running memory checking
+
+valgrind --tool=massif project-rtp --fg
+
+After running, this will create a massif file in the directry you run valgrind from. i.e. massif.out.3823
+You can use ms_print to pretify th econtents of this file:
+
+ms_print massif.out.3823
+
+### Leak detection
+
+valgrind --leak-check=yes project-rtp --fg
 
 ## Registry
 
@@ -120,11 +136,11 @@ registerclient.xml & .csv.
 
 Which are config files to be used with sipp which can test various scenarios.
 
-sipp 127.0.0.1 -sf registerclient.xml -inf registerclient.csv -m 1 -l 1 -trace_msg -trace_err
+sipp 127.0.0.1:9997 -sf registerclient.xml -inf registerclient.csv -m 1 -l 1 -trace_msg -trace_err
 
 or without the logging files.
 
-sipp 127.0.0.1 -sf registerclient.xml -inf registerclient.csv -m 1 -l 1
+sipp 127.0.0.1:9997 -sf registerclient.xml -inf registerclient.csv -m 1 -l 1
 
 To upload test data to the sip server use
 

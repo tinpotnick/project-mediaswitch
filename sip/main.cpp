@@ -18,6 +18,7 @@
 #include "projectsipdirectory.h"
 #include "json.hpp"
 #include "projectdaemon.h"
+#include "projectsipconfig.h"
 
 #include "test.h"
 
@@ -114,12 +115,12 @@ Function: startserver
 Purpose: As it says...
 Updated: 12.12.2018
 *******************************************************************************/
-void startserver( short port )
+void startserver( short controlport, short sipport )
 {
 	try
 	{
-    projectsipserver s( io_service, 5060 );
-    projecthttpserver h( io_service, BOOST_ASIO_HAS_SERIAL_PORT, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
+    projectsipserver s( io_service, sipport );
+    projecthttpserver h( io_service, controlport, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
 		io_service.run();
 	}
 	catch( std::exception& e )
@@ -140,6 +141,7 @@ Updated: 12.12.2018
 int main( int argc, const char* argv[] )
 {
   short port = 9000;
+  short sipport = 5060;
   srand( time( NULL ) );
 
 	bool fg = false;
@@ -151,21 +153,46 @@ int main( int argc, const char* argv[] )
 		{
 			std::string argvstr = argv[i];
 
-			if ( "--fg" == argvstr)
+			if ( "--help" == argvstr )
+      {
+        std::cout << "--fg - run the server in the foreground" << std::endl;
+        std::cout << "--cp - set the control server listening port (default 9000)" << std::endl;
+        std::cout << "--sp - set the sip server listening port (default 5060)" << std::endl;
+        return 1;
+      }
+      else if ( "--fg" == argvstr )
 			{
 				fg = true;
 			}
-      else if ( "--test" == argvstr)
+      else if ( "--test" == argvstr )
 			{
 				tests = true;
 			}
-      else if( "--port" == argvstr )
+      else if( "--cp" == argvstr )
       {
         try
         {
           if( argc > ( i + 1 ) )
           {
             port = boost::lexical_cast< int >( argv[ i + 1 ] );
+            i++;
+            continue;
+          }
+        }
+        catch( boost::bad_lexical_cast &e )
+        {
+        }
+        std::cerr << "What port was that?" << std::endl;
+        return -1;
+      }
+      else if( "--sp" == argvstr )
+      {
+        try
+        {
+          if( argc > ( i + 1 ) )
+          {
+            sipport = boost::lexical_cast< int >( argv[ i + 1 ] );
+            projectsipconfig::setsipport( sipport );
             i++;
             continue;
           }
@@ -192,14 +219,16 @@ int main( int argc, const char* argv[] )
     return 0;
   }
 
-  std::cout << "Starting Project SIP server with control port listening on port " << port << std::endl;
+  std::cout << "Starting Project SIP server." << std::endl;
+  std::cout << "Control port listening on port " << port << std::endl;
+  std::cout << "SIP port listening on port " << sipport << std::endl;
 
 	if ( !fg )
 	{
 		daemonize();
 	}
 
-	startserver( port );
+	startserver( port, sipport );
 
 	return 0;
 }

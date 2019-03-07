@@ -8,6 +8,8 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
 
+#include <boost/lexical_cast.hpp>
+
 #ifndef PROJECTSIPSTRING_H
 #define PROJECTSIPSTRING_H
 

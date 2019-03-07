@@ -86,7 +86,7 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
       projectrtpchannel::pointer p = *dormantchannels.begin();
       dormantchannels.pop_front();
       activechannels[ u ] = p;
-      p->open();
+      p->open( projectrtpchannel::PCMA );
 
       JSON::Object v;
       v[ "channel" ] = u;
@@ -142,7 +142,7 @@ void initchannels( short startport, short endport )
     for( i = startport; i < endport; i += 2 )
     {
       projectrtpchannel::pointer p = projectrtpchannel::create( io_service, i );
-      p->open();
+      p->open( projectrtpchannel::PCMA );
       dormantchannels.push_back( p );
     }
   }

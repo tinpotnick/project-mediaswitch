@@ -23,6 +23,8 @@ projectsipconfig::projectsipconfig()
     return;
   }
   this->hostname = b;
+
+  this->sipport = 5060;
 }
 
 /*******************************************************************************
@@ -50,7 +52,17 @@ Function: getsipport
 Purpose: Getour sip port - used in SIP comms.
 Updated: 10.01.2019
 *******************************************************************************/
-const int projectsipconfig::getsipport( void )
+const short projectsipconfig::getsipport( void )
 {
-  return 5060;
+  return cnf.sipport;
+}
+
+/*******************************************************************************
+Function: setsipport
+Purpose: Set our sip port - used in SIP comms.
+Updated: 05.03.2019
+*******************************************************************************/
+const void projectsipconfig::setsipport( short port )
+{
+  cnf.sipport = port;
 }

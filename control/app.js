@@ -3,7 +3,7 @@
 const projectcontrol = require( "./projectcontrol/index.js" );
 
 const hostname = "127.0.0.1";
-const port = 3000;
+const port = 9001;
 
 var onhangup = function()
 {
@@ -33,8 +33,10 @@ projectcontrol.onnewcall( function( call )
 
 setTimeout( function()
 {
-  projectcontrol.invite( { realm: "bling.babblevoice.com", to: "1003", from: "1001", maxforwards: 1, callerid: { number: "1001", name: "", private: false } } );
+  //projectcontrol.invite( { realm: "bling.babblevoice.com", to: "1003", from: "1001", maxforwards: 1, callerid: { number: "1001", name: "", private: false } } );
 }, 1000 );
 
-projectcontrol.listen( port, hostname );
+projectcontrol.directory( "bling.babblevoice.com", [{ "username": "1003", "secret": "1123654789" } ] );
+
+projectcontrol.listen();
 
