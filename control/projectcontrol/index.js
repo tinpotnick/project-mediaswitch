@@ -270,7 +270,7 @@ projectcontrol.prototype.directory = function( domain, users )
   request.control.port = this.us.port;
   request.users = users;
 
-  this.sipserver( request, "/dir" );
+  this.sipserver( [ request ], "/dir" );
 }
 
 

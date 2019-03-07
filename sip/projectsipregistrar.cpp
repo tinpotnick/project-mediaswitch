@@ -24,8 +24,6 @@ projectsipregistration::projectsipregistration( std::string u ) :
   expires( boost::posix_time::second_clock::local_time() + boost::posix_time::seconds( DEFAULTSIPEXPIRES ) ),
   nextping( boost::posix_time::second_clock::local_time() + boost::posix_time::seconds( OPTIONSPINGFREQUENCY ) ),
   outstandingping( 0 ),
-  nextstate( std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 ) ),
-  laststate( std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 ) ),
   timer( io_service ),
   optionscseq( 0 ),
   controlrequest( projecthttpclient::create( io_service ) )
@@ -125,9 +123,6 @@ void projectsipregistration::regstart( projectsippacketptr pk )
                       "0" );
 
   pk->respond( this->authrequest->strptr() );
-
-  this->laststate = std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 );
-  this->nextstate = std::bind( &projectsipregistration::regwaitauth, this, std::placeholders::_1 );
 }
 
 
@@ -253,9 +248,6 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
   this->expires = boost::posix_time::second_clock::local_time() + 
                       boost::posix_time::seconds( expires );
 
-  this->laststate = std::bind( &projectsipregistration::regwaitauth, this, std::placeholders::_1 );
-  this->nextstate = std::bind( &projectsipregistration::regstart, this, std::placeholders::_1 );
-
   this->timer.expires_after( std::chrono::seconds( OPTIONSPINGFREQUENCY ) );
   this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, this, std::placeholders::_1 ) );
 
@@ -276,7 +268,6 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
   d->setbody( t.c_str() );
 
   this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, this, std::placeholders::_1 ) );
-
 }
 
 /*******************************************************************************
@@ -443,7 +434,13 @@ void projectsipregistration::registrarsippacket( projectsippacketptr pk )
     r = *it;
   }
 
-  r->nextstate( pk );
+  if( pk->hasheader( projectsippacket::Authorization ) && r->authrequest )
+  {
+    r->regwaitauth( pk );
+    return;
+  }
+  
+  r->regstart( pk );
 }
 
 

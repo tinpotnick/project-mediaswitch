@@ -58,9 +58,6 @@ public:
 
   void timerhandler( const boost::system::error_code& error );
 
-  std::function<void ( projectsippacketptr pk ) > nextstate;
-  std::function<void ( projectsippacketptr pk ) > laststate;
-
   static void registrarsippacket( projectsippacketptr pk );
   static void httpget( stringvector &path, projectwebdocument &response );
   static bool sendtoregisteredclient( std::string &user, projectsippacketptr pk );
