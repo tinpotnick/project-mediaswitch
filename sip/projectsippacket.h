@@ -41,11 +41,14 @@ public:
   substring getheader( std::string name );
 
   substring s;
+  /* uri- anything contained between the < & > or if not present the whole string.*/
+  substring uri;
   substring displayname;
   substring protocol;
   substring user;
   substring secret;
   substring host;
+  substring userhost;
   substring parameters;
   substring headers;
 };
@@ -68,6 +71,7 @@ public:
   virtual ~projectsippacket();
 
   static stringptr branch( void );
+  static stringptr tag( void );
   static stringptr callid( void );
   static stringptr contact( stringptr user, stringptr host, int expires, int port );
 

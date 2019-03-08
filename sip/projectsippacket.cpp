@@ -7,6 +7,9 @@
 #include <boost/lexical_cast.hpp>
 #include <openssl/md5.h>
 
+#include <boost/random/random_device.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
+
 /* Debuggng */
 #include <iostream>
 
@@ -55,6 +58,7 @@ stringptr projectsippacket::contact( stringptr user, stringptr host, int expires
 
   if( 5060 != port )
   {
+    *s += ":";
     *s += std::to_string( port );
   }
 
@@ -73,10 +77,49 @@ Function: branch
 Purpose: Generate a branch parameter.
 Updated: 03.01.2019
 *******************************************************************************/
-stringptr projectsippacket::branch()
+static std::string randomcharbase(
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "1234567890" );
+stringptr projectsippacket::branch( void )
 {
-  boost::uuids::basic_random_generator<boost::mt19937> gen;
-  boost::uuids::uuid u = gen();
+  std::string br;
+  boost::random::random_device rng;
+  boost::random::uniform_int_distribution<> index_dist( 0, randomcharbase.size() - 1 );
+  for( int i = 0; i < 8; ++i )
+  {
+    br += randomcharbase[ index_dist( rng ) ];
+  }
+
+  stringptr s = stringptr( new std::string() );
+  s->reserve( DEFAULTHEADERLINELENGTH );
+
+  try
+  {
+    *s = "branch=z9hG4bK" + br;
+  }
+  catch( boost::bad_lexical_cast &e )
+  {
+    // This shouldn't happen
+  }
+  
+  return s;
+}
+
+/*******************************************************************************
+Function: tag
+Purpose: Generate a tag parameter.
+Updated: 03.01.2019
+*******************************************************************************/
+stringptr projectsippacket::tag( void )
+{
+  std::string tg;
+  boost::random::random_device rng;
+  boost::random::uniform_int_distribution<> index_dist( 0, randomcharbase.size() - 1 );
+  for( int i = 0; i < 8; ++i )
+  {
+    tg += randomcharbase[ index_dist( rng ) ];
+  }
 
   stringptr s = stringptr( new std::string() );
 
@@ -84,7 +127,7 @@ stringptr projectsippacket::branch()
 
   try
   {
-    *s = "branch=z9hG4bK" + boost::lexical_cast< std::string >( u );
+    *s = "tag=" + tg;
   }
   catch( boost::bad_lexical_cast &e )
   {
@@ -275,7 +318,9 @@ bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
     br = projectsippacket::branch();
     stringptr bptr = projectsippacket::branch();
     memcpy( &paramvalue[ lh + 12 + 1 ], bptr->c_str(), bptr->length() );
-    paramvalue[ lh + 12 + 1 + 1 + bptr->length() ] = 0;
+    paramvalue[ lh + 12 + 1 + bptr->length() ] = 0;
+
+    this->addheader( projectsippacket::Via, paramvalue );
   }
   else
   {
@@ -465,7 +510,7 @@ static inline char *kd( const char *ha1,
 
   return buf;
 }
-#if 1
+#if 0
 /*******************************************************************************
 Function: requestdigest
 Purpose: The 1 call to calculate the SIP request digest.
@@ -609,22 +654,8 @@ Updated: 17.01.2019
 *******************************************************************************/
 std::string projectsippacket::getuserhost( int tofrom )
 {
-  std::string s;
-  s.reserve( DEFAULTHEADERLINELENGTH );
-  s = this->getuser( tofrom ).str();
-  s += '@';
-
-  if( this->isrequest() )
-  {
-    s += this->geturihost().str();
-  }
-  else
-  {
-    s += this->gethost().str();
-  }
-  return s;
+  return sipuri( this->getheader( tofrom ) ).userhost.str();
 }
-
 
 /*******************************************************************************
 Function: geturihost
@@ -922,11 +953,13 @@ Updated: 03.01.2019
 *******************************************************************************/
 sipuri::sipuri( substring s ) :
    s( s ),
+   uri( s ),
    displayname( s ),
    protocol( s ),
    user( s ),
    secret( s ),
    host( s ),
+   userhost( s ),
    parameters( s ),
    headers( s )
 {
@@ -943,12 +976,18 @@ sipuri::sipuri( substring s ) :
       return;
     }
   }
+  this->uri.start( this->protocol.start() );
   this->protocol--; /* remove the : */
 
   substring sipuserhost = s.findsubstr( '<', '>' );
   if( 0 == sipuserhost.end() )
   {
     sipuserhost.end( s.end() );
+    this->uri.end( s.end() );
+  }
+  else
+  {
+    this->uri.end( sipuserhost.end() );
   }
 
   substring userhost = sipuserhost;
@@ -992,6 +1031,9 @@ sipuri::sipuri( substring s ) :
     this->displayname.end( sipuserhost.start() - 2 );
     this->displayname.trim();
   }
+
+  this->userhost.start( this->user.start() );
+  this->userhost.end( this->host.end() );
 }
 
 

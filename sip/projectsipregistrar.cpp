@@ -37,13 +37,7 @@ Purpose: Our start state. We wait to receive a REGISTER packet.
 Updated: 10.01.2019
 *******************************************************************************/
 void projectsipregistration::regstart( projectsippacketptr pk )
-{
-  if( !pk->isrequest() )
-  {
-    this->handleresponse( pk );
-    return;
-  }
-  
+{  
   /*
     What is the expires the client is requesting.
   */
@@ -65,7 +59,12 @@ void projectsipregistration::regstart( projectsippacketptr pk )
     projectsippacket toobrief;
 
     toobrief.setstatusline( 423, "Interval Too Brief" );
-    toobrief.addviaheader( projectsipconfig::gethostname(), pk.get() );
+
+    std::string via = projectsipconfig::gethostip() + 
+                    std::string( ":" ) + 
+                    std::to_string( projectsipconfig::getsipport() );
+
+    toobrief.addviaheader( via.c_str(), pk.get() );
 
     toobrief.addheader( projectsippacket::Min_Expires, 
                 DEFAULTSIPEXPIRES );
@@ -98,7 +97,12 @@ void projectsipregistration::regstart( projectsippacketptr pk )
   this->authrequest = projectsippacketptr( new projectsippacket() );
 
   this->authrequest->setstatusline( 401, "Unauthorized" );
-  this->authrequest->addviaheader( projectsipconfig::gethostname(), pk.get() );
+
+  std::string via = projectsipconfig::gethostip() + 
+                    std::string( ":" ) + 
+                    std::to_string( projectsipconfig::getsipport() );
+
+  this->authrequest->addviaheader( via.c_str(), pk.get() );
 
   this->authrequest->addwwwauthenticateheader( pk.get() );
 
@@ -133,12 +137,6 @@ Updated: 10.01.2019
 *******************************************************************************/
 void projectsipregistration::regwaitauth( projectsippacketptr pk )
 {
-  if( !pk->isrequest() )
-  {
-    this->handleresponse( pk );
-    return;
-  }
-
   this->currentpacket = pk;
 
   stringptr password = projectsipdirdomain::lookuppassword( 
@@ -152,7 +150,12 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
     projectsippacket failedauth;
 
     failedauth.setstatusline( 403, "Failed auth" );
-    failedauth.addviaheader( projectsipconfig::gethostname(), this->currentpacket.get() );
+
+    std::string via = projectsipconfig::gethostip() + 
+                    std::string( ":" ) + 
+                    std::to_string( projectsipconfig::getsipport() );
+
+    failedauth.addviaheader( via.c_str(), this->currentpacket.get() );
 
     failedauth.addheader( projectsippacket::To,
                 this->currentpacket->getheader( projectsippacket::To ) );
@@ -220,7 +223,11 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
   p.setstatusline( 200, "Ok" );
 
-  p.addviaheader( projectsipconfig::gethostname(), this->currentpacket.get() );
+  std::string via = projectsipconfig::gethostip() + 
+                    std::string( ":" ) + 
+                    std::to_string( projectsipconfig::getsipport() );
+
+  p.addviaheader( via.c_str(), this->currentpacket.get() );
   p.addheader( projectsippacket::To,
               this->currentpacket->getheader( projectsippacket::To ) );
   p.addheader( projectsippacket::From,
@@ -352,14 +359,28 @@ Updated: 17.01.2019
 void projectsipregistration::sendoptions( void )
 {
   projectsippacket request;
-  request.setrequestline( projectsippacket::OPTIONS, this->user );
-  request.addviaheader( projectsipconfig::gethostname(), this->authacceptpacket.get() );
+
+  sipuri contacturi( this->authacceptpacket->getheader( projectsippacket::Contact ) );
+
+  request.setrequestline( projectsippacket::OPTIONS, contacturi.uri.str() );
+
+  std::string via = projectsipconfig::gethostip() + 
+                    std::string( ":" ) + 
+                    std::to_string( projectsipconfig::getsipport() );
+
+  request.addviaheader( via.c_str() );
 
   request.addheader( projectsippacket::Max_Forwards, "70" );
   request.addheader( projectsippacket::To,
                       this->authacceptpacket->getheader( projectsippacket::To ) );
+  
+  std::string from = "<sip:";
+  from += this->user;
+  from += ">;";
+  from += *projectsippacket::tag();
+
   request.addheader( projectsippacket::From,
-                      this->authacceptpacket->getheader( projectsippacket::From ) );
+                      from );
   request.addheader( projectsippacket::Call_ID,
                       projectsippacket::callid() );
   request.addheader( projectsippacket::CSeq,
@@ -371,8 +392,6 @@ void projectsipregistration::sendoptions( void )
                       projectsipconfig::getsipport() ) );
   request.addheader( projectsippacket::Allow,
                       "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-  request.addheader( projectsippacket::Content_Type,
-                      "application/sdp" );
   request.addheader( projectsippacket::Content_Length,
                       "0" );
 
@@ -393,8 +412,8 @@ void projectsipregistration::handleresponse( projectsippacketptr pk )
   {
     return;
   }
-  
-  if( 0 != this->authacceptpacket->getheader( projectsippacket::CSeq )
+
+  if( 0 != pk->getheader( projectsippacket::CSeq )
                 .find( "OPTIONS" ).length() )
   {
     this->optionscseq++;
@@ -434,13 +453,19 @@ void projectsipregistration::registrarsippacket( projectsippacketptr pk )
     r = *it;
   }
 
-  if( pk->hasheader( projectsippacket::Authorization ) && r->authrequest )
+  if( pk->isrequest() )
   {
-    r->regwaitauth( pk );
+    if( pk->hasheader( projectsippacket::Authorization ) && r->authrequest )
+    {
+      r->regwaitauth( pk );
+      return;
+    }
+    
+    r->regstart( pk );
     return;
   }
-  
-  r->regstart( pk );
+
+  r->handleresponse( pk );
 }
 
 

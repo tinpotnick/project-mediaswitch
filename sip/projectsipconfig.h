@@ -18,6 +18,7 @@ public:
   static const void setsipport( short );
 private:
   std::string hostname;
+  std::string hostip;
   short sipport;
 };
 

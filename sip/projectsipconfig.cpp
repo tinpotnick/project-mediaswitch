@@ -7,6 +7,12 @@
 
 #include "projectsipconfig.h"
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
 projectsipconfig cnf;
 
 /*******************************************************************************
@@ -25,6 +31,19 @@ projectsipconfig::projectsipconfig()
   this->hostname = b;
 
   this->sipport = 5060;
+
+  /* Work out a default IP. */
+  char *IPbuffer; 
+  struct hostent *host_entry; 
+
+  // To retrieve host information 
+  host_entry = ::gethostbyname( this->hostname.c_str() ); 
+
+  // To convert an Internet network 
+  // address into ASCII string 
+  IPbuffer = inet_ntoa(*((struct in_addr*) 
+                          host_entry->h_addr_list[0])); 
+  this->hostip = IPbuffer;
 }
 
 /*******************************************************************************
@@ -39,12 +58,12 @@ const char* projectsipconfig::gethostname( void )
 
 /*******************************************************************************
 Function: gethostip
-Purpose: Getour host ip - used in SIP comms.
+Purpose: Getour host ip - used in SIP comms especially in the contact field
 Updated: 10.01.2019
 *******************************************************************************/
 const char* projectsipconfig::gethostip( void )
 {
-  return "10.0.0.3";
+  return cnf.hostip.c_str();
 }
 
 /*******************************************************************************
