@@ -73,8 +73,6 @@ private:
   boost::asio::steady_timer timer;
   unsigned int optionscseq;
   projecthttpclient::pointer controlrequest;
-
-  //std::string usednonce;
 };
 
 typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;

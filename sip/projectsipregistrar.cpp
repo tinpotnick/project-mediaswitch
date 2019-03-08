@@ -196,9 +196,6 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
     this->isregistered = true;
   }
 
-
-  //this->usednonce = this->authrequest->getheaderparam( projectsippacket::WWW_Authenticate, "nonce" ).str();
-
   /* We have authd. Get an iterator into our container so that we can modify. */
   projectsipregistrations::index< regindexuser >::type::iterator userit;
   userit = regs.get< regindexuser >().find( this->user );
