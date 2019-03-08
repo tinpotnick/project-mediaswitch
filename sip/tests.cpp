@@ -301,6 +301,8 @@ void testurl( void )
     projecttest( s.user, "c8oqz84zk7z", "Bad user." );
     projecttest( s.host, "privacy.org", "Bad host." );
     projecttest( s.parameters, "tag=hyh8", "Bad params." );
+    projecttest( s.uri, "sip:c8oqz84zk7z@privacy.org", "Bad uri." );
+    projecttest( s.userhost, "c8oqz84zk7z@privacy.org", "Bad uri." );
   }
 
   {
@@ -312,6 +314,8 @@ void testurl( void )
     projecttest( s.user, "+12125551212", "Bad user." );
     projecttest( s.host, "phone2net.com", "Bad host." );
     projecttest( s.parameters, "tag=887s", "Bad params." );
+    projecttest( s.uri, "sip:+12125551212@phone2net.com;tag=887s", "Bad uri." );
+    projecttest( s.userhost, "+12125551212@phone2net.com", "Bad userhost." );
     projecttest( s.getparameter( "tag" ), "887s", "Bad tag param." );
   }
 
