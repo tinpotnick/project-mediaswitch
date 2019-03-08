@@ -21,6 +21,8 @@ Updated: 18.12.2018
 *******************************************************************************/
 projectsipregistration::projectsipregistration( std::string u ) :
   user( u ),
+  registered( std::time( nullptr ) ),
+  isregistered( false ),
   expires( boost::posix_time::second_clock::local_time() + boost::posix_time::seconds( DEFAULTSIPEXPIRES ) ),
   nextping( boost::posix_time::second_clock::local_time() + boost::posix_time::seconds( OPTIONSPINGFREQUENCY ) ),
   outstandingping( 0 ),
@@ -42,12 +44,13 @@ void projectsipregistration::regstart( projectsippacketptr pk )
     What is the expires the client is requesting.
   */
   int expires = pk->getexpires();
+
   if( -1 == expires )
   {
     expires = DEFAULTSIPEXPIRES;
   }
 
-  if( 0 == expires && DEFAULTSIPEXPIRES > expires )
+  if( 0 == expires || DEFAULTSIPEXPIRES > expires )
   {
     /*
      If a UA receives a 423 (Interval Too Brief) response, it MAY retry
@@ -143,6 +146,11 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
                 pk->geturihost(), 
                 pk->getuser() );
 
+  if( !this->authrequest )
+  {
+    this->regstart( pk );
+    return;
+  }
 
   if( !password ||
         !this->currentpacket->checkauth( this->authrequest.get(), password ) )
@@ -181,6 +189,15 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
     return;
   }
+
+  if( false == this->isregistered )
+  {
+    this->registered = std::time( nullptr );
+    this->isregistered = true;
+  }
+
+
+  //this->usednonce = this->authrequest->getheaderparam( projectsippacket::WWW_Authenticate, "nonce" ).str();
 
   /* We have authd. Get an iterator into our container so that we can modify. */
   projectsipregistrations::index< regindexuser >::type::iterator userit;
@@ -275,6 +292,8 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
   d->setbody( t.c_str() );
 
   this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, this, std::placeholders::_1 ) );
+
+  this->authrequest.reset();
 }
 
 /*******************************************************************************
@@ -476,14 +495,81 @@ Updated: 22.01.2019
 *******************************************************************************/
 void projectsipregistration::httpget( stringvector &path, projectwebdocument &response )
 {
-  JSON::Object v;
-  v[ "count" ] = ( JSON::Integer ) regs.size();
-  std::string t = JSON::to_string( v );
+  if( 2 == path.size() )
+  {
 
-  response.setstatusline( 200, "Ok" );
-  response.addheader( projectwebdocument::Content_Length, t.length() );
-  response.addheader( projectwebdocument::Content_Type, "text/json" );
-  response.setbody( t.c_str() );
+    std::string domain = path[ 1 ];
+    // Report for a domain
+    JSON::Array a;
+    int registeredcount = 0;
+
+    projectsipdirdomain::pointer d = projectsipdirdomain::lookupdomain( domain );
+    if( !d )
+    {
+      response.setstatusline( 404, "Domain not found" );
+      response.addheader( projectwebdocument::Content_Type, "text/json" );
+      return;
+    }
+    
+    projectsipdirusers::iterator uit;
+    for( uit = d->users.begin(); uit != d->users.end(); uit++ )
+    {
+      JSON::Object v;
+
+      v[ "username" ] = uit->first;
+
+      std::string s = uit->first + "@" + domain;
+      projectsipregistrationptr r;
+      projectsipregistrations::index< regindexuser >::type::iterator it = regs.get< regindexuser >().find( s );
+
+      if ( it == regs.get< regindexuser >().end() || !( *it )->isregistered )
+      {
+        v[ "registered" ] = ( JSON::Bool ) false;
+      }
+      else
+      {
+        v[ "registered" ] = ( JSON::Bool ) true;
+        v[ "agent" ] = ( *it )->authacceptpacket->getheader( projectsippacket::User_Agent ).str();
+        
+        JSON::Object r;
+        r[ "host" ] = ( *it )->authacceptpacket->getremotehost();
+        r[ "port" ] = ( JSON::Integer ) ( *it )->authacceptpacket->getremoteport();
+        v[ "remote" ] = r;
+
+        JSON::Object e;
+        e[ "registered" ] = boost::numeric_cast< JSON::Integer >( ( *it )->registered );
+        v[ "epochs" ] = e;
+        registeredcount++;
+      }
+
+      a.values.push_back( v );
+    }
+
+    JSON::Object r;
+    r[ "domain" ] = domain;
+    r[ "count" ] = ( JSON::Integer ) d->users.size();
+    r[ "registered" ] = ( JSON::Integer ) registeredcount;
+    r[ "users" ] = a;
+
+    std::string t = JSON::to_string( r );
+
+    response.setstatusline( 200, "Ok" );
+    response.addheader( projectwebdocument::Content_Length, t.length() );
+    response.addheader( projectwebdocument::Content_Type, "text/json" );
+    response.setbody( t.c_str() );
+
+  }
+  else
+  {
+    JSON::Object v;
+    v[ "count" ] = ( JSON::Integer ) regs.size();
+    std::string t = JSON::to_string( v );
+
+    response.setstatusline( 200, "Ok" );
+    response.addheader( projectwebdocument::Content_Length, t.length() );
+    response.addheader( projectwebdocument::Content_Type, "text/json" );
+    response.setbody( t.c_str() );
+  }
 }
 
 /*******************************************************************************
