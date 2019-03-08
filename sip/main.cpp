@@ -174,7 +174,7 @@ int main( int argc, const char* argv[] )
         {
           if( argc > ( i + 1 ) )
           {
-            port = boost::lexical_cast< int >( argv[ i + 1 ] );
+            port = boost::lexical_cast< short >( argv[ i + 1 ] );
             i++;
             continue;
           }
@@ -191,7 +191,7 @@ int main( int argc, const char* argv[] )
         {
           if( argc > ( i + 1 ) )
           {
-            sipport = boost::lexical_cast< int >( argv[ i + 1 ] );
+            sipport = boost::lexical_cast< short >( argv[ i + 1 ] );
             projectsipconfig::setsipport( sipport );
             i++;
             continue;
