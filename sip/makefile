@@ -1,5 +1,5 @@
 CCOPTS:=-Wall -g -O0 -fstack-protector-all -I../projectlib/
-LL:=-lboost_system -lpthread -lcrypto -L../Debug/ -lproject
+LL:=-lboost_system -lboost_random -lpthread -lcrypto -L../Debug/ -lproject
 
 default: ../Debug/project-sip
 
