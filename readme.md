@@ -40,17 +40,18 @@ curl -X DELETE --data-raw '{ "domain": "bling.babblevoice.com", "user": "1000" }
 
 ## project-sip
 
-### POST http://sip/dir
+### PUT http://sip/dir/domain
 
 This interface is used to add directory information to the SIP server.
 
 Example:
-curl -X POST --data-raw '[{ "domain": "bling.babblevoice.com", "control": { "host": "127.0.0.1", "port": 9001 }, "users": [ { "username": "1003", "secret": "1123654789"}]}]' -H "Content-Type:application/json" http://127.0.0.1/dir
+curl -X PUT --data-raw '{ "control": { "host": "127.0.0.1", "port": 9001 }, "users": [ { "username": "1003", "secret": "1123654789"}]}' -H "Content-Type:application/json" http://127.0.0.1/dir/bling.babblevoice.com
 
 * domain: the name of the sip domain
 * control: a structure of host and port of the control server responsible for this domain
 * users: an array of user structures containing username and secret
 
+Returns 201 on success.
 
 ### GET http://sip/dir/bling.babblevoice.com
 
