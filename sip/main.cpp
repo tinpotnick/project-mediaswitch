@@ -78,10 +78,10 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
         projectsipdirdomain::httpget( pathparts, response );
         break;
       }
-      case projectwebdocument::POST:
+      case projectwebdocument::PUT:
       {
         JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
-        projectsipdirdomain::httppost( pathparts, body, response );
+        projectsipdirdomain::httpput( pathparts, body, response );
         break;
       }
     }

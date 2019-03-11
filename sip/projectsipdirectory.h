@@ -62,14 +62,14 @@ public:
   static projectsipdirdomain::pointer lookupdomain( substring domain );
   static projectsipdirdomain::pointer lookupdomain( std::string &domain );
 
-  /* Addng entries to the directory */
+  /* Adding entries to the directory */
   static projectsipdirdomain::pointer adddomain( std::string &domain );
   void adduser( std::string &user, std::string &secret );
 
   std::string geturiforcontrol( std::string path );
 
   static void httpget( stringvector &path, projectwebdocument &response );
-  static void httppost( stringvector &path, JSON::Value &body, projectwebdocument &response );
+  static void httpput( stringvector &path, JSON::Value &body, projectwebdocument &response );
 };
 
 

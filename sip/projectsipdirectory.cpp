@@ -5,7 +5,8 @@
 #include "projecthttpclient.h"
 #include "json.hpp"
 
-static projectsipdirdomain dir;
+//static projectsipdirdomain dir;
+static projectsipdirdomain::pointer dir = projectsipdirdomain::create();
 
 /*******************************************************************************
 Function: projectsipdiruser
@@ -169,7 +170,7 @@ projectsipdirdomain::pointer projectsipdirdomain::lookupdomain( substring domain
     return ref;
   }
 
-  projectsipdirdomain::map *dirref = &dir.subdomains;
+  projectsipdirdomain::map *dirref = &dir->subdomains;
   projectsipdirdomain::map::iterator it = dirref->end();
   for( int i = l.size(); i != 0; i-- )
   {
@@ -199,7 +200,7 @@ projectsipdirdomain::pointer projectsipdirdomain::lookupdomain( std::string &dst
     return ref;
   }
 
-  projectsipdirdomain::map *dirref = &dir.subdomains;
+  projectsipdirdomain::map *dirref = &dir->subdomains;
   projectsipdirdomain::map::iterator it = dirref->end();
   for( int i = l.size(); i != 0; i-- )
   {
@@ -227,7 +228,7 @@ projectsipdirdomain::pointer projectsipdirdomain::adddomain( std::string &domain
 
   stringvector parts = splitstring( domain, '.' );
 
-  map *domptr = &dir.subdomains;
+  map *domptr = &dir->subdomains;
 
   while( 0 != parts.size() )
   {
@@ -284,90 +285,113 @@ Updated: 20.02.2019
 *******************************************************************************/
 void projectsipdirdomain::httpget( stringvector &path, projectwebdocument &response )
 {
+  projectsipdirdomain::pointer ptr;
+
   if( path.size() > 1 )
   {
-    projectsipdirdomain::pointer ptr = lookupdomain( path[ 1 ] );
-    if( ptr )
-    {
-      JSON::Object v;
-      v[ "count" ] = ( JSON::Integer ) ptr->users.size();
-      std::string t = JSON::to_string( v );
+    ptr = lookupdomain( path[ 1 ] );
+  }
+  else
+  {
+    ptr = dir;
+  }
 
-      response.setstatusline( 200, "Ok" );
-      response.addheader( projectwebdocument::Content_Length, t.length() );
-      response.addheader( projectwebdocument::Content_Type, "text/json" );
-      response.setbody( t.c_str() );
-      return;
+  if( ptr )
+  {
+    JSON::Object v;
+    JSON::Array a;
+
+    projectsipdirusers::iterator userit;
+    for( userit = ptr->users.begin(); userit != ptr->users.end(); userit++ )
+    {
+      a.values.push_back( *userit->second->username );
     }
+
+    v[ "users" ] = a;
+
+    projectsipdirdomain::map::iterator domit;
+    JSON::Array d;
+    for( domit = ptr->subdomains.begin(); domit != ptr->subdomains.end(); domit++ )
+    {
+      std::string domain = domit->first;
+      d.values.push_back( domain );
+    }
+
+    v[ "domains" ] = d;
+
+    std::string t = JSON::to_string( v );
+
+    response.setstatusline( 200, "Ok" );
+    response.addheader( projectwebdocument::Content_Length, t.length() );
+    response.addheader( projectwebdocument::Content_Type, "text/json" );
+    response.setbody( t.c_str() );
+    return;
   }
 
   response.setstatusline( 404, "Not found" );
 }
 
 /*******************************************************************************
-Function: httppost
+Function: httpput
 Purpose: Respods to post requests form our control server.
 It needs to handle the following array:
-[
-  {
-    domain: "bling.babblevoice.com",
-    users:
-    [
-      {
-        username: "1000",
-        secret: "blah"
-      }
-    ]
-  }
-]
+HTTP PUT /dir/bling.babblevoice.com
+{ 
+  "control": 
+  { 
+    "host": "127.0.0.1", 
+    "port": 9001 
+  }, 
+  "users": 
+  [ 
+    { "username": "1003", "secret": "mysecret"}
+  ]
+}
 Updated: 20.02.2019
 *******************************************************************************/
-void projectsipdirdomain::httppost( stringvector &path, JSON::Value &body, projectwebdocument &response )
+void projectsipdirdomain::httpput( stringvector &path, JSON::Value &body, projectwebdocument &response )
 {
-  JSON::Array mainarray = JSON::as_array( body );
-
-  JSON::Array::values_t::iterator it;
-  for( it = mainarray.values.begin();
-        it != mainarray.values.end();
-        it++ )
+  if( path.size() <= 1 )
   {
-    JSON::Object d = JSON::as_object( *it );
-
-    std::string domain = JSON::as_string( d[ "domain" ] );
-    JSON::Object control = JSON::as_object( d[ "control" ] );
-
-    projectsipdirdomain::pointer domentry = projectsipdirdomain::adddomain( domain );
-
-    domentry->controlhost = stringptr( new std::string( JSON::as_string( control[ "host" ] ) ) );
-    domentry->controlport = JSON::as_int64( control[ "port" ] );
-
-    domentry->users.clear();
-
-    JSON::Array userarray = JSON::as_array( d[ "users" ] );
-    JSON::Array::values_t::iterator userit;
-    for( userit = userarray.values.begin();
-          userit != userarray.values.end();
-          userit++ )
-    {
-      JSON::Object userobj = JSON::as_object( *userit );
-      if( !userobj.has_key( "username" ) )
-      {
-        continue;
-      }
-
-      if( !userobj.has_key( "secret" ) )
-      {
-        continue;
-      }
-
-      std::string user = JSON::as_string( userobj[ "username" ] );
-      std::string secret = JSON::as_string( userobj[ "secret" ] );
-
-      domentry->adduser( user, secret );
-    }
+    response.setstatusline( 400, "Path too short" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    return;
   }
 
-  response.setstatusline( 200, "Ok" );
+  JSON::Object d = JSON::as_object( body);
+  JSON::Object control = JSON::as_object( d[ "control" ] );
+
+  projectsipdirdomain::pointer domentry = projectsipdirdomain::adddomain( path[ 1 ] );
+
+  domentry->controlhost = stringptr( new std::string( JSON::as_string( control[ "host" ] ) ) );
+  domentry->controlport = JSON::as_int64( control[ "port" ] );
+
+  domentry->users.clear();
+
+  JSON::Array userarray = JSON::as_array( d[ "users" ] );
+  JSON::Array::values_t::iterator userit;
+  for( userit = userarray.values.begin();
+        userit != userarray.values.end();
+        userit++ )
+  {
+    JSON::Object userobj = JSON::as_object( *userit );
+    if( !userobj.has_key( "username" ) )
+    {
+      continue;
+    }
+
+    if( !userobj.has_key( "secret" ) )
+    {
+      continue;
+    }
+
+    std::string user = JSON::as_string( userobj[ "username" ] );
+    std::string secret = JSON::as_string( userobj[ "secret" ] );
+
+    domentry->adduser( user, secret );
+  }
+
+  response.setstatusline( 201, "Created" );
   response.addheader( projectwebdocument::Content_Length, 0 );
 }
 
