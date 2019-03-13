@@ -184,6 +184,8 @@ const char *projectwebdocument::getmethodstr( int method )
       return "POST";
     case PUT:
       return "PUT";
+    case PATCH:
+      return "PATCH";
     case DELETE:
       return "DELETE";
     case TRACE:
@@ -224,6 +226,10 @@ int projectwebdocument::getmethodfromcrc( int crc )
     case 0xae9089d4:   /* put */
     {
       return PUT;
+    }
+    case 0xe22b9636:   /* patch */
+    {
+      return PATCH;
     }
     case 0x3a127c87:   /* delete */
     {

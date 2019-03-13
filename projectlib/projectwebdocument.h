@@ -48,7 +48,7 @@ class projectwebdocument
 public:
 
   /* Methods */
-  enum { OPTIONS, GET, HEAD, POST, PUT, DELETE, TRACE, CONNECT, RESPONSE, METHODUNKNOWN };
+  enum { OPTIONS, GET, HEAD, POST, PUT, PATCH, DELETE, TRACE, CONNECT, RESPONSE, METHODUNKNOWN };
 
   enum { /* Request */
           Accept,
