@@ -10,6 +10,8 @@ Between the 3 sub projects, events re communicated via a HTTP event mechanism. i
 
 The design of this project is designed to work with cloud services so that workloads can be scaled up and down appropriately.
 
+Part of the design is to be in-memory. i.e. the SIP server should no be required to query a database to get username information. After starting, directory information should be pushed to the SIP server (either by the control server or your web site - a friendly host).
+
 # Interfaces
 
 All three projects are designed to either run on the same physical server or separate servers. This way load balancing between servers can be achieved. Multiple RTP servers can then be run to handle large volumes of transcoding for every SIP and control server.
@@ -45,13 +47,23 @@ curl -X DELETE --data-raw '{ "domain": "bling.babblevoice.com", "user": "1000" }
 This interface is used to add directory information to the SIP server.
 
 Example:
-curl -X PUT --data-raw '{ "control": { "host": "127.0.0.1", "port": 9001 }, "users": [ { "username": "1003", "secret": "1123654789"}]}' -H "Content-Type:application/json" http://127.0.0.1/dir/bling.babblevoice.com
+curl -X PUT --data-raw '{ "control": "http://127.0.0.1:9001", "users": [ { "username": "1003", "secret": "1123654789"}]}' -H "Content-Type:application/json" http://127.0.0.1/dir/bling.babblevoice.com
 
 * domain: the name of the sip domain
 * control: a structure of host and port of the control server responsible for this domain
 * users: an array of user structures containing username and secret
 
 Returns 201 on success.
+
+### PUT http://sip/dir/domain/username
+
+This is synonymous with PATCH.
+
+### PATCH http://sip/dir/domain/username
+
+This will replace the user only. When PUT the domain, this replace the whole domain object.
+
+curl -X PUT --data-raw '{ "secret": "1123654789" }' -H "Content-Type:application/json" http://127.0.0.1/dir/bling.babblevoice.com/1003
 
 ### GET http://sip/dir/bling.babblevoice.com
 
