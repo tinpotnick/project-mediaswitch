@@ -84,6 +84,17 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
         projectsipdirdomain::httpput( pathparts, body, response );
         break;
       }
+      case projectwebdocument::PATCH:
+      {
+        JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
+        projectsipdirdomain::httppatch( pathparts, body, response );
+        break;
+      }
+      case projectwebdocument::DELETE:
+      {
+        projectsipdirdomain::httpdelete( pathparts, response );
+        break;
+      }
     }
   }
   else if( "dialog" == pathparts[ 0 ] )

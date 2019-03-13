@@ -71,6 +71,21 @@ void projectsipdirdomain::adduser( std::string &user, std::string &secret )
 
 
 /*******************************************************************************
+Function: removeuser
+Purpose: Remove a user from a domain.
+Updated: 11.03.2019
+*******************************************************************************/
+void projectsipdirdomain::removeuser( std::string &user )
+{
+  projectsipdirusers::iterator it;
+  it = this->users.find( user );
+  if( this->users.end() != it )
+  {
+    this->users.erase( it );
+  }
+}
+
+/*******************************************************************************
 Function: lookuppassword
 Purpose: Looks up the users password from our directory. Our data must be 
 populated via the http server. This also then limits the look up on rogue
@@ -253,28 +268,68 @@ projectsipdirdomain::pointer projectsipdirdomain::adddomain( std::string &domain
 }
 
 /*******************************************************************************
-Function: geturiforcontrol
-Purpose: Returns the full http uri for the path given.
-Updated: 22.02.2019
+Function: removedomain
+Purpose: Removes a domain. Will tidy up the tree of domains if they are unused.
+com ---> babblevoice ---> bling
+                     ---> blong
+removedomain( bling.babblevoice.com ) will remove only bling
+
+if
+com ---> babblevoice ---> bling
+         yadaya      ---> bling
+removedomain( bling.babblevoice.com ) will remove babblevoice.bling i.e. you are
+left with 
+com ---> yadaya      ---> bling
+
+It ill remove the specified domain regardless of it having children, however
+parent domains will be tidied up (removed) if they are empty of other domains
+and users.
+Updated: 11.03.2019
 *******************************************************************************/
-std::string projectsipdirdomain::geturiforcontrol( std::string path )
+bool projectsipdirdomain::removedomain( std::string &domain, bool force )
 {
+  std::string::size_type i = domain.find( '.' );
+  std::string hostdom, domdom;
+  projectsipdirdomain::pointer ptr;
 
-  std::string controluri = "http://";
-  controluri += *this->controlhost;
-
-  if( 80 != this->controlport )
+  if ( i != std::string::npos )
   {
-    controluri += ":";
-    controluri += std::to_string( this->controlport );
-  }
+    hostdom = domain.substr( 0, i );
+    domdom = domain.substr( i + 1, domain.size() );
+    ptr = projectsipdirdomain::lookupdomain( domdom );
 
-  if( '/' != path[ 0 ] )
-  {
-    controluri += "/";
+    if( !ptr )
+    {
+      return false;
+    }
+    map::iterator domit = ptr->subdomains.find( hostdom );
+    if( ptr->subdomains.end() != domit )
+    {
+      if( force || 
+          ( 0 == domit->second->users.size() && 0 == domit->second->subdomains.size() ) 
+        )
+      {
+        ptr->subdomains.erase( domit );
+        projectsipdirdomain::removedomain( domdom, false );
+        return true;
+      }
+    }
   }
-  controluri += path;
-  return controluri;
+  else
+  {
+    map::iterator domit = dir->subdomains.find( domain );
+    if( dir->subdomains.end() != domit )
+    {
+      if( force ||
+        ( 0 == domit->second->users.size() || 0 == domit->second->subdomains.size() ) )
+      {
+        dir->subdomains.erase( domit );
+        return true;
+      }
+    }
+  }
+  
+  return false;
 }
 
 
@@ -307,7 +362,10 @@ void projectsipdirdomain::httpget( stringvector &path, projectwebdocument &respo
       a.values.push_back( *userit->second->username );
     }
 
-    v[ "users" ] = a;
+    if( a.values.size() > 0 )
+    {
+      v[ "users" ] = a;
+    }
 
     projectsipdirdomain::map::iterator domit;
     JSON::Array d;
@@ -317,8 +375,16 @@ void projectsipdirdomain::httpget( stringvector &path, projectwebdocument &respo
       d.values.push_back( domain );
     }
 
-    v[ "domains" ] = d;
+    if( d.values.size() > 0 )
+    {
+      v[ "domains" ] = d;
+    }
 
+    if( ptr->controlhost->size() > 0 )
+    {
+      v[ "control" ] = JSON::as_string( *ptr->controlhost );;
+    }
+    
     std::string t = JSON::to_string( v );
 
     response.setstatusline( 200, "Ok" );
@@ -333,20 +399,20 @@ void projectsipdirdomain::httpget( stringvector &path, projectwebdocument &respo
 
 /*******************************************************************************
 Function: httpput
-Purpose: Respods to post requests form our control server.
+Purpose: Respods to put requests form our control server.
 It needs to handle the following array:
 HTTP PUT /dir/bling.babblevoice.com
 { 
-  "control": 
-  { 
-    "host": "127.0.0.1", 
-    "port": 9001 
-  }, 
+  "control": "http://127.0.0.1:9000",
   "users": 
   [ 
     { "username": "1003", "secret": "mysecret"}
   ]
 }
+OR
+HTTP PUT /dir/bling.babblevoice.com/1003
+{ "secret": "mysecret"}
+
 Updated: 20.02.2019
 *******************************************************************************/
 void projectsipdirdomain::httpput( stringvector &path, JSON::Value &body, projectwebdocument &response )
@@ -358,13 +424,17 @@ void projectsipdirdomain::httpput( stringvector &path, JSON::Value &body, projec
     return;
   }
 
+  if( 3 == path.size() )
+  {
+    projectsipdirdomain::httppatch( path, body, response );
+    return;
+  }
+
   JSON::Object d = JSON::as_object( body);
-  JSON::Object control = JSON::as_object( d[ "control" ] );
 
   projectsipdirdomain::pointer domentry = projectsipdirdomain::adddomain( path[ 1 ] );
 
-  domentry->controlhost = stringptr( new std::string( JSON::as_string( control[ "host" ] ) ) );
-  domentry->controlport = JSON::as_int64( control[ "port" ] );
+  domentry->controlhost = stringptr( new std::string( JSON::as_string( d[ "control" ] ) ) );
 
   domentry->users.clear();
 
@@ -395,4 +465,142 @@ void projectsipdirdomain::httpput( stringvector &path, JSON::Value &body, projec
   response.addheader( projectwebdocument::Content_Length, 0 );
 }
 
+/*******************************************************************************
+Function: httppatch
+Purpose: Responds to patch requests form our control server. The domain must 
+already exist.
+It needs to handle the following array:
+HTTP PUT /dir/bling.babblevoice.com
+{ 
+  "control": 
+  { 
+    "host": "127.0.0.1", 
+    "port": 9001 
+  }, 
+  "users": 
+  [ 
+    { "username": "1003", "secret": "mysecret"}
+  ]
+}
+
+OR
+
+HTTP PUT /dir/bling.babblevoice.com/1003
+{ "secret": "mysecret"}
+
+The document can be the same as put, but we will update the entry without removing
+some items.
+Updated: 20.02.2019
+*******************************************************************************/
+void projectsipdirdomain::httppatch( stringvector &path, JSON::Value &body, projectwebdocument &response )
+{
+  
+  if( 2 != path.size() || 3 != path.size() )
+  {
+    response.setstatusline( 400, "Path wrong length" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    return;
+  }
+
+  projectsipdirdomain::pointer domentry = projectsipdirdomain::lookupdomain( path[ 1 ] );
+
+  if( !domentry )
+  {
+    response.setstatusline( 404, "Domain not found" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    return;
+  }
+
+  if( 3 == path.size() )
+  {
+    JSON::Object u = JSON::as_object( body );
+
+    if( !u.has_key( "secret" ) )
+    {
+      response.setstatusline( 400, "Secret required" );
+      response.addheader( projectwebdocument::Content_Length, 0 );
+      return;
+    }
+
+    domentry->adduser( path[ 2 ], JSON::as_string( u[ "secret" ] ) );
+          
+    response.setstatusline( 200, "Updated" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    return;
+  }
+  else if( 2 == path.size() )
+  {
+    JSON::Object d = JSON::as_object( body );
+    if( d.has_key( "control" ) )
+    {
+      domentry->controlhost = stringptr( new std::string( JSON::as_string( d[ "control" ] ) ) );
+    }
+
+    JSON::Array userarray = JSON::as_array( d[ "users" ] );
+    JSON::Array::values_t::iterator userit;
+    for( userit = userarray.values.begin();
+          userit != userarray.values.end();
+          userit++ )
+    {
+      JSON::Object userobj = JSON::as_object( *userit );
+      if( !userobj.has_key( "username" ) )
+      {
+        continue;
+      }
+
+      if( !userobj.has_key( "secret" ) )
+      {
+        continue;
+      }
+
+      std::string user = JSON::as_string( userobj[ "username" ] );
+      std::string secret = JSON::as_string( userobj[ "secret" ] );
+
+      domentry->adduser( user, secret );
+    }
+
+    response.setstatusline( 200, "Updated" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+  }
+}
+
+/*******************************************************************************
+Function: httpdelete
+Purpose: Report on directory information
+Updated: 20.02.2019
+*******************************************************************************/
+void projectsipdirdomain::httpdelete( stringvector &path, projectwebdocument &response )
+{
+  if( 3 == path.size() )
+  {
+    projectsipdirdomain::pointer ptr;
+    ptr = lookupdomain( path[ 1 ] );
+    if( !ptr )
+    {
+      response.setstatusline( 404, "No such domain" );
+      response.addheader( projectwebdocument::Content_Length, 0 );
+      return;
+    }
+    ptr->removeuser( path[ 2 ] );
+
+    response.setstatusline( 200, "Removed" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    return;
+  }
+  
+  if( 2 == path.size() )
+  {
+    if( projectsipdirdomain::removedomain( path[ 1 ] ) )
+    {
+      response.setstatusline( 200, "Removed" );
+      response.addheader( projectwebdocument::Content_Length, 0 );
+      return;
+    }
+  }
+
+  response.setstatusline( 400, "Bad path" );
+  response.addheader( projectwebdocument::Content_Length, 0 );
+  return;
+  
+}
 

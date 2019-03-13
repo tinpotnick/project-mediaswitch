@@ -274,7 +274,7 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
   /* update control */
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( pk->geturihost() );
-  std::string controluri = ptr->geturiforcontrol( "reg" );
+  std::string controluri = *ptr->controlhost;
   
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
   d->setrequestline( projectwebdocument::POST, controluri );
@@ -323,7 +323,7 @@ void projectsipregistration::expire( void )
 {
   /* update control */
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->authacceptpacket->geturihost() );
-  std::string controluri = ptr->geturiforcontrol( "reg" );
+  std::string controluri = *ptr->controlhost;
   
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
   d->setrequestline( projectwebdocument::DELETE, controluri );

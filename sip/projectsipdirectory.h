@@ -52,7 +52,6 @@ public:
   stringptr domain;
 
   stringptr controlhost;
-  short controlport;
 
   projectsipdirusers users;
 
@@ -64,12 +63,14 @@ public:
 
   /* Adding entries to the directory */
   static projectsipdirdomain::pointer adddomain( std::string &domain );
+  static bool removedomain( std::string &domain, bool force = true );
   void adduser( std::string &user, std::string &secret );
-
-  std::string geturiforcontrol( std::string path );
+  void removeuser( std::string &user );
 
   static void httpget( stringvector &path, projectwebdocument &response );
   static void httpput( stringvector &path, JSON::Value &body, projectwebdocument &response );
+  static void httppatch( stringvector &path, JSON::Value &body, projectwebdocument &response );
+  static void httpdelete( stringvector &path, projectwebdocument &response );
 };
 
 
