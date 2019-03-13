@@ -66,6 +66,7 @@ httpheaders = [
           "HEAD",
           "POST",
           "PUT",
+          "PATCH",
           "DELETE",
           "TRACE",
           "CONNECT",
