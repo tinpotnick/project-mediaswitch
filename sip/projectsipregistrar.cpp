@@ -509,7 +509,7 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
 
     std::string domain = path[ 1 ];
     // Report for a domain
-    JSON::Array a;
+    JSON::Object a;
     int registeredcount = 0;
 
     projectsipdirdomain::pointer d = projectsipdirdomain::lookupdomain( domain );
@@ -524,8 +524,6 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
     for( uit = d->users.begin(); uit != d->users.end(); uit++ )
     {
       JSON::Object v;
-
-      v[ "username" ] = uit->first;
 
       std::string s = uit->first + "@" + domain;
       projectsipregistrationptr r;
@@ -556,7 +554,7 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
         registeredcount++;
       }
 
-      a.values.push_back( v );
+      a[ uit->first ] = v;
     }
 
     JSON::Object r;

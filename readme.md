@@ -84,27 +84,28 @@ Returns 200 with the body:
 ```
 {
   "domain": "bling.babblevoice.com",
-  "count": 2,
+  "count": 3,
   "registered": 1,
-  "users": [
-    {
-      "username": "1002",
+  "users": {
+    "1000": {
       "registered": false
     },
-    {
-      "username": "1003",
+    "1001": {
+      "registered": false
+    },
+    "1003": {
       "registered": true,
       "outstandingping": 0,
       "remote": {
         "host": "127.0.0.1",
-        "port": 52249,
+        "port": 42068,
         "agent": "Z 5.2.28 rv2.8.114"
       },
       "epochs": {
-        "registered": 1552496808
+        "registered": 1552507958
       }
     }
-  ]
+  }
 }
 ```
 
