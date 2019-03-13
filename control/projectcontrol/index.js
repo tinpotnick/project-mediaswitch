@@ -164,7 +164,7 @@ projectcontrol.prototype.onnewcall = function( callback )
 Function: sipserver
 Purpose: Communicate with sip server.
 ***************************************************************************/
-projectcontrol.prototype.sipserver = function( request, path )
+projectcontrol.prototype.sipserver = function( request, path, method = "POST" )
 {
   try
   {
@@ -173,7 +173,7 @@ projectcontrol.prototype.sipserver = function( request, path )
       "host": this.sip.host,
       "port": this.sip.port,
       "path": path,
-      "method": "POST",
+      "method": method,
       "headers": {
         "Content-Type": "text/json",
         "Content-Length": Buffer.byteLength( data )
@@ -246,31 +246,29 @@ projectcontrol.prototype.listen = function()
 Function: directory
 Purpose: Register users with our SIP server and let it know we are the 
 control server for them.
-[
+HTTP PUT /dir/bling.babblevoice.com
+{ 
+  "control": 
   { 
-    "domain": "bling.babblevoice.com", 
-    "control": 
-    { 
-      "host": "127.0.0.1", 
-      "port": 9001 
-    }, 
-    "users": 
-    [ 
-      { "username": "1003", "secret": "mysecret"}
-    ]
-  }
-]
+    "host": "127.0.0.1", 
+    "port": 9001 
+  }, 
+  "users": 
+  [ 
+    { "username": "1003", "secret": "mysecret"}
+  ]
+}
+
 ***************************************************************************/
 projectcontrol.prototype.directory = function( domain, users )
 {
   var request = {};
-  request.domain = domain;
   request.control = {};
   request.control.host = this.us.host;
   request.control.port = this.us.port;
   request.users = users;
 
-  this.sipserver( [ request ], "/dir" );
+  this.sipserver( request, "/dir/" + domain, "PUT" );
 }
 
 

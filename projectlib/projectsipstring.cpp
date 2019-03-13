@@ -439,7 +439,7 @@ std::string substring::str( void )
   {
     return std::string( "" );
   }
-  return std::string( s->substr( this->startpos, this->endpos - this->startpos ) );
+  return s->substr( this->startpos, this->endpos - this->startpos );
 }
 
 /*******************************************************************************

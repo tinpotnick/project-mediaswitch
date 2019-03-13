@@ -101,6 +101,7 @@ void projecthttpclient::handleresolve(
   if( it == end )
   {
     this->callback( FAIL_RESOLVE );
+    this->asynccancel();
     return;
   }
 
@@ -120,6 +121,7 @@ void projecthttpclient::handleconnect( boost::system::error_code errorcode )
   if( errorcode != boost::asio::error::already_connected && errorcode )
   {
     this->callback( FAIL_CONNECT );
+    this->asynccancel();
     return;
   }
 
@@ -141,6 +143,7 @@ void projecthttpclient::handlewrite( boost::system::error_code errorcode, std::s
   if( errorcode )
   {
     this->callback( FAIL_WRITE );
+    this->asynccancel();
     return;
   }
 
@@ -162,12 +165,14 @@ void projecthttpclient::handleread( boost::system::error_code errorcode, std::si
   if( errorcode )
   {
     this->callback( FAIL_READ );
+    this->asynccancel();
     return;
   }
 
   if( 0 == bytestransferred )
   {
     this->callback( FAIL_READ );
+    this->asynccancel();
     return;
   }
 
@@ -190,6 +195,7 @@ void projecthttpclient::handletimeout( const boost::system::error_code& error )
   if ( error != boost::asio::error::operation_aborted )
   {
     this->callback( FAIL_TIMEOUT );
+    this->asynccancel();
   }
 }
 

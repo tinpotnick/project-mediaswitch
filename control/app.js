@@ -19,12 +19,15 @@ var onanswer = function()
 projectcontrol.onnewcall( function( call )
 {
   call.onhangup( onhangup );
+  console.log(call)
 
   setTimeout( function()
   {
+    console.log( "Indicating ringing" )
     call.ring();
     setTimeout( function()
     {
+      console.log( "now answering" )
       call.answer( onanswer );
     }, 1100 );
   }, 2000 );

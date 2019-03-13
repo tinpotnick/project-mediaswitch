@@ -190,12 +190,6 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
     return;
   }
 
-  if( false == this->isregistered )
-  {
-    this->registered = std::time( nullptr );
-    this->isregistered = true;
-  }
-
   /* We have authd. Get an iterator into our container so that we can modify. */
   projectsipregistrations::index< regindexuser >::type::iterator userit;
   userit = regs.get< regindexuser >().find( this->user );
@@ -263,6 +257,8 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
   p.addheader( projectsippacket::Content_Length,
               "0" );
 
+  this->outstandingping = 0;
+
   this->currentpacket->respond( p.strptr() );
   this->authacceptpacket = this->currentpacket;
 
@@ -271,6 +267,12 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
   this->timer.expires_after( std::chrono::seconds( OPTIONSPINGFREQUENCY ) );
   this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, this, std::placeholders::_1 ) );
+
+  if( false == this->isregistered )
+  {
+    this->registered = std::time( nullptr );
+    this->isregistered = true;
+  }
 
   /* update control */
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( pk->geturihost() );
@@ -305,12 +307,17 @@ void projectsipregistration::httpcallback( int errorcode )
 
 void projectsipregistration::httpcallbackanddie( int errorcode )
 {
-  projectsipregistrations::index< regindexuser >::type::iterator userit;
-  userit = regs.get< regindexuser >().find( this->user );
-
-  if( regs.get< regindexuser >().end() != userit )
+  /* Only do this if we have no re-registered whilst trying to 
+  contact our control server. All may be forgiven. */
+  if( !this->isregistered )
   {
-    regs.get< regindexuser >().erase( userit );
+    projectsipregistrations::index< regindexuser >::type::iterator userit;
+    userit = regs.get< regindexuser >().find( this->user );
+
+    if( regs.get< regindexuser >().end() != userit )
+    {
+      regs.get< regindexuser >().erase( userit );
+    }
   }
 }
 
@@ -321,6 +328,7 @@ Updated: 17.01.2019
 *******************************************************************************/
 void projectsipregistration::expire( void )
 {
+  this->isregistered = false;
   /* update control */
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->authacceptpacket->geturihost() );
   std::string controluri = *ptr->controlhost;
@@ -337,7 +345,7 @@ void projectsipregistration::expire( void )
   d->addheader( projectwebdocument::Content_Type, "text/json" );
   d->setbody( t.c_str() );
 
-  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, this, std::placeholders::_1 ) );
+  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallbackanddie, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
@@ -355,7 +363,7 @@ void projectsipregistration::timerhandler( const boost::system::error_code& erro
       return;
     }
 
-    if( this->outstandingping > OPTIONSMAXFAILCOUNT )
+    if( OPTIONSMAXFAILCOUNT == this->outstandingping )
     {
       this->expire();
       return;
@@ -433,7 +441,11 @@ void projectsipregistration::handleresponse( projectsippacketptr pk )
                 .find( "OPTIONS" ).length() )
   {
     this->optionscseq++;
-    this->outstandingping = 0;
+
+    if( 0 != this->outstandingping )
+    {
+      this->outstandingping--;
+    }
   }
 }
 
@@ -526,11 +538,16 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
       else
       {
         v[ "registered" ] = ( JSON::Bool ) true;
-        v[ "agent" ] = ( *it )->authacceptpacket->getheader( projectsippacket::User_Agent ).str();
+
+        v[ "outstandingping" ] = ( JSON::Integer ) ( *it )->outstandingping;
         
         JSON::Object r;
         r[ "host" ] = ( *it )->authacceptpacket->getremotehost();
         r[ "port" ] = ( JSON::Integer ) ( *it )->authacceptpacket->getremoteport();
+        if( ( *it )->authacceptpacket->hasheader( projectsippacket::User_Agent  ) )
+        {
+          r[ "agent" ] = ( *it )->authacceptpacket->getheader( projectsippacket::User_Agent ).str();
+        }
         v[ "remote" ] = r;
 
         JSON::Object e;

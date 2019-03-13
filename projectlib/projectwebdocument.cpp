@@ -1077,10 +1077,13 @@ httpuri::httpuri( substring s )
   this->host.start( this->protocol.end() + 3 );
   if( 0 == this->host.end() )
   {
-    this->host.end( s.length() );
-    return;
+    this->host.end( s.end() );
   }
-  this->host--;
+  else
+  {
+    this->host--;
+  }
+  
 
   substring subhost = this->host.find( ':' );
   if( 0 != subhost.end() )

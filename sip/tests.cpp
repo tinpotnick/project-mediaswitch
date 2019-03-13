@@ -249,6 +249,15 @@ Updated: 17.12.2018
 void testurl( void )
 {
   {
+    stringptr u( new std::string( "http://127.0.0.1:9000" ) );
+    httpuri uri( u );
+
+    projecttest( uri.protocol, "http", "Bad protocol." );
+    projecttest( uri.host, "127.0.0.1", "Bad host." );
+    projecttest( uri.port, "9000", "Bad port." );
+  }
+
+  {
     stringptr u( new std::string( "http://myhost/my/big/path?myquerystring" ) );
     httpuri s( u );
 

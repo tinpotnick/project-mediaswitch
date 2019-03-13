@@ -74,9 +74,58 @@ Returns JSON listing this domains entry in the directory.
 
 Returns the number of registered clients.
 
-### POST http://sip/reg
+The example:
 
-TODO - register (outbound) with a SIP service.
+```
+GET http://127.0.0.1:9000/reg/bling.babblevoice.com
+```
+
+Returns 200 with the body:
+```
+{
+  "domain": "bling.babblevoice.com",
+  "count": 2,
+  "registered": 1,
+  "users": [
+    {
+      "username": "1002",
+      "registered": false
+    },
+    {
+      "username": "1003",
+      "registered": true,
+      "outstandingping": 0,
+      "remote": {
+        "host": "127.0.0.1",
+        "port": 52249,
+        "agent": "Z 5.2.28 rv2.8.114"
+      },
+      "epochs": {
+        "registered": 1552496808
+      }
+    }
+  ]
+}
+```
+
+When a request is for a specific domain the fields are:
+
+* count - number of users that exist for this domain
+* registered - the number of users that are registered
+* users - array listing the state of the each user, most of which are self explanatory, outstandingping is the current OPTIONS failure count.
+
+```
+GET http://127.0.0.1:9000/reg/
+```
+Returns 200 with the body:
+```
+{
+  "count": 1255
+}
+```
+
+This is a complete count of all registrations on this SIP server.
+
 
 ### POST http://sip/dialog/invite
 
