@@ -277,13 +277,19 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
   /* update control */
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( pk->geturihost() );
   std::string controluri = *ptr->controlhost;
+  controluri += "/reg/" + pk->geturihost().str() + '/' + this->authacceptpacket->getuser().str();
   
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
-  d->setrequestline( projectwebdocument::POST, controluri );
+  d->setrequestline( projectwebdocument::PUT, controluri );
 
   JSON::Object v;
-  v[ "domain" ] = pk->geturihost().str();
-  v[ "user" ] = this->user;
+  /* Send client info? Host, port and agent */
+  v[ "host" ] = this->authacceptpacket->getremotehost();
+  v[ "port" ] = ( JSON::Integer ) this->authacceptpacket->getremoteport();
+  if( this->authacceptpacket->hasheader( projectsippacket::User_Agent  ) )
+  {
+    v[ "agent" ] = this->authacceptpacket->getheader( projectsippacket::User_Agent ).str();
+  }
 
   std::string t = JSON::to_string( v );
   d->addheader( projectwebdocument::Content_Length, t.length() );
@@ -332,18 +338,13 @@ void projectsipregistration::expire( void )
   /* update control */
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->authacceptpacket->geturihost() );
   std::string controluri = *ptr->controlhost;
+  controluri += "/reg/" + this->authacceptpacket->geturihost().str() + '/' + this->authacceptpacket->getuser().str();
   
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
   d->setrequestline( projectwebdocument::DELETE, controluri );
 
-  JSON::Object v;
-  v[ "domain" ] = this->authacceptpacket->geturihost().str();
-  v[ "user" ] = this->user;
-
-  std::string t = JSON::to_string( v );
-  d->addheader( projectwebdocument::Content_Length, t.length() );
+  d->addheader( projectwebdocument::Content_Length, 0 );
   d->addheader( projectwebdocument::Content_Type, "text/json" );
-  d->setbody( t.c_str() );
 
   this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallbackanddie, this, std::placeholders::_1 ) );
 }
@@ -504,9 +505,9 @@ Updated: 22.01.2019
 *******************************************************************************/
 void projectsipregistration::httpget( stringvector &path, projectwebdocument &response )
 {
-  if( 2 == path.size() )
+  std::size_t pathsize = path.size();
+  if( 2 == pathsize || 3 == pathsize )
   {
-
     std::string domain = path[ 1 ];
     // Report for a domain
     JSON::Object a;
@@ -521,7 +522,17 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
     }
     
     projectsipdirusers::iterator uit;
-    for( uit = d->users.begin(); uit != d->users.end(); uit++ )
+
+    if( 3 == pathsize )
+    {
+      uit = d->users.find( path[ 2 ] );
+    }
+    else
+    {
+      uit = d->users.begin();
+    }
+    
+    for( ; uit != d->users.end(); uit++ )
     {
       JSON::Object v;
 
@@ -555,6 +566,11 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
       }
 
       a[ uit->first ] = v;
+
+      if( 3 == pathsize )
+      {
+        break;
+      }
     }
 
     JSON::Object r;
