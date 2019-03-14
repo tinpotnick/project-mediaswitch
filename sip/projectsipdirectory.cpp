@@ -472,11 +472,7 @@ already exist.
 It needs to handle the following array:
 HTTP PUT /dir/bling.babblevoice.com
 { 
-  "control": 
-  { 
-    "host": "127.0.0.1", 
-    "port": 9001 
-  }, 
+  "control": "http://127.0.0.1:9001".
   "users": 
   [ 
     { "username": "1003", "secret": "mysecret"}
