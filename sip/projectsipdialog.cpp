@@ -911,15 +911,25 @@ Function: updatecontrol
 Purpose: Pass information to our control server.
 Updated: 25.01.2019
 *******************************************************************************/
-void projectsipdialog::updatecontrol( projectsippacketptr pk )
+bool projectsipdialog::updatecontrol( projectsippacketptr pk )
 {
+  projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( pk->geturihost() );
+
+  if( !ptr )
+  {
+    return false;
+  }
+
+  std::string controluri = *ptr->controlhost;
+  controluri += "/invite/" + pk->getheader( projectsippacket::Call_ID ).str();
+
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
-  d->setrequestline( projectwebdocument::POST, "http://127.0.0.1/invite" );
+  d->setrequestline( projectwebdocument::PUT, controluri );
 
   JSON::Object v;
 
   v[ "callid" ] = pk->getheader( projectsippacket::Call_ID ).str();
-  v[ "realm" ] = pk->geturihost().str();
+  v[ "domain" ] = pk->geturihost().str();
   v[ "to" ] = pk->getuser( projectsippacket::To ).str();
   v[ "from" ] = pk->getuser( projectsippacket::From ).str();
   v[ "contact" ] = pk->getheader( projectsippacket::Contact ).str();
@@ -957,6 +967,8 @@ void projectsipdialog::updatecontrol( projectsippacketptr pk )
   d->setbody( t.c_str() );
 
   this->controlrequest->asyncrequest( d, std::bind( &projectsipdialog::httpcallback, this, std::placeholders::_1 ) );
+
+  return true;
 }
 
 /*******************************************************************************
@@ -1008,11 +1020,11 @@ void projectsipdialog::httpget( stringvector &path, projectwebdocument &response
 }
 
 /*******************************************************************************
-Function: httppost
+Function: httpput
 Purpose: Handle a request from our web server.
 Updated: 30.01.2019
 *******************************************************************************/
-void projectsipdialog::httppost( stringvector &path, JSON::Value &body, projectwebdocument &response )
+void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwebdocument &response )
 {
   JSON::Object b = JSON::as_object( body );
 

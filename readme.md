@@ -260,3 +260,30 @@ To upload test data to the sip server use
 
 sipp 127.0.0.1 -sf uaclateoffer.xml -m 1 -l 1
 
+# Control Server
+
+A control server can be written in any language. The first one (the only one and the one provided) is written in Javascript for Node. The reason for this, whilst it is not as efficient as C++ it has much more access to create business logic as required.
+
+Having to recompile a project when you need to change a small amount of logic is not great for most.
+
+A simple example.
+
+We register our new call handler (onnewcall), send directory information to the SIP server so the client can authenticate. Then listen (wait) for new calls.
+
+```
+const projectcontrol = require( "./projectcontrol/index.js" );
+
+projectcontrol.onnewcall( function( call )
+{
+  call.ring();
+} );
+
+/* Register our user */
+projectcontrol.directory( "bling.babblevoice.com", [{ "username": "1003", "secret": "1123654789" } ] );
+
+/* Wait for requests */
+projectcontrol.listen();
+
+```
+
+

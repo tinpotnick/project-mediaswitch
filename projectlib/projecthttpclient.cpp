@@ -50,7 +50,6 @@ void projecthttpclient::asynccancel( void )
 {
   this->callback = std::bind( &projecthttpclient::nullfunction, this, std::placeholders::_1 );
   this->timer.cancel();
-  this->socket.close();
 }
 
 /*******************************************************************************

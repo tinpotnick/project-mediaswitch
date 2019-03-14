@@ -41,7 +41,7 @@ public:
   static pointer create();
   static bool invitesippacket( projectsippacketptr pk );
   static void httpget( stringvector &path, projectwebdocument &response );
-  static void httppost( stringvector &path, JSON::Value &body, projectwebdocument &response );
+  static void httpput( stringvector &path, JSON::Value &body, projectwebdocument &response );
 
   std::string callid;
   std::string alertinfo;
@@ -63,7 +63,7 @@ public:
 
   /* non state function */
   void handlebye( projectsippacketptr pk );
-  void updatecontrol( projectsippacketptr pk );
+  bool updatecontrol( projectsippacketptr pk );
   void httpcallback( int errorcode );
 
   /* timer functions */

@@ -106,11 +106,11 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
         projectsipdialog::httpget( pathparts, response );
         break;
       }
-      case projectwebdocument::POST:
+      case projectwebdocument::PUT:
       {
         JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
         
-        projectsipdialog::httppost( pathparts, body, response );
+        projectsipdialog::httpput( pathparts, body, response );
         break;
       }
     }
