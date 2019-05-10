@@ -27,7 +27,8 @@ projecthttpclient::projecthttpclient( boost::asio::io_service &ioservice ) :
   ioservice( ioservice ),
   socket( ioservice ),
   resolver( ioservice ),
-  timer( ioservice )
+  timer( ioservice ),
+  socketopen( false )
 {
 }
 
@@ -57,33 +58,44 @@ Function: asyncrequest
 Purpose: Make a HTTP request with callback.
 Updated: 18.01.2019
 *******************************************************************************/
-void projecthttpclient::asyncrequest( projectwebdocumentptr request, 
+void projecthttpclient::asyncrequest( projectwebdocumentptr request,
       std::function< void ( int errorcode ) > callback )
 {
   this->callback = callback;
 
-  httpuri uri( request->getrequesturi() );
+  this->uri =  httpuri( request->getrequesturi() );
   this->requestdoc = request->strptr();
 
   this->timer.expires_after( std::chrono::seconds( HTTPCLIENTDEFAULTTIMEOUT ) );
-  this->timer.async_wait( boost::bind( &projecthttpclient::handletimeout, 
-                                        shared_from_this(), 
+  this->timer.async_wait( boost::bind( &projecthttpclient::handletimeout,
+                                        shared_from_this(),
                                         boost::asio::placeholders::error ) );
 
   boost::asio::ip::tcp::resolver resolver( this->ioservice );
 
   std::string port = "80";
-  if( 0 != uri.port.end() )
+  if( 0 != this->uri.port.end() )
   {
-    port = uri.port.str();
+    port = this->uri.port.str();
   }
 
-  boost::asio::ip::tcp::resolver::query query( uri.host.str(), port.c_str() );
-  this->resolver.async_resolve( query,
-      boost::bind( &projecthttpclient::handleresolve, shared_from_this(),
-        boost::asio::placeholders::error,
+  if( this->socketopen )
+  {
+    boost::asio::async_write(
+      this->socket,
+      boost::asio::buffer( this->requestdoc->c_str(), this->requestdoc->length() ),
+        boost::bind( &projecthttpclient::handlewrite, shared_from_this(),
+            boost::asio::placeholders::error,
+            boost::asio::placeholders::bytes_transferred ) );
+  }
+  else
+  {
+    boost::asio::ip::tcp::resolver::query query( this->uri.host.str(), port.c_str() );
+    this->resolver.async_resolve( query,
+        boost::bind( &projecthttpclient::handleresolve, shared_from_this(),
+          boost::asio::placeholders::error,
           boost::asio::placeholders::iterator ) );
-
+  }
 }
 
 /*******************************************************************************
@@ -91,8 +103,8 @@ Function: handleresolve
 Purpose: We have resolved (or not)
 Updated: 18.01.2019
 *******************************************************************************/
-void projecthttpclient::handleresolve( 
-            boost::system::error_code e, 
+void projecthttpclient::handleresolve(
+            boost::system::error_code e,
             boost::asio::ip::tcp::resolver::iterator it )
 {
   boost::asio::ip::tcp::resolver::iterator end;
@@ -104,7 +116,7 @@ void projecthttpclient::handleresolve(
     return;
   }
 
-  this->socket.async_connect( *it, 
+  this->socket.async_connect( *it,
     boost::bind( &projecthttpclient::handleconnect, shared_from_this(),
           boost::asio::placeholders::error ) );
 
@@ -123,6 +135,8 @@ void projecthttpclient::handleconnect( boost::system::error_code errorcode )
     this->asynccancel();
     return;
   }
+
+  this->socketopen = true;
 
   boost::asio::async_write(
     this->socket,
@@ -161,6 +175,29 @@ Updated: 29.01.2019
 *******************************************************************************/
 void projecthttpclient::handleread( boost::system::error_code errorcode, std::size_t bytestransferred )
 {
+  if( boost::asio::error::eof == errorcode )
+  {
+    /*
+      This indicates the other end has closed the socket - reconnect.
+      This is the only way to detect a disconnect from a client - after we attempt a read.
+    */
+    this->socketopen = false;
+    this->socket.close();
+
+    std::string port = "80";
+    if( 0 != this->uri.port.end() )
+    {
+      port = this->uri.port.str();
+    }
+
+    boost::asio::ip::tcp::resolver::query query( this->uri.host.str(), port.c_str() );
+    this->resolver.async_resolve( query,
+        boost::bind( &projecthttpclient::handleresolve, shared_from_this(),
+          boost::asio::placeholders::error,
+          boost::asio::placeholders::iterator ) );
+    return;
+  }
+
   if( errorcode )
   {
     this->callback( FAIL_READ );
@@ -178,7 +215,7 @@ void projecthttpclient::handleread( boost::system::error_code errorcode, std::si
   this->inbounddata[ bytestransferred ] = 0;
   stringptr p( new std::string( (const char*)this->inbounddata.data() ) );
   this->response = projectwebdocumentptr( new projectwebdocument( p ) );
-  
+
   this->timer.cancel();
   this->callback( 0 );
   return;
@@ -208,4 +245,3 @@ projectwebdocumentptr projecthttpclient::getresponse( void )
 {
   return this->response;
 }
-

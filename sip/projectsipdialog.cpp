@@ -34,7 +34,8 @@ projectsipdialog::projectsipdialog() :
   ringingat( 0 ),
   answerat( 0 ),
   endat( 0 ),
-  finished( false )
+  finished( false ),
+  totag( projectsippacket::tag() )
 {
   projectsipdialogcounter++;
 }
@@ -51,7 +52,7 @@ projectsipdialog::~projectsipdialog()
 
 /*******************************************************************************
 Function: create
-Purpose: 
+Purpose:
 Updated: 23.01.2019
 *******************************************************************************/
 projectsipdialog::pointer projectsipdialog::create()
@@ -115,9 +116,9 @@ bool projectsipdialog::invitesippacket( projectsippacketptr pk )
         response->addheader( projectsippacket::CSeq,
                             pk->getheader( projectsippacket::CSeq ) );
         response->addheader( projectsippacket::Contact,
-                            projectsippacket::contact( pk->getuser().strptr(), 
-                            stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                            0, 
+                            projectsippacket::contact( pk->getuser().strptr(),
+                            stringptr( new std::string( projectsipconfig::gethostip() ) ),
+                            0,
                             projectsipconfig::getsipport() ) );
         response->addheader( projectsippacket::Allow,
                             "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -138,7 +139,9 @@ bool projectsipdialog::invitesippacket( projectsippacketptr pk )
 
   switch( pk->getmethod() )
   {
+    /* There may be a reason I should seperate this out - but for now */
     case projectsippacket::BYE:
+    case projectsippacket::CANCEL:
     {
       /* we always have to handle a BYE. */
       ptr->handlebye( pk );
@@ -150,7 +153,7 @@ bool projectsipdialog::invitesippacket( projectsippacketptr pk )
       break;
     }
   }
-  
+
   return true;
 }
 
@@ -189,7 +192,7 @@ Function: waitfortimer
 Purpose: Async wait for timer.
 Updated: 30.01.2019
 *******************************************************************************/
-void projectsipdialog::waitfortimer( std::chrono::milliseconds s, 
+void projectsipdialog::waitfortimer( std::chrono::milliseconds s,
       std::function<void ( const boost::system::error_code& error ) > f )
 {
   this->timer.cancel();
@@ -255,9 +258,9 @@ void projectsipdialog::invitestart( projectsippacketptr pk )
     this->authrequest->addheader( projectsippacket::CSeq,
                         pk->getheader( projectsippacket::CSeq ) );
     this->authrequest->addheader( projectsippacket::Contact,
-                        projectsippacket::contact( pk->getuser().strptr(), 
-                        stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                        0, 
+                        projectsippacket::contact( pk->getuser().strptr(),
+                        stringptr( new std::string( projectsipconfig::gethostip() ) ),
+                        0,
                         projectsipconfig::getsipport() ) );
     this->authrequest->addheader( projectsippacket::Allow,
                         "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -287,8 +290,8 @@ void projectsipdialog::inviteauth( projectsippacketptr pk )
 {
   this->lastpacket = pk;
 
-  stringptr password = projectsipdirdomain::lookuppassword( 
-                pk->geturihost(), 
+  stringptr password = projectsipdirdomain::lookuppassword(
+                pk->geturihost(),
                 pk->getuser() );
 
 
@@ -309,8 +312,8 @@ void projectsipdialog::inviteauth( projectsippacketptr pk )
     failedauth.addheader( projectsippacket::CSeq,
                 pk->getheader( projectsippacket::CSeq ) );
     failedauth.addheader( projectsippacket::Contact,
-                projectsippacket::contact( pk->getuser().strptr(), 
-                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+                projectsippacket::contact( pk->getuser().strptr(),
+                stringptr( new std::string( projectsipconfig::gethostip() ) ),
                 0,
                 projectsipconfig::getsipport() ) );
     failedauth.addheader( projectsippacket::Allow,
@@ -339,10 +342,19 @@ void projectsipdialog::trying( void )
 {
   projectsippacket trying;
   trying.setstatusline( 100, "Trying" );
-  trying.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
 
+  sipuri u( this->lastpacket->getheader( projectsippacket::To ) );
+  substring uri = u.uri;
+  if( 0 != uri.end() )
+  {
+    uri.start( uri.start() - 1 );
+    uri.end( uri.end() + 1 );
+  }
+
+  trying.addheader( projectsippacket::Via,
+              this->lastpacket->getheader( projectsippacket::Via ) );
   trying.addheader( projectsippacket::To,
-              this->lastpacket->getheader( projectsippacket::To ) );
+              uri.str() + ";" + *this->totag );
   trying.addheader( projectsippacket::From,
               this->lastpacket->getheader( projectsippacket::From ) );
   trying.addheader( projectsippacket::Call_ID,
@@ -350,8 +362,8 @@ void projectsipdialog::trying( void )
   trying.addheader( projectsippacket::CSeq,
               this->lastpacket->getheader( projectsippacket::CSeq ) );
   trying.addheader( projectsippacket::Contact,
-              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
-              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              projectsippacket::contact( this->lastpacket->getuser().strptr(),
+              stringptr( new std::string( projectsipconfig::gethostip() ) ),
               0,
               projectsipconfig::getsipport() ) );
   trying.addheader( projectsippacket::Allow,
@@ -361,7 +373,7 @@ void projectsipdialog::trying( void )
 
   this->lastpacket->respond( trying.strptr() );
 
-  this->waitfortimer( std::chrono::milliseconds( DIALOGSETUPTIMEOUT ), 
+  this->waitfortimer( std::chrono::milliseconds( DIALOGSETUPTIMEOUT ),
       std::bind( &projectsipdialog::ontimeout486andenddialog, this, std::placeholders::_1 ) );
 }
 
@@ -386,8 +398,8 @@ void projectsipdialog::temporaryunavailable( void )
   unavail.addheader( projectsippacket::CSeq,
               this->lastpacket->getheader( projectsippacket::CSeq ) );
   unavail.addheader( projectsippacket::Contact,
-              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
-              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              projectsippacket::contact( this->lastpacket->getuser().strptr(),
+              stringptr( new std::string( projectsipconfig::gethostip() ) ),
               0,
               projectsipconfig::getsipport() ) );
   unavail.addheader( projectsippacket::Allow,
@@ -400,13 +412,13 @@ void projectsipdialog::temporaryunavailable( void )
   // We should receive a ACK - at that point the dialog can be closed.
   this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
-  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
 Function: waitforack
-Purpose: 
+Purpose:
 Updated: 05.02.2019
 *******************************************************************************/
 void projectsipdialog::waitforack( projectsippacketptr pk )
@@ -425,7 +437,7 @@ void projectsipdialog::waitforack( projectsippacketptr pk )
 
 /*******************************************************************************
 Function: waitforackanddie
-Purpose: 
+Purpose:
 Updated: 30.01.2019
 *******************************************************************************/
 void projectsipdialog::waitforackanddie( projectsippacketptr pk )
@@ -440,7 +452,7 @@ void projectsipdialog::waitforackanddie( projectsippacketptr pk )
 
 /*******************************************************************************
 Function: waitfornextinstruction
-Purpose: We have received an INVITE and sent a trying, if the client has 
+Purpose: We have received an INVITE and sent a trying, if the client has
 not recevieved the trying then we will get another INVITE. So send trying again
 whilst we wait for our next control instruction.
 Updated: 06.02.2019
@@ -459,7 +471,7 @@ void projectsipdialog::waitfornextinstruction( projectsippacketptr pk )
   }
 
   /* Wait up to DIALOGSETUPTIMEOUT seconds before we close this dialog */
-  this->waitfortimer( std::chrono::milliseconds( DIALOGSETUPTIMEOUT ), 
+  this->waitfortimer( std::chrono::milliseconds( DIALOGSETUPTIMEOUT ),
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
 }
 
@@ -475,10 +487,21 @@ void projectsipdialog::ringing( void )
     projectsippacket ringing;
 
     ringing.setstatusline( 180, "Ringing" );
-    ringing.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
+
+    ringing.addheader( projectsippacket::Via,
+              this->lastpacket->getheader( projectsippacket::Via ) );
+
+    sipuri u( this->lastpacket->getheader( projectsippacket::To ) );
+    substring uri = u.uri;
+    if( 0 != uri.end() )
+    {
+      /* include the <> */
+      uri.start( uri.start() - 1 );
+      uri.end( uri.end() + 1 );
+    }
 
     ringing.addheader( projectsippacket::To,
-                this->lastpacket->getheader( projectsippacket::To ) );
+                uri.str() + ";" + *this->totag );
     ringing.addheader( projectsippacket::From,
                 this->lastpacket->getheader( projectsippacket::From ) );
     ringing.addheader( projectsippacket::Call_ID,
@@ -486,8 +509,8 @@ void projectsipdialog::ringing( void )
     ringing.addheader( projectsippacket::CSeq,
                 this->lastpacket->getheader( projectsippacket::CSeq ) );
     ringing.addheader( projectsippacket::Contact,
-                projectsippacket::contact( this->lastpacket->getuser().strptr(), 
-                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+                projectsippacket::contact( this->lastpacket->getuser().strptr(),
+                stringptr( new std::string( projectsipconfig::gethostip() ) ),
                 0,
                 projectsipconfig::getsipport() ) );
     ringing.addheader( projectsippacket::Allow,
@@ -507,7 +530,7 @@ void projectsipdialog::ringing( void )
     this->callringing = true;
     this->ringingat = std::time( nullptr );
 
-    this->waitfortimer( std::chrono::milliseconds( DIALOGSETUPTIMEOUT ), 
+    this->waitfortimer( std::chrono::milliseconds( DIALOGSETUPTIMEOUT ),
       std::bind( &projectsipdialog::ontimeout486andenddialog, this, std::placeholders::_1 ) );
   }
 }
@@ -535,7 +558,7 @@ void projectsipdialog::answer( void )
     this->answerat = std::time( nullptr );
 
       /* Wait up to 60 seconds before we close this dialog */
-    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
   }
 }
@@ -561,8 +584,8 @@ void projectsipdialog::send200( bool final )
   ok.addheader( projectsippacket::CSeq,
               this->lastpacket->getheader( projectsippacket::CSeq ) );
   ok.addheader( projectsippacket::Contact,
-              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
-              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              projectsippacket::contact( this->lastpacket->getuser().strptr(),
+              stringptr( new std::string( projectsipconfig::gethostip() ) ),
               0,
               projectsipconfig::getsipport() ) );
   ok.addheader( projectsippacket::Allow,
@@ -581,7 +604,7 @@ void projectsipdialog::send200( bool final )
     this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
   }
 
-  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::resend200, this, std::placeholders::_1 ) );
 }
 
@@ -604,7 +627,7 @@ void projectsipdialog::resend200( const boost::system::error_code& error )
     this->send200();
     this->retries--;
 
-    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
         std::bind( &projectsipdialog::resend200, this, std::placeholders::_1 ) );
   }
 }
@@ -623,7 +646,7 @@ void projectsipdialog::busy( void )
     this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
       /* Wait up to DIALOGACKTIMEOUT seconds before we close this dialog */
-    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
   }
   else
@@ -653,8 +676,8 @@ void projectsipdialog::send486( void )
   ok.addheader( projectsippacket::CSeq,
               this->lastpacket->getheader( projectsippacket::CSeq ) );
   ok.addheader( projectsippacket::Contact,
-              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
-              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              projectsippacket::contact( this->lastpacket->getuser().strptr(),
+              stringptr( new std::string( projectsipconfig::gethostip() ) ),
               0,
               projectsipconfig::getsipport() ) );
   ok.addheader( projectsippacket::Allow,
@@ -666,7 +689,7 @@ void projectsipdialog::send486( void )
 
   this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
 
-  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::resend486, this, std::placeholders::_1 ) );
 }
 
@@ -688,7 +711,7 @@ void projectsipdialog::resend486( const boost::system::error_code& error )
     this->send486();
     this->retries--;
 
-    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
         std::bind( &projectsipdialog::resend486, this, std::placeholders::_1 ) );
   }
 }
@@ -720,8 +743,8 @@ void projectsipdialog::sendbye( void )
   bye.addheader( projectsippacket::CSeq,
               this->lastpacket->getheader( projectsippacket::CSeq ) );
   bye.addheader( projectsippacket::Contact,
-              projectsippacket::contact( this->lastpacket->getuser().strptr(), 
-              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              projectsippacket::contact( this->lastpacket->getuser().strptr(),
+              stringptr( new std::string( projectsipconfig::gethostip() ) ),
               0,
               projectsipconfig::getsipport() ) );
   bye.addheader( projectsippacket::Allow,
@@ -733,14 +756,14 @@ void projectsipdialog::sendbye( void )
 
   this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
 
-  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::resendbye, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
 Function: sendinvite
 Purpose: Send an INVITE. We will need to make a couple of decisions on how
-and where to send the INVITE. For a registered INVITE this will be simpler. 
+and where to send the INVITE. For a registered INVITE this will be simpler.
 Updated: 08.02.2019
 *******************************************************************************/
 void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &response )
@@ -793,11 +816,11 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
   invite->addheader( projectsippacket::Max_Forwards, maxforwards );
 
   invite->addheader( projectsippacket::Contact,
-              projectsippacket::contact( stringptr( new std::string( from ) ), 
-              stringptr( new std::string( projectsipconfig::gethostip() ) ), 
+              projectsippacket::contact( stringptr( new std::string( from ) ),
+              stringptr( new std::string( projectsipconfig::gethostip() ) ),
               0,
               projectsipconfig::getsipport() ) );
-  
+
   invite->addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   invite->addheader( projectsippacket::Content_Length,
@@ -824,7 +847,7 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
         response.addheader( projectwebdocument::Content_Type, "text/json" );
         return;
       }
-              
+
       this->untrack();
       response.setstatusline( 404, "User not found" );
       response.addheader( projectwebdocument::Content_Length, 0 );
@@ -849,7 +872,7 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
 
   this->laststate = std::bind( &projectsipdialog::waitforinviteprogress, this, std::placeholders::_1 );
   this->nextstate = std::bind( &projectsipdialog::waitforinviteprogress, this, std::placeholders::_1 );
-  
+
 }
 
 
@@ -880,7 +903,7 @@ void projectsipdialog::resendbye( const boost::system::error_code& error )
     this->sendbye();
     this->retries--;
 
-    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ), 
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
         std::bind( &projectsipdialog::resendbye, this, std::placeholders::_1 ) );
   }
 }
@@ -1092,5 +1115,3 @@ void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwe
   response.setstatusline( 404, "Not found" );
   response.addheader( projectwebdocument::Content_Length, 0 );
 }
-
-

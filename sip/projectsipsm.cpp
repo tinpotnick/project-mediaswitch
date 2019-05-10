@@ -104,7 +104,7 @@ void projectsipsm::handleoptions( projectsippacketptr pk )
 
 /*******************************************************************************
 Function: handleregister
-Purpose: As it says. RFC 3261 section 10. We do not support anonymous 
+Purpose: As it says. RFC 3261 section 10. We do not support anonymous
 registrations.
 Updated: 17.12.2018
 *******************************************************************************/
@@ -142,7 +142,7 @@ void projectsipsm::handleinvite( projectsippacketptr pk )
       false == pk->hasheader( projectsippacket::From ) ||
       false == pk->hasheader( projectsippacket::Call_ID ) ||
       false == pk->hasheader( projectsippacket::CSeq ) ||
-      false == pk->hasheader( projectsippacket::Contact ) ||
+      /*false == pk->hasheader( projectsippacket::Contact ) || - not sure if we can do this, but zoiper does not send this on cancel*/
       false == pk->hasheader( projectsippacket::Via ) )
   {
     return;
@@ -168,4 +168,3 @@ void projectsipsm::handleresponse( projectsippacketptr pk )
     projectsipregistration::registrarsippacket( pk );
   }
 }
-

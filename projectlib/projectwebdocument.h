@@ -26,6 +26,7 @@ Updated: 17.12.2018
 class httpuri
 {
 public:
+  httpuri(){};
   httpuri( substring s );
 
   substring s;
@@ -101,7 +102,7 @@ public:
 
   bool iscomplete( void );
   void append( chararray &in, size_t length );
-  
+
   /*
     Get functions.
   */

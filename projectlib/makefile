@@ -1,5 +1,5 @@
 
-CCOPTS:=-Wall -g -O0 -fstack-protector-all
+CCOPTS:=-Wall -g -O3 -fstack-protector-all
 
 # Find all sources
 CPPSOURCES:=$(shell ls *.cpp)
@@ -20,5 +20,3 @@ default: ../Debug/libproject.a
 clean:
 	rm $(ALLOBJS) -f
 	rm ../Debug/libproject.a
-
-

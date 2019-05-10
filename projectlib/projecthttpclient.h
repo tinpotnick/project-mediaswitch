@@ -19,7 +19,7 @@
 #define HTTPCLIENTDEFAULTTIMEOUT 10
 
 /*
-TODO 
+TODO
 
 1. Get the io context within this file. Anyone file using
 a webclient doens't need to know about io contexts.
@@ -47,13 +47,13 @@ public:
   enum{ FAIL_RESOLVE = 1, FAIL_CONNECT, FAIL_READ, FAIL_WRITE, FAIL_TIMEOUT };
 
   void asynccancel( void );
-  void asyncrequest( projectwebdocumentptr request, 
+  void asyncrequest( projectwebdocumentptr request,
       std::function< void ( int errorcode ) > );
 
   projectwebdocumentptr getresponse( void );
 
-  void handleresolve( 
-            boost::system::error_code e, 
+  void handleresolve(
+            boost::system::error_code e,
             boost::asio::ip::tcp::resolver::iterator it );
   void handleconnect( boost::system::error_code errorcode );
   void handleread( boost::system::error_code errorcode, std::size_t bytestransferred );
@@ -73,7 +73,9 @@ private:
 
   boost::asio::ip::tcp::resolver resolver;
   boost::asio::steady_timer timer;
+
+  httpuri uri;
+  bool socketopen;
 };
 
 #endif /* PROJECTHTTPCLIENT_H */
-

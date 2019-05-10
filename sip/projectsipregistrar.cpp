@@ -273,6 +273,7 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
     this->registered = std::time( nullptr );
     this->isregistered = true;
   }
+  this->isavailable = true;
 
   /* update control */
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( pk->geturihost() );
@@ -347,6 +348,30 @@ void projectsipregistration::expire( void )
   d->addheader( projectwebdocument::Content_Type, "text/json" );
 
   this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallbackanddie, this, std::placeholders::_1 ) );
+}
+
+/*******************************************************************************
+Function: unavailable
+Purpose: When we have an options expiry (within our registration period) we don't
+expire - we mark as unavailable. This way if it comes back online we will detect 
+this.
+Updated: 15.03.2019
+*******************************************************************************/
+void projectsipregistration::unavailable( void )
+{
+  this->isavailable = false;
+  /* update control */
+  projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->authacceptpacket->geturihost() );
+  std::string controluri = *ptr->controlhost;
+  controluri += "/reg/" + this->authacceptpacket->geturihost().str() + '/' + this->authacceptpacket->getuser().str();
+  
+  projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
+  d->setrequestline( projectwebdocument::DELETE, controluri );
+
+  d->addheader( projectwebdocument::Content_Length, 0 );
+  d->addheader( projectwebdocument::Content_Type, "text/json" );
+
+  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************

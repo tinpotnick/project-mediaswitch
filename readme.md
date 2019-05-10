@@ -18,7 +18,7 @@ All three projects are designed to either run on the same physical server or sep
 
 All services communicate with each other via HTTP. The following section defines the interfaces. In this section all of the examples use curl to get or post data.
 
-## project-control 
+## project-control
 
 ### POST http://control/invite
 
@@ -65,11 +65,11 @@ This interface is used to add directory information to the SIP server.
 PUT http://127.0.0.1:9000/dir/bling.babblevoice.com
 
 {
-  "control": "http://127.0.0.1:9001", 
-  "users": 
-  [ 
-    { 
-      "username": "1003", 
+  "control": "http://127.0.0.1:9001",
+  "users":
+  [
+    {
+      "username": "1003",
       "secret": "1123654789"
     }
   ]
@@ -199,12 +199,39 @@ If the call is not in a ringing or answered state it will send a 180 ringing alo
 
 ### POST http://rtp/
 
-Posting a blank document will create a new channel. 
+Posting a blank document will create a new channel.
 
 Example:
 curl -X  POST --data-raw '{}' -H "Content-Type:application/json" http://rtp/
 
 The server will return a JSON document. Including stats regarding the workload of the server so that the control server can make decisions based on workload as well as routing.
+
+# Control Server
+
+A control server can be written in any language. The first one (the only one and the one provided) is written in Javascript for Node. The reason for this, whilst it is not as efficient as C++ it has much more access to create business logic as required.
+
+Having to recompile a project when you need to change a small amount of logic is not great for most.
+
+A simple example.
+
+We register our new call handler (onnewcall), send directory information to the SIP server so the client can authenticate. Then listen (wait) for new calls.
+
+```
+const projectcontrol = require( "./projectcontrol/index.js" );
+
+projectcontrol.onnewcall( function( call )
+{
+  call.ring();
+} );
+
+/* Register our user */
+projectcontrol.directory( "bling.babblevoice.com", [{ "username": "1003", "secret": "1123654789" } ] );
+
+/* Wait for requests */
+projectcontrol.run();
+
+```
+
 
 # RFCs used in this project
 
@@ -259,31 +286,3 @@ To upload test data to the sip server use
 ## Invite
 
 sipp 127.0.0.1 -sf uaclateoffer.xml -m 1 -l 1
-
-# Control Server
-
-A control server can be written in any language. The first one (the only one and the one provided) is written in Javascript for Node. The reason for this, whilst it is not as efficient as C++ it has much more access to create business logic as required.
-
-Having to recompile a project when you need to change a small amount of logic is not great for most.
-
-A simple example.
-
-We register our new call handler (onnewcall), send directory information to the SIP server so the client can authenticate. Then listen (wait) for new calls.
-
-```
-const projectcontrol = require( "./projectcontrol/index.js" );
-
-projectcontrol.onnewcall( function( call )
-{
-  call.ring();
-} );
-
-/* Register our user */
-projectcontrol.directory( "bling.babblevoice.com", [{ "username": "1003", "secret": "1123654789" } ] );
-
-/* Wait for requests */
-projectcontrol.listen();
-
-```
-
-

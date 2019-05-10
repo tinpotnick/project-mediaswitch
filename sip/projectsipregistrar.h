@@ -38,6 +38,7 @@ public:
   std::string user; /* fully qualified user@domain */
   std::time_t registered; /* when we first registered */
   bool isregistered;
+  bool isavailable;
   boost::posix_time::ptime expires; /* when we expire the registration */
   boost::posix_time::ptime nextping; /* when is the next options (ping) due */
   int outstandingping; /* how many pings we have sent without a response. */
@@ -69,6 +70,7 @@ public:
 
 private:
   void expire( void );
+  void unavailable( void );
   void sendoptions( void );
   boost::asio::steady_timer timer;
   unsigned int optionscseq;

@@ -1,5 +1,5 @@
-CCOPTS:=-Wall -g -O0 -fstack-protector-all -I../projectlib/
-LL:=-lboost_system -lboost_random -lpthread -lcrypto -L../Debug/ -lproject
+CCOPTS:=-Wall -g -O3 -fstack-protector-all -I../projectlib/
+LL:=-L../Debug/ -lproject -lboost_system -lboost_random -lpthread -lcrypto
 
 default: ../Debug/project-sip
 
@@ -21,5 +21,3 @@ debug:
 
 ../Debug/%.o: %.cpp
 	g++ -c $(CCOPTS) $(INCLUDE) $(DEFINE) $< -o $@
-
-

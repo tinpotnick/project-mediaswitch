@@ -119,6 +119,7 @@ private:
   std::time_t endat;
 
   bool finished;
+  stringptr totag;
 };
 
 
