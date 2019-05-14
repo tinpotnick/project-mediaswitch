@@ -275,6 +275,8 @@ void projectsipdialog::invitestart( projectsippacketptr pk )
     return;
   }
 
+  this->domain = pk->geturihost().str();
+
   this->invitepacket = pk;
   this->updatecontrol( pk );
   this->nextstate = std::bind( &projectsipdialog::waitfornextinstruction, this, std::placeholders::_1 );
@@ -327,6 +329,8 @@ void projectsipdialog::inviteauth( projectsippacketptr pk )
 
     return;
   }
+
+  this->domain = pk->geturihost().str();
 
   this->authenticated = true;
   this->updatecontrol( pk );
@@ -793,9 +797,6 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
 
     JSON::Object control = JSON::as_object( request[ "control" ] );
 
-    this->controlhost = JSON::as_string( control[ "host" ] );
-    this->controlport = JSON::as_int64( control[ "port" ] );
-
     hide = ( bool )JSON::as_boolean( cid[ "private" ] );
   }
   catch( const std::out_of_range& oor )
@@ -944,7 +945,7 @@ Updated: 25.01.2019
 *******************************************************************************/
 bool projectsipdialog::updatecontrol( projectsippacketptr pk )
 {
-  projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( pk->geturihost() );
+  projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->domain );
 
   if( !ptr )
   {

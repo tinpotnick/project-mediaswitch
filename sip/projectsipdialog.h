@@ -106,8 +106,7 @@ private:
   int retries;
   bool authenticated;
 
-  std::string controlhost;
-  int controlport;
+  std::string domain;
 
   bool callringing;
   bool callanswered;
