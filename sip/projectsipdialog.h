@@ -83,9 +83,9 @@ private:
   void temporaryunavailable( void );
   void trying( void );
   void ringing( void );
-  void answer( void );
+  void answer( std::string body );
   void busy( void );
-  void send200( bool final = false );
+  void send200( std::string body = "", bool final = false );
   void send486( void );
 
   /* Verbs */
@@ -128,7 +128,7 @@ struct projectsipdialogcallid{};
 
 /*******************************************************************************
 Class: projectsipdialogs
-Purpose: Boost multi index set to store our dialogs. 
+Purpose: Boost multi index set to store our dialogs.
 Updated: 23.01.2019
 *******************************************************************************/
 typedef boost::multi_index::multi_index_container<
@@ -151,6 +151,3 @@ typedef boost::multi_index::multi_index_container<
 
 
 #endif /* PROJECTSIPDIALOG_H */
-
-
-

@@ -547,12 +547,12 @@ Function: answer
 Purpose: Send a 200 answer
 Updated: 30.01.2019
 *******************************************************************************/
-void projectsipdialog::answer( void )
+void projectsipdialog::answer( std::string body )
 {
   if( !this->callanswered )
   {
     this->retries = 3;
-    this->send200();
+    this->send200( body );
     this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
     this->callanswered = true;
     this->answerat = std::time( nullptr );
@@ -568,7 +568,7 @@ Function: send200
 Purpose: Send a 200
 Updated: 06.02.2019
 *******************************************************************************/
-void projectsipdialog::send200( bool final )
+void projectsipdialog::send200( std::string body, bool final )
 {
   projectsippacket ok;
 
@@ -590,8 +590,16 @@ void projectsipdialog::send200( bool final )
               projectsipconfig::getsipport() ) );
   ok.addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+
+
   ok.addheader( projectsippacket::Content_Length,
-                      "0" );
+                      std::to_string( body.length() ) );
+
+  if( body.length() > 0 )
+  {
+    ok.addheader( projectsippacket::Content_Type, "application/sdp" );
+    ok.setbody( body.c_str() );
+  }
 
   this->lastpacket->respond( ok.strptr() );
 
@@ -944,7 +952,7 @@ bool projectsipdialog::updatecontrol( projectsippacketptr pk )
   }
 
   std::string controluri = *ptr->controlhost;
-  controluri += "/invite/" + pk->getheader( projectsippacket::Call_ID ).str();
+  controluri += "/dialog/" + pk->getheader( projectsippacket::Call_ID ).str();
 
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
   d->setrequestline( projectwebdocument::PUT, controluri );
@@ -1101,17 +1109,31 @@ void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwe
 
     // need to add sdp info.
     (*it)->retries = 3;
-    (*it)->answer();
+
+    std::string sdp = "";
+    if ( b.has_key( "sdp" ) )
+    {
+      sdp = *( jsontosdp( JSON::as_object( b[ "sdp" ] ) ) );
+    }
+
+    (*it)->answer( sdp );
   }
-  else if( action == "busy" )
+  else if( action == "hangup" )
   {
     response.setstatusline( 200, "Ok" );
 
-    // need to add sdp info.
     (*it)->retries = 3;
-    (*it)->busy();
+
+    if ( b.has_key( "reason" ) && "busy" == JSON::as_string( b[ "reason" ] ) )
+    {
+      (*it)->busy();
+    }
+    // TODO other hangup methids including normal.
+  }
+  else
+  {
+    response.setstatusline( 404, "Not found" );
   }
 
-  response.setstatusline( 404, "Not found" );
   response.addheader( projectwebdocument::Content_Length, 0 );
 }

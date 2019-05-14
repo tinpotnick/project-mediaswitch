@@ -4,13 +4,31 @@ const projectcontrol = require( "./projectcontrol/index.js" );
 
 projectcontrol.onnewcall = ( call ) =>
 {
+  console.log( "new call" );
+  //console.log( call.callinfo.sdp )
+
   call.onhangup = () =>
   {
     console.log( "hung up" );
   }
 
-  console.log( "new call" );
   call.ring();
+
+  setTimeout( () =>
+  {
+    var sdp = projectcontrol.sdp( 20518, "127.0.0.1", 54400 );
+    projectcontrol.addmedia( sdp, "pcmu" );
+
+    call.answer( sdp, () =>
+    {
+      console.log( "Answered" );
+    } );
+
+    setTimeout( () =>
+    {
+      call.hangup( "busy" );
+    }, 3000 );
+  }, 5000 );
 }
 
 /* Register our user */

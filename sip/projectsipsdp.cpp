@@ -12,7 +12,7 @@
 
 /*******************************************************************************
 Function: sdptojson
-Purpose: Search for the next end of line and return a count to that point from 
+Purpose: Search for the next end of line and return a count to that point from
 in.
 Updated: 31.01.2019
 *******************************************************************************/
@@ -83,7 +83,7 @@ inline JSON::Integer toseconds( std::string &str )
 
 /*******************************************************************************
 Function: sdptojson
-Purpose: Convert the SDP to a JSON document so we can pass up the tree in 
+Purpose: Convert the SDP to a JSON document so we can pass up the tree in
 a more usable format.
 
       Session description
@@ -341,7 +341,7 @@ bool sdptojson( substring in, JSON::Value &out )
         stringvector parts = splitstring( strtosplit, ':' );
 
         boost::crc_32_type crccheck;
-        for( std::string::iterator crcit = parts[ 0 ].begin(); 
+        for( std::string::iterator crcit = parts[ 0 ].begin();
               crcit != parts[ 0 ].end();
               crcit++ )
         {
@@ -478,7 +478,7 @@ bool sdptojson( substring in, JSON::Value &out )
   {
     sdp[ "a" ] = a;
   }
-  
+
   out = sdp;
   return true;
 }
@@ -494,13 +494,13 @@ static inline void appendattributes( std::string &out, JSON::Object &a )
     boost::crc_32_type crccheck;
     std::string attr = it->first;
 
-    for( std::string::iterator crcit = attr.begin(); 
+    for( std::string::iterator crcit = attr.begin();
           crcit != attr.end();
           crcit++ )
     {
       crccheck.process_byte( std::tolower( *crcit ) );
     }
-    
+
     switch( crccheck.checksum() )
     {
       case 0x3e4ad1b3:   /* direction - instead of all of the send/recv/inactive */
@@ -528,7 +528,7 @@ static inline void appendattributes( std::string &out, JSON::Object &a )
           if( ref.has_key( "clock" ) )
           {
             out += "/";
-            out += JSON::to_string( ref[ "clock" ] );
+            out += JSON::as_string( ref[ "clock" ] );
           }
           if( ref.has_key( "params" ) )
           {
@@ -582,7 +582,7 @@ static inline void appendattributes( std::string &out, JSON::Object &a )
 /*******************************************************************************
 Function: jsontosdp
 Purpose: Convert the JSON to a string to be sent to a client. We only support
-version 0. 
+version 0.
 
 {"v":0,
   "o":{"username":"-","sessionid":20518,"sessionversion":0,"nettype":"IN", "ipver": 4, "address":"203.0.113.1"},
@@ -812,5 +812,3 @@ stringptr jsontosdp( JSON::Object &in )
 
   return sdp;
 }
-
-

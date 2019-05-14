@@ -157,14 +157,10 @@ class call
     return false;
   }
 
-  answer( onanswer )
+  answer( sdp, onanswer )
   {
-    var postdata = {
-      action: "answer"
-    };
-
-    this._onanswer = onanswer;
-    this.postrequest( postdata );
+    this.onanswercallback = onanswer;
+    this.postrequest( "answer", { "sdp": sdp } );
   }
 
   ring( alertinfo )
@@ -191,13 +187,9 @@ class call
       return;
     }
 
-    var postdata =
-    {
-      reason: reason
-    };
-
-    this.postrequest( "hangup", postdata );
+    this.postrequest( "hangup", { "reason": reason } );
   }
+
 
   postrequest( action, data )
   {
@@ -224,7 +216,7 @@ class projectcontrol
     this.us.host = "127.0.0.1";
     this.us.port = 9001;
 
-    this.handlers.invite = ( pathparts, req, res, body ) =>
+    this.handlers.dialog = ( pathparts, req, res, body ) =>
     {
       /*
         We add a call to our call dictionary when we get a call we do not know about (i.e new),
@@ -382,6 +374,58 @@ class projectcontrol
     request.users = users;
 
     this.sipserver( request, "/dir/" + domain );
+  }
+
+  /*
+    Create a new SDP object.
+  */
+  sdp( sessionid, ip, port )
+  {
+    var sdp = {
+      v: 0,
+      t: { start: 0, stop: 0 },
+      o: {
+        username: "-",
+        sessionid: sessionid,
+        sessionversion: 0,
+        nettype: "IN",
+        ipver: 4,
+        address: ip
+      },
+      s: " ",
+      c: [
+        {
+          nettype: "IN",
+          ipver: 4,
+          address: ip
+        } ],
+      m: [
+          {
+            media: "audio",
+            port: port,
+            proto: "RTP/AVP",
+            ptime: 20,
+            direction: "sendrecv",
+            payloads: [],
+            rtpmap: {},
+          }
+        ]
+    };
+
+    return sdp;
+  }
+
+  addmedia( sdp, codec )
+  {
+    switch( codec )
+    {
+      case "pcmu":
+      {
+        sdp.m[ 0 ].payloads.push( 0 );
+        sdp.m[ 0 ].rtpmap[ "0" ] = { encoding: "PCMU", clock: "8000" };
+        break;
+      }
+    }
   }
 }
 
