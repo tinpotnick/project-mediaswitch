@@ -185,14 +185,44 @@ class call
     this.postrequest( "ring", postdata );
   }
 
-  hangup( reason )
+  notfound()
   {
     if( this.hungup )
     {
       return;
     }
 
-    this.postrequest( "hangup", { "reason": reason } );
+    this.postrequest( "hangup", { "reason": "Not found", "code": 404 } );
+  }
+
+  paymentrequired()
+  {
+    if( this.hungup )
+    {
+      return;
+    }
+
+    this.postrequest( "hangup", { "reason": "Payment required", "code": 402 } );
+  }
+
+  busy()
+  {
+    if( this.hungup )
+    {
+      return;
+    }
+
+    this.postrequest( "hangup", { "reason": "Busy here", "code": 486 } );
+  }
+
+  hangup()
+  {
+    if( this.hungup )
+    {
+      return;
+    }
+
+    this.postrequest( "hangup" );
   }
 
 
