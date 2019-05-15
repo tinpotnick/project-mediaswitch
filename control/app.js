@@ -31,6 +31,18 @@ projectcontrol.onnewcall = ( call ) =>
   }, 5000 );
 }
 
+projectcontrol.onreg = ( reg ) =>
+{
+  console.log( "onreg" );
+  console.log( reg );
+}
+
+projectcontrol.ondereg = ( reg ) =>
+{
+  console.log( "ondereg" );
+  console.log( reg );
+}
+
 /* Register our user */
 projectcontrol.directory( "bling.babblevoice.com", [ { "username": "1003", "secret": "1123654789" } ] );
 

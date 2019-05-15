@@ -112,6 +112,7 @@ class call
     this.onringingcallback = [];
     this.onanswercallback = [];
     this.onhangupcallback = [];
+    this.onhangupcallback = [];
   }
 
   set info( callinf )
@@ -163,7 +164,7 @@ class call
 
   answer( sdp, onanswer )
   {
-    this.onanswercallback = onanswer;
+    this.onanswercallback.push( onanswer );
     this.postrequest( "answer", { "sdp": sdp } );
   }
 
@@ -207,7 +208,11 @@ class projectcontrol
 {
   constructor()
   {
-    this.handlers = {}
+    this.onregcallbacks = [];
+    this.onderegcallbacks = [];
+    this.onnewcallcallbacks = [];
+
+    this.handlers = { 'PUT': {}, 'POST': {}, 'DELETE': {}, 'GET': {} };
 
     /* Store by call-id */
     this.calls = {}
@@ -220,7 +225,7 @@ class projectcontrol
     this.us.host = "127.0.0.1";
     this.us.port = 9001;
 
-    this.handlers.dialog = ( pathparts, req, res, body ) =>
+    this.handlers.PUT.dialog = ( pathparts, req, res, body ) =>
     {
       /*
         We add a call to our call dictionary when we get a call we do not know about (i.e new),
@@ -236,9 +241,9 @@ class projectcontrol
           c = new call( this, callinfo );
           this.calls[ callinfo.callid ] = c;
 
-          if( "onnewcallcallback" in this )
+          for( var i = 0; i < this.onnewcallcallbacks.length; i ++ )
           {
-            this.onnewcallcallback( c );
+            this.onnewcallcallbacks[ i ]( c );
           }
         }
         else
@@ -247,18 +252,18 @@ class projectcontrol
           c.info = callinfo;
         }
 
-        if( c.ringing && this.onringingcallback.length > 0 )
+        if( c.ringing && c.onringingcallback.length > 0 )
         {
-          for( var i = 0; i < this.onringingcallback.length; i ++ )
+          for( var i = 0; i < c.onringingcallback.length; i ++ )
           {
             c.onringingcallback[ i ]();
           }
           c.onringingcallback = [];
         }
 
-        if( c.answered && this.onanswercallback.length > 0 )
+        if( c.answered && c.onanswercallback.length > 0 )
         {
-          for( var i = 0; i < this.onanswercallback.length; i ++ )
+          for( var i = 0; i < c.onanswercallback.length; i ++ )
           {
             c.onanswercallback[ i ]();
           }
@@ -267,7 +272,7 @@ class projectcontrol
 
         if( c.hungup )
         {
-          for( var i = 0; i < this.onhangupcallback.length; i ++ )
+          for( var i = 0; i < c.onhangupcallback.length; i ++ )
           {
             c.onhangupcallback[ i ]();
           }
@@ -282,14 +287,29 @@ class projectcontrol
       }
     }
 
-    this.handlers.reg = ( pathparts, req, res, body ) =>
+    this.handlers.PUT.reg = ( pathparts, req, res, body ) =>
     {
       try
       {
-        console.log( req.method );
-        console.log( "reg" );
-        console.log( pathparts )
-        console.log( body );
+        for( var i = 0; i < this.onregcallbacks.length; i++ )
+        {
+          this.onregcallbacks[ i ]( body );
+        }
+      }
+      catch( e )
+      {
+        console.log( e );
+      }
+    }
+
+    this.handlers.DELETE.reg = ( pathparts, req, res, body ) =>
+    {
+      try
+      {
+        for( var i = 0; i < this.onderegcallbacks.length; i++ )
+        {
+          this.onderegcallbacks[ i ]( body );
+        }
       }
       catch( e )
       {
@@ -298,9 +318,19 @@ class projectcontrol
     }
   }
 
+  set onreg( callback )
+  {
+    this.onregcallbacks.push( callback );
+  }
+
+  set ondereg( callback )
+  {
+    this.onderegcallbacks.push( callback );
+  }
+
   set onnewcall( callback )
   {
-    this.onnewcallcallback = callback;
+    this.onnewcallcallbacks.push( callback );
   }
 
   sipserver( request, path, method = "PUT" )
@@ -356,14 +386,15 @@ class projectcontrol
         var path = urlparts.path.substr( 1 );
         var pathparts = path.split( '/' );
 
-        if( pathparts[ 0 ] in this.handlers )
+        if( req.method in this.handlers && pathparts[ 0 ] in this.handlers[ req.method ] )
         {
           res.writeHead( 200, { "Content-Length": "0" } );
-          this.handlers[ pathparts[ 0 ] ]( pathparts, req, res, Buffer.concat( this.collatedbody ).toString() );
+          this.handlers[ req.method ][ pathparts[ 0 ] ]( pathparts, req, res, Buffer.concat( this.collatedbody ).toString() );
           this.collatedbody = [];
         }
         else
         {
+          console.log( "Unknown method " + req.method + ":" + url );
           res.writeHead( 404, { "Content-Length": "0" } );
         }
         res.end();
