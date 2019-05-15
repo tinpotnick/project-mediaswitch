@@ -45,7 +45,7 @@ Request the SIP server to perform an INVITE.
 After setting up our control server listen for new connections.
 
 ```
-projectcontrol.listen();
+projectcontrol.run();
 ```
 
 ### directory
@@ -108,6 +108,10 @@ class call
   {
     this.control = control;
     this.callinfo = callinfo;
+
+    this.onringingcallback = [];
+    this.onanswercallback = [];
+    this.onhangupcallback = [];
   }
 
   set info( callinf )
@@ -117,17 +121,17 @@ class call
 
   set onringing( cb )
   {
-    this.onringingcallback = cb
+    this.onringingcallback.push( cb );
   }
 
   set onanswer( cb )
   {
-    this.onanswercallback = cb
+    this.onanswercallback.push( cb );
   }
 
   set onhangup( cb )
   {
-    this.onhangupcallback = cb
+    this.onhangupcallback.push( cb );
   }
 
   get ringing()
@@ -243,25 +247,31 @@ class projectcontrol
           c.info = callinfo;
         }
 
-        if( c.ringing && "onringingcallback" in c )
+        if( c.ringing && this.onringingcallback.length > 0 )
         {
-          c.onringingcallback();
-          delete c.onringingcallback;
+          for( var i = 0; i < this.onringingcallback.length; i ++ )
+          {
+            c.onringingcallback[ i ]();
+          }
+          c.onringingcallback = [];
         }
 
-        if( c.answered && "onanswercallback" in c )
+        if( c.answered && this.onanswercallback.length > 0 )
         {
-          c.onanswercallback();
-          delete c.onanswercallback;
+          for( var i = 0; i < this.onanswercallback.length; i ++ )
+          {
+            c.onanswercallback[ i ]();
+          }
+          c.onanswercallback = [];
         }
 
         if( c.hungup )
         {
-          if( "onhangupcallback" in c )
+          for( var i = 0; i < this.onhangupcallback.length; i ++ )
           {
-            c.onhangupcallback();
-            delete c.onhangupcallback;
+            c.onhangupcallback[ i ]();
           }
+          c.onhangupcallback = [];
           delete this.calls[ callinfo.callid ];
         }
       }
