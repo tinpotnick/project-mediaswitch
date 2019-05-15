@@ -428,14 +428,10 @@ Updated: 05.02.2019
 void projectsipdialog::waitforack( projectsippacketptr pk )
 {
   this->lastpacket = pk;
-  switch( pk->getmethod() )
+  if( projectsippacket::ACK == pk->getmethod() )
   {
-    case projectsippacket::ACK:
-    {
-      this->canceltimer();
-      this->updatecontrol( pk );
-      break;
-    }
+    this->canceltimer();
+    this->updatecontrol( pk );
   }
 }
 
@@ -450,6 +446,7 @@ void projectsipdialog::waitforackanddie( projectsippacketptr pk )
   // When we get an ACK to the last message we can die.
   if( projectsippacket::ACK == pk->getmethod() )
   {
+    this->updatecontrol( pk );
     this->untrack();
   }
 }
@@ -645,38 +642,42 @@ void projectsipdialog::resend200( const boost::system::error_code& error )
 }
 
 /*******************************************************************************
-Function: answer
-Purpose: Send a 200 answer
+Function: hangup
+Purpose: Hangup if ansered (BYE) or send reason for error code.
 Updated: 30.01.2019
 *******************************************************************************/
-void projectsipdialog::busy( void )
+void projectsipdialog::hangup( void )
 {
-  if( !this->callanswered )
+  this->callhungup = true;
+  this->endat = std::time( nullptr );
+
+  if( this->callanswered )
+  {
+    this->sendbye();
+  }
+  else
   {
     this->retries = 3;
-    this->send486();
+
+    this->senderror();
     this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
       /* Wait up to DIALOGACKTIMEOUT seconds before we close this dialog */
     this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
   }
-  else
-  {
-    this->sendbye();
-  }
 }
 
 /*******************************************************************************
-Function: send486
-Purpose: Send a 486 Busy here
+Function: senderror
+Purpose: Send an error
 Updated: 06.02.2019
 *******************************************************************************/
-void projectsipdialog::send486( void )
+void projectsipdialog::senderror( void )
 {
   projectsippacket ok;
 
-  ok.setstatusline( 486, "Busy here" );
+  ok.setstatusline( this->errorcode, errorreason );
   ok.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
 
   ok.addheader( projectsippacket::To,
@@ -699,18 +700,18 @@ void projectsipdialog::send486( void )
 
   this->lastpacket->respond( ok.strptr() );
 
-  this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
+  this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
   this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
-      std::bind( &projectsipdialog::resend486, this, std::placeholders::_1 ) );
+      std::bind( &projectsipdialog::resenderror, this, std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
-Function: resend486
+Function: resenderror
 Purpose: Send a 200
 Updated: 06.02.2019
 *******************************************************************************/
-void projectsipdialog::resend486( const boost::system::error_code& error )
+void projectsipdialog::resenderror( const boost::system::error_code& error )
 {
   if ( error != boost::asio::error::operation_aborted )
   {
@@ -720,11 +721,11 @@ void projectsipdialog::resend486( const boost::system::error_code& error )
       return;
     }
 
-    this->send486();
+    this->senderror();
     this->retries--;
 
     this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
-        std::bind( &projectsipdialog::resend486, this, std::placeholders::_1 ) );
+        std::bind( &projectsipdialog::resenderror, this, std::placeholders::_1 ) );
   }
 }
 
@@ -766,7 +767,7 @@ void projectsipdialog::sendbye( void )
 
   this->lastpacket->respond( bye.strptr() );
 
-  this->nextstate = std::bind( &projectsipdialog::waitforack, this, std::placeholders::_1 );
+  this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
   this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::resendbye, this, std::placeholders::_1 ) );
@@ -1125,11 +1126,26 @@ void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwe
 
     (*it)->retries = 3;
 
-    if ( b.has_key( "reason" ) && "busy" == JSON::as_string( b[ "reason" ] ) )
+    if ( b.has_key( "reason" ) )
     {
-      (*it)->busy();
+      (*it)->errorreason = JSON::as_string( b[ "reason" ] );
     }
-    // TODO other hangup methids including normal.
+    else
+    {
+      (*it)->errorreason = "";
+    }
+
+    if ( b.has_key( "code" ) )
+    {
+      (*it)->errorcode = JSON::as_int64( b[ "code" ] );
+    }
+    else
+    {
+      /* Default - not found */
+      (*it)->errorcode = 404;
+    }
+
+    (*it)->hangup();
   }
   else
   {

@@ -74,7 +74,7 @@ public:
   void ontimeoutenddialog( const boost::system::error_code& error );
   void ontimeout486andenddialog( const boost::system::error_code& error );
   void resend200( const boost::system::error_code& error );
-  void resend486( const boost::system::error_code& error );
+  void resenderror( const boost::system::error_code& error );
   void resendbye( const boost::system::error_code& error );
 
 private:
@@ -84,9 +84,9 @@ private:
   void trying( void );
   void ringing( void );
   void answer( std::string body );
-  void busy( void );
+  void hangup( void );
   void send200( std::string body = "", bool final = false );
-  void send486( void );
+  void senderror( void );
 
   /* Verbs */
   void sendinvite( JSON::Object &request, projectwebdocument &response );
@@ -116,6 +116,9 @@ private:
   std::time_t ringingat;
   std::time_t answerat;
   std::time_t endat;
+
+  int errorcode;
+  std::string errorreason;
 
   bool finished;
   stringptr totag;
