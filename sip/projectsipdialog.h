@@ -63,7 +63,7 @@ public:
 
   /* non state function */
   void handlebye( projectsippacketptr pk );
-  bool updatecontrol( projectsippacketptr pk );
+  bool updatecontrol( void );
   void httpcallback( int errorcode );
 
   /* timer functions */
@@ -100,6 +100,7 @@ private:
   projectsippacketptr invitepacket;
   projectsippacketptr authrequest;
   projectsippacketptr lastpacket;
+  projectsippacketptr lastackpacket;
 
   boost::asio::steady_timer timer;
 
@@ -107,6 +108,7 @@ private:
   bool authenticated;
 
   std::string domain;
+  JSON::Value remotesdp;
 
   bool callringing;
   bool callanswered;

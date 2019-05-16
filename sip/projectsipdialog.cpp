@@ -222,7 +222,7 @@ void projectsipdialog::handlebye( projectsippacketptr pk )
   this->lastpacket = pk;
   this->send200();
   this->finished = true;
-  this->updatecontrol( pk );
+  this->updatecontrol();
 }
 
 /*******************************************************************************
@@ -277,8 +277,14 @@ void projectsipdialog::invitestart( projectsippacketptr pk )
 
   this->domain = pk->geturihost().str();
 
+  if( pk->getheader( projectsippacket::Content_Length ).toint() > 0 &&
+      0 != pk->getheader( projectsippacket::Content_Type ).find( "sdp" ).end() )
+  {
+    sdptojson( pk->getbody(), this->remotesdp );
+  }
+
   this->invitepacket = pk;
-  this->updatecontrol( pk );
+  this->updatecontrol();
   this->nextstate = std::bind( &projectsipdialog::waitfornextinstruction, this, std::placeholders::_1 );
   this->trying();
 }
@@ -332,8 +338,14 @@ void projectsipdialog::inviteauth( projectsippacketptr pk )
 
   this->domain = pk->geturihost().str();
 
+  if( pk->getheader( projectsippacket::Content_Length ).toint() > 0 &&
+      0 != pk->getheader( projectsippacket::Content_Type ).find( "sdp" ).end() )
+  {
+    sdptojson( pk->getbody(), this->remotesdp );
+  }
+
   this->authenticated = true;
-  this->updatecontrol( pk );
+  this->updatecontrol();
   this->trying();
 }
 
@@ -347,18 +359,10 @@ void projectsipdialog::trying( void )
   projectsippacket trying;
   trying.setstatusline( 100, "Trying" );
 
-  sipuri u( this->lastpacket->getheader( projectsippacket::To ) );
-  substring uri = u.uri;
-  if( 0 != uri.end() )
-  {
-    uri.start( uri.start() - 1 );
-    uri.end( uri.end() + 1 );
-  }
-
   trying.addheader( projectsippacket::Via,
               this->lastpacket->getheader( projectsippacket::Via ) );
   trying.addheader( projectsippacket::To,
-              uri.str() + ";" + *this->totag );
+              this->lastpacket->getheader( projectsippacket::To ) );
   trying.addheader( projectsippacket::From,
               this->lastpacket->getheader( projectsippacket::From ) );
   trying.addheader( projectsippacket::Call_ID,
@@ -427,11 +431,11 @@ Updated: 05.02.2019
 *******************************************************************************/
 void projectsipdialog::waitforack( projectsippacketptr pk )
 {
-  this->lastpacket = pk;
+  this->lastackpacket = pk;
   if( projectsippacket::ACK == pk->getmethod() )
   {
     this->canceltimer();
-    this->updatecontrol( pk );
+    this->updatecontrol();
   }
 }
 
@@ -442,11 +446,10 @@ Updated: 30.01.2019
 *******************************************************************************/
 void projectsipdialog::waitforackanddie( projectsippacketptr pk )
 {
-  this->lastpacket = pk;
   // When we get an ACK to the last message we can die.
   if( projectsippacket::ACK == pk->getmethod() )
   {
-    this->updatecontrol( pk );
+    this->updatecontrol();
     this->untrack();
   }
 }
@@ -576,8 +579,16 @@ void projectsipdialog::send200( std::string body, bool final )
   ok.setstatusline( 200, "Ok" );
   ok.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
 
+  sipuri tu( this->invitepacket->getheader( projectsippacket::To ) );
+  substring stu = tu.uri;
+  if( 0 != stu.end() )
+  {
+    stu.start( stu.start() - 1 );
+    stu.end( stu.end() + 1 );
+  }
   ok.addheader( projectsippacket::To,
-              this->lastpacket->getheader( projectsippacket::To ) );
+                stu.str() + ";" + *this->totag );
+
   ok.addheader( projectsippacket::From,
               this->lastpacket->getheader( projectsippacket::From ) );
   ok.addheader( projectsippacket::Call_ID,
@@ -648,6 +659,7 @@ Updated: 30.01.2019
 *******************************************************************************/
 void projectsipdialog::hangup( void )
 {
+  /* tehcnically we should only consider us hung up when we receive an ack or we have timed out waiting */
   this->callhungup = true;
   this->endat = std::time( nullptr );
 
@@ -736,7 +748,13 @@ Updated: 08.02.2019
 *******************************************************************************/
 void projectsipdialog::sendbye( void )
 {
-  if( !this->lastpacket )
+  if( !this->lastackpacket )
+  {
+    /* We must have a previous packet to send a BYE */
+    return;
+  }
+
+  if( !this->invitepacket )
   {
     /* We must have a previous packet to send a BYE */
     return;
@@ -744,19 +762,35 @@ void projectsipdialog::sendbye( void )
 
   projectsippacket bye;
 
-  bye.setrequestline( projectsippacket::BYE, "" );
-  bye.addviaheader( projectsipconfig::gethostname(), this->lastpacket.get() );
+  sipuri u( this->lastackpacket->getheader( projectsippacket::Contact ) );
+  bye.setrequestline( projectsippacket::BYE, u.uri.str() );
+  //bye.setrequestline( projectsippacket::BYE, this->invitepacket->getheader( projectsippacket::Contact ).str() );
+
+  bye.addviaheader( projectsipconfig::gethostname(), this->invitepacket.get() );
+  bye.addheader( projectsippacket::Max_Forwards, 70 );
+
+  /* To param */
+  sipuri tu( this->invitepacket->getheader( projectsippacket::To ) );
+  substring stu = tu.uri;
+  if( 0 != stu.end() )
+  {
+    stu.start( stu.start() - 1 );
+    stu.end( stu.end() + 1 );
+  }
+  bye.addheader( projectsippacket::From,
+                stu.str() + ";" + *this->totag );
 
   bye.addheader( projectsippacket::To,
-              this->lastpacket->getheader( projectsippacket::To ) );
-  bye.addheader( projectsippacket::From,
-              this->lastpacket->getheader( projectsippacket::From ) );
+              this->invitepacket->getheader( projectsippacket::From ) );
+
   bye.addheader( projectsippacket::Call_ID,
-              this->lastpacket->getheader( projectsippacket::Call_ID ) );
+              this->invitepacket->getheader( projectsippacket::Call_ID ) );
+
   bye.addheader( projectsippacket::CSeq,
-              this->lastpacket->getheader( projectsippacket::CSeq ) );
+              std::to_string( this->invitepacket->getcseq() + 1 ) + " BYE" );
+
   bye.addheader( projectsippacket::Contact,
-              projectsippacket::contact( this->lastpacket->getuser().strptr(),
+              projectsippacket::contact( this->invitepacket->getuser().strptr(),
               stringptr( new std::string( projectsipconfig::gethostip() ) ),
               0,
               projectsipconfig::getsipport() ) );
@@ -765,7 +799,7 @@ void projectsipdialog::sendbye( void )
   bye.addheader( projectsippacket::Content_Length,
                       "0" );
 
-  this->lastpacket->respond( bye.strptr() );
+  this->invitepacket->respond( bye.strptr() );
 
   this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
@@ -906,6 +940,7 @@ void projectsipdialog::resendbye( const boost::system::error_code& error )
   {
     if( 0 == this->retries )
     {
+      this->updatecontrol();
       this->untrack();
       return;
     }
@@ -944,7 +979,7 @@ Function: updatecontrol
 Purpose: Pass information to our control server.
 Updated: 25.01.2019
 *******************************************************************************/
-bool projectsipdialog::updatecontrol( projectsippacketptr pk )
+bool projectsipdialog::updatecontrol( void )
 {
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->domain );
 
@@ -954,27 +989,36 @@ bool projectsipdialog::updatecontrol( projectsippacketptr pk )
   }
 
   std::string controluri = *ptr->controlhost;
-  controluri += "/dialog/" + pk->getheader( projectsippacket::Call_ID ).str();
+  controluri += "/dialog/" + this->callid;
 
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
   d->setrequestline( projectwebdocument::PUT, controluri );
 
   JSON::Object v;
 
-  v[ "callid" ] = pk->getheader( projectsippacket::Call_ID ).str();
-  v[ "domain" ] = pk->geturihost().str();
-  v[ "to" ] = pk->getuser( projectsippacket::To ).str();
-  v[ "from" ] = pk->getuser( projectsippacket::From ).str();
-  v[ "contact" ] = pk->getheader( projectsippacket::Contact ).str();
+  v[ "callid" ] = this->callid;
+  v[ "domain" ] = this->domain;
+
+  if( this->invitepacket )
+  {
+    v[ "to" ] = this->invitepacket->getuser( projectsippacket::To ).str();
+    v[ "from" ] = this->invitepacket->getuser( projectsippacket::From ).str();
+    v[ "contact" ] = this->invitepacket->getheader( projectsippacket::Contact ).str();
+  }
   v[ "authenticated" ] = ( JSON::Bool ) this->authenticated;
   v[ "ring" ] = ( JSON::Bool ) this->callringing;
   v[ "answered" ] = ( JSON::Bool ) this->callanswered;
   v[ "hangup" ] = ( JSON::Bool ) this->callhungup;
 
-  JSON::Object rh;
-  rh[ "host" ] = pk->getremotehost();
-  rh[ "port" ] = boost::numeric_cast< JSON::Integer >( pk->getremoteport() );
-  v[ "remote" ] = rh;
+  if( this->lastpacket )
+  {
+    JSON::Object rh;
+    rh[ "host" ] = this->lastpacket->getremotehost();
+    rh[ "port" ] = boost::numeric_cast< JSON::Integer >( this->lastpacket->getremoteport() );
+    v[ "remote" ] = rh;
+  }
+
+  v[ "sdp" ] = this->remotesdp;
 
   JSON::Object epochs;
   epochs[ "start" ] = boost::numeric_cast< JSON::Integer >( this->startat );
@@ -983,16 +1027,6 @@ bool projectsipdialog::updatecontrol( projectsippacketptr pk )
   epochs[ "end" ] = boost::numeric_cast< JSON::Integer >( this->endat );
 
   v[ "epochs" ] = epochs;
-
-  if( pk->getheader( projectsippacket::Content_Length ).toint() > 0 &&
-      0 != pk->getheader( projectsippacket::Content_Type ).find( "sdp" ).end() )
-  {
-    JSON::Value sdpv;
-    if( sdptojson( pk->getbody(), sdpv ) )
-    {
-      v[ "sdp" ] = sdpv;
-    }
-  }
 
   std::string t = JSON::to_string( v );
   d->addheader( projectwebdocument::Content_Length, t.length() );

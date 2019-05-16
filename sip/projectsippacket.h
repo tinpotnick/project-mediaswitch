@@ -82,12 +82,13 @@ public:
   std::string getuserhost( int tofrom = To );
   substring geturihost( void );
   int getexpires( void );
+  int getcseq( void );
 
   /* specific headers */
   bool addviaheader( const char *host, projectsippacket *ref = NULL );
   bool addwwwauthenticateheader( projectsippacket *ref );
-  bool addremotepartyid( const char * realm, 
-                          const char *calleridname, 
+  bool addremotepartyid( const char * realm,
+                          const char *calleridname,
                           const char * callerid,
                           bool hide );
   bool checkauth( projectsippacket *ref, stringptr password );

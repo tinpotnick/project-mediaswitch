@@ -107,5 +107,3 @@ typedef boost::multi_index::multi_index_container<
 > projectsipregistrations;
 
 #endif  /* PROJECTSIPREGISTRAR_H */
-
-

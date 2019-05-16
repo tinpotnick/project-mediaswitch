@@ -102,7 +102,7 @@ stringptr projectsippacket::branch( void )
   {
     // This shouldn't happen
   }
-  
+
   return s;
 }
 
@@ -133,7 +133,7 @@ stringptr projectsippacket::tag( void )
   {
     // This shouldn't happen
   }
-  
+
   return s;
 }
 
@@ -159,7 +159,7 @@ stringptr projectsippacket::callid()
   {
     // This shouldn't happen
   }
-  
+
   return s;
 }
 
@@ -211,7 +211,7 @@ substring projectsippacket::getheaderparam( int header, const char *param )
   }
   retval.start( ppos.end() );
 
-  /* Check for a quoted string TODO - these are case sensative 
+  /* Check for a quoted string TODO - these are case sensative
   unquoted strings should be insensative */
   substring pposquoted = ppos;
   pposquoted.end( h.end() );
@@ -234,8 +234,8 @@ setheaderparam( "server10.biloxi.com" "z9hG4bK4b43c2ff8.1" );
 Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
 Updated: 09.01.2019
 *******************************************************************************/
-bool projectsippacket::addremotepartyid( const char *realm, 
-                                          const char *calleridname, 
+bool projectsippacket::addremotepartyid( const char *realm,
+                                          const char *calleridname,
                                           const char *callerid,
                                           bool hide )
 {
@@ -325,14 +325,14 @@ bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
   else
   {
     substring branch = ref->getheaderparam( projectsippacket::Via, "branch" );
-    
+
     size_t lb = branch.end() - branch.start();
 
     if( ( lh + lb ) > DEFAULTHEADERLINELENGTH )
     {
       return false;
     }
-      
+
     if( 0 != lb )
     {
       memcpy( &paramvalue[ lh + 12 + 1 ], "branch=", 7 );
@@ -349,7 +349,7 @@ bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
 
 /*******************************************************************************
 Function: addauthenticateheader
-Purpose: Generate a nonce parameter used for auth and add the authenticate 
+Purpose: Generate a nonce parameter used for auth and add the authenticate
 header. Ref RFC 2617 section 3.2.1.
 Updated: 03.01.2019
 *******************************************************************************/
@@ -364,7 +364,7 @@ bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
   s = "Digest realm=\"";
   sipuri suri( ref->getrequesturi() );
   s += suri.host.str();
-  
+
   s += "\",algorithm=\"MD5\",nonce=\"";
 
   try
@@ -386,14 +386,14 @@ bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
     // This shouldn't happen
   }
   s += "\",qop=\"auth\"";
-  
+
   this->addheader( projectsippacket::WWW_Authenticate, s.c_str() );
   return true;
 }
 
 /*******************************************************************************
 Function: md5hashtostring
-Purpose: Converts input 16 bytes hex to string hex. buf need to be 33 bytes to 
+Purpose: Converts input 16 bytes hex to string hex. buf need to be 33 bytes to
 include null terminator.
 Updated: 08.01.2019
 *******************************************************************************/
@@ -420,11 +420,11 @@ Purpose: Calculate the h(a1) using cnonce and cnonce (algorithm = "MD5-sess").
 Ref RFC 2617.
 Updated: 11.01.2019
 *******************************************************************************/
-static inline char * ha1( const char *username, size_t ul, 
-                          const char *realm, size_t rl, 
+static inline char * ha1( const char *username, size_t ul,
+                          const char *realm, size_t rl,
                           const char *password, size_t pl,
-                          const char *nonce, size_t cl, 
-                          const char *cnonce, size_t cnl, 
+                          const char *nonce, size_t cl,
+                          const char *cnonce, size_t cnl,
                           const char *alg,
                           char *buf )
 {
@@ -458,7 +458,7 @@ Function: ha2
 Purpose: Calculate the h(a2). Ref RFC 2617.
 Updated: 11.01.2019
 *******************************************************************************/
-static inline char * ha2( const char *method, size_t ml, 
+static inline char * ha2( const char *method, size_t ml,
                                     const char *uri, size_t ul,
                                     char *buf )
 {
@@ -516,13 +516,13 @@ Function: requestdigest
 Purpose: The 1 call to calculate the SIP request digest.
 Updated: 11.01.2019
 *******************************************************************************/
-char * requestdigest( const char *username, size_t ul, 
-                      const char *realm, size_t rl, 
+char * requestdigest( const char *username, size_t ul,
+                      const char *realm, size_t rl,
                       const char *password, size_t pl,
-                      const char *nonce, size_t nl, 
-                      const char *nc, size_t ncl, 
+                      const char *nonce, size_t nl,
+                      const char *nc, size_t ncl,
                       const char *cnonce, size_t cnl,
-                      const char *method, size_t ml, 
+                      const char *method, size_t ml,
                       const char *uri, size_t url,
                       const char *qop, size_t ql,
                       const char *alg,
@@ -531,11 +531,11 @@ char * requestdigest( const char *username, size_t ul,
   char h1[ 33 ];
   char h2[ 33 ];
 
-  kd( 
-    ha1( username, ul, 
-         realm, rl, 
+  kd(
+    ha1( username, ul,
+         realm, rl,
          password, pl,
-         nonce, nl, 
+         nonce, nl,
          cnonce, cnl,
          alg,
          h1 ),
@@ -543,7 +543,7 @@ char * requestdigest( const char *username, size_t ul,
     nc, ncl,
     cnonce, cnl,
     qop, ql,
-    ha2( method, ml, 
+    ha2( method, ml,
          uri, url,
          h2 ),
     buf );
@@ -555,7 +555,7 @@ char * requestdigest( const char *username, size_t ul,
 /*******************************************************************************
 Function: checkauth
 Purpose: Check the auth of this packet. The reference contans the nonce to check
-we set the nonce and it is not a replay. 
+we set the nonce and it is not a replay.
 Updated: 10.01.2019
 *******************************************************************************/
 bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
@@ -581,7 +581,7 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
   {
     realm = this->geturihost();
   }
-  
+
   substring nonce = ref->getheaderparam( projectsippacket::WWW_Authenticate, "nonce" );
   substring uri = this->getheaderparam( projectsippacket::Authorization, "uri" );
   if( 0 == uri.end() )
@@ -589,11 +589,11 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
     uri = this->uri;
   }
 
-  kd( 
-    ha1( user.c_str(), user.length(), 
-         realm.c_str(), realm.length(), 
+  kd(
+    ha1( user.c_str(), user.length(),
+         realm.c_str(), realm.length(),
          password->c_str(), password->length(),
-         nonce.c_str(), nonce.length(), 
+         nonce.c_str(), nonce.length(),
          cnonce.c_str(), cnonce.length(),
          "MD5",
          h1 ),
@@ -601,7 +601,7 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
     noncecount.c_str(), noncecount.length(),
     cnonce.c_str(), cnonce.length(),
     qop.c_str(), qop.length(),
-    ha2( this->methodstr.c_str(), this->methodstr.length(), 
+    ha2( this->methodstr.c_str(), this->methodstr.length(),
          uri.c_str(), uri.length(),
          h2 ),
     response );
@@ -691,6 +691,22 @@ int projectsippacket::getexpires( void )
   }
 
   return expires;
+}
+
+/*******************************************************************************
+Function: getcseq
+Purpose: Get the cseq value from teh cseq header (the number value)
+Updated: 15.05.2019
+*******************************************************************************/
+int projectsippacket::getcseq( void )
+{
+  substring ex;
+  if( this->hasheader( projectsippacket::CSeq ) )
+  {
+    ex = this->getheader( projectsippacket::CSeq );
+    return std::stoi( ex.str() );
+  }
+  return -1;
 }
 
 /*******************************************************************************
@@ -895,7 +911,7 @@ const char *projectsippacket::getheaderstr( int header )
       return "Authorization";
     case Allow:
       return "Allow";
-    case Alert_Info:   
+    case Alert_Info:
       return "Alert-Info";
     case Call_ID:
       return "Call-ID";
@@ -1011,7 +1027,7 @@ sipuri::sipuri( substring s ) :
     this->secret = userpass.aftertoken( ':' );
   }
 
-  this->headers = s.findsubstr( '?', ';' );  
+  this->headers = s.findsubstr( '?', ';' );
   this->parameters = s.findsubstr( ';', '?' );
 
   if( 0 != this->headers.end() )
@@ -1083,4 +1099,3 @@ substring sipuri::getheader( std::string name )
 
   return header.findend( '&' );
 }
-

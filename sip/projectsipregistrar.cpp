@@ -39,7 +39,7 @@ Purpose: Our start state. We wait to receive a REGISTER packet.
 Updated: 10.01.2019
 *******************************************************************************/
 void projectsipregistration::regstart( projectsippacketptr pk )
-{  
+{
   /*
     What is the expires the client is requesting.
   */
@@ -63,13 +63,13 @@ void projectsipregistration::regstart( projectsippacketptr pk )
 
     toobrief.setstatusline( 423, "Interval Too Brief" );
 
-    std::string via = projectsipconfig::gethostip() + 
-                    std::string( ":" ) + 
+    std::string via = projectsipconfig::gethostip() +
+                    std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
 
     toobrief.addviaheader( via.c_str(), pk.get() );
 
-    toobrief.addheader( projectsippacket::Min_Expires, 
+    toobrief.addheader( projectsippacket::Min_Expires,
                 DEFAULTSIPEXPIRES );
 
     toobrief.addheader( projectsippacket::To,
@@ -81,9 +81,9 @@ void projectsipregistration::regstart( projectsippacketptr pk )
     toobrief.addheader( projectsippacket::CSeq,
                 pk->getheader( projectsippacket::CSeq ) );
     toobrief.addheader( projectsippacket::Contact,
-                projectsippacket::contact( pk->getuser().strptr(), 
-                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                0, 
+                projectsippacket::contact( pk->getuser().strptr(),
+                stringptr( new std::string( projectsipconfig::gethostip() ) ),
+                0,
                 projectsipconfig::getsipport() ) );
     toobrief.addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -101,8 +101,8 @@ void projectsipregistration::regstart( projectsippacketptr pk )
 
   this->authrequest->setstatusline( 401, "Unauthorized" );
 
-  std::string via = projectsipconfig::gethostip() + 
-                    std::string( ":" ) + 
+  std::string via = projectsipconfig::gethostip() +
+                    std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
 
   this->authrequest->addviaheader( via.c_str(), pk.get() );
@@ -118,9 +118,9 @@ void projectsipregistration::regstart( projectsippacketptr pk )
   this->authrequest->addheader( projectsippacket::CSeq,
                       pk->getheader( projectsippacket::CSeq ) );
   this->authrequest->addheader( projectsippacket::Contact,
-                      projectsippacket::contact( pk->getuser().strptr(), 
-                      stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                      0, 
+                      projectsippacket::contact( pk->getuser().strptr(),
+                      stringptr( new std::string( projectsipconfig::gethostip() ) ),
+                      0,
                       projectsipconfig::getsipport() ) );
   this->authrequest->addheader( projectsippacket::Allow,
                       "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -142,8 +142,8 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 {
   this->currentpacket = pk;
 
-  stringptr password = projectsipdirdomain::lookuppassword( 
-                pk->geturihost(), 
+  stringptr password = projectsipdirdomain::lookuppassword(
+                pk->geturihost(),
                 pk->getuser() );
 
   if( !this->authrequest )
@@ -159,8 +159,8 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
     failedauth.setstatusline( 403, "Failed auth" );
 
-    std::string via = projectsipconfig::gethostip() + 
-                    std::string( ":" ) + 
+    std::string via = projectsipconfig::gethostip() +
+                    std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
 
     failedauth.addviaheader( via.c_str(), this->currentpacket.get() );
@@ -174,9 +174,9 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
     failedauth.addheader( projectsippacket::CSeq,
                 this->currentpacket->getheader( projectsippacket::CSeq ) );
     failedauth.addheader( projectsippacket::Contact,
-                projectsippacket::contact( this->currentpacket->getuser().strptr(), 
-                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                0, 
+                projectsippacket::contact( this->currentpacket->getuser().strptr(),
+                stringptr( new std::string( projectsipconfig::gethostip() ) ),
+                0,
                 projectsipconfig::getsipport() ) );
     failedauth.addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -210,17 +210,17 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
     expires = DEFAULTSIPEXPIRES;
   }
 
-  if( this->authrequest->getheader( projectsippacket::CSeq ) != 
+  if( this->authrequest->getheader( projectsippacket::CSeq ) !=
         this->currentpacket->getheader( projectsippacket::CSeq ) )
   {
-    // This should not happen. Although, if 2 different clients managed 
+    // This should not happen. Although, if 2 different clients managed
     // to do this at the same time it could. This will make one stall
     // (and retry).
     return;
   }
 
   /*
-    Now send a 200 
+    Now send a 200
     The registrar returns a 200 (OK) response.  The response MUST
     contain Contact header field values enumerating all current
     bindings.  Each Contact value MUST feature an "expires"
@@ -231,8 +231,8 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
   p.setstatusline( 200, "Ok" );
 
-  std::string via = projectsipconfig::gethostip() + 
-                    std::string( ":" ) + 
+  std::string via = projectsipconfig::gethostip() +
+                    std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
 
   p.addviaheader( via.c_str(), this->currentpacket.get() );
@@ -246,9 +246,9 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
               this->currentpacket->getheader( projectsippacket::CSeq ) );
 
   p.addheader( projectsippacket::Contact,
-              projectsippacket::contact( this->currentpacket->getuser().strptr(), 
-                stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                expires, 
+              projectsippacket::contact( this->currentpacket->getuser().strptr(),
+                stringptr( new std::string( projectsipconfig::gethostip() ) ),
+                expires,
                 projectsipconfig::getsipport() ) );
   p.addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -262,7 +262,7 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
   this->currentpacket->respond( p.strptr() );
   this->authacceptpacket = this->currentpacket;
 
-  this->expires = boost::posix_time::second_clock::local_time() + 
+  this->expires = boost::posix_time::second_clock::local_time() +
                       boost::posix_time::seconds( expires );
 
   this->timer.expires_after( std::chrono::seconds( OPTIONSPINGFREQUENCY ) );
@@ -279,7 +279,7 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( pk->geturihost() );
   std::string controluri = *ptr->controlhost;
   controluri += "/reg/" + pk->geturihost().str() + '/' + this->authacceptpacket->getuser().str();
-  
+
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
   d->setrequestline( projectwebdocument::PUT, controluri );
 
@@ -314,7 +314,7 @@ void projectsipregistration::httpcallback( int errorcode )
 
 void projectsipregistration::httpcallbackanddie( int errorcode )
 {
-  /* Only do this if we have no re-registered whilst trying to 
+  /* Only do this if we have no re-registered whilst trying to
   contact our control server. All may be forgiven. */
   if( !this->isregistered )
   {
@@ -340,7 +340,7 @@ void projectsipregistration::expire( void )
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->authacceptpacket->geturihost() );
   std::string controluri = *ptr->controlhost;
   controluri += "/reg/" + this->authacceptpacket->geturihost().str() + '/' + this->authacceptpacket->getuser().str();
-  
+
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
   d->setrequestline( projectwebdocument::DELETE, controluri );
 
@@ -353,7 +353,7 @@ void projectsipregistration::expire( void )
 /*******************************************************************************
 Function: unavailable
 Purpose: When we have an options expiry (within our registration period) we don't
-expire - we mark as unavailable. This way if it comes back online we will detect 
+expire - we mark as unavailable. This way if it comes back online we will detect
 this.
 Updated: 15.03.2019
 *******************************************************************************/
@@ -364,7 +364,7 @@ void projectsipregistration::unavailable( void )
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->authacceptpacket->geturihost() );
   std::string controluri = *ptr->controlhost;
   controluri += "/reg/" + this->authacceptpacket->geturihost().str() + '/' + this->authacceptpacket->getuser().str();
-  
+
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
   d->setrequestline( projectwebdocument::DELETE, controluri );
 
@@ -414,8 +414,8 @@ void projectsipregistration::sendoptions( void )
 
   request.setrequestline( projectsippacket::OPTIONS, contacturi.uri.str() );
 
-  std::string via = projectsipconfig::gethostip() + 
-                    std::string( ":" ) + 
+  std::string via = projectsipconfig::gethostip() +
+                    std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
 
   request.addviaheader( via.c_str() );
@@ -423,7 +423,7 @@ void projectsipregistration::sendoptions( void )
   request.addheader( projectsippacket::Max_Forwards, "70" );
   request.addheader( projectsippacket::To,
                       this->authacceptpacket->getheader( projectsippacket::To ) );
-  
+
   std::string from = "<sip:";
   from += this->user;
   from += ">;";
@@ -436,9 +436,9 @@ void projectsipregistration::sendoptions( void )
   request.addheader( projectsippacket::CSeq,
                       std::to_string( this->optionscseq ) + " OPTIONS" );
   request.addheader( projectsippacket::Contact,
-                      projectsippacket::contact( this->authacceptpacket->getuser().strptr(), 
-                      stringptr( new std::string( projectsipconfig::gethostip() ) ), 
-                      0, 
+                      projectsippacket::contact( this->authacceptpacket->getuser().strptr(),
+                      stringptr( new std::string( projectsipconfig::gethostip() ) ),
+                      0,
                       projectsipconfig::getsipport() ) );
   request.addheader( projectsippacket::Allow,
                       "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -452,7 +452,7 @@ void projectsipregistration::sendoptions( void )
 
 /*******************************************************************************
 Function: handleresponse
-Purpose: We received a SIP 200 OK in response to our OPTIONS request. We only 
+Purpose: We received a SIP 200 OK in response to our OPTIONS request. We only
 (at the moment) senauthrequestd out options.
 Updated: 17.01.2019
 *******************************************************************************/
@@ -478,7 +478,7 @@ void projectsipregistration::handleresponse( projectsippacketptr pk )
 /*******************************************************************************
 Function: processsippacket
 Purpose: Process a REGISTER packet. To get into this function
-the packet must have already been checked as a REGISTER packet and has all 
+the packet must have already been checked as a REGISTER packet and has all
 of the required headers.
 Updated: 10.01.2019
 *******************************************************************************/
@@ -514,7 +514,7 @@ void projectsipregistration::registrarsippacket( projectsippacketptr pk )
       r->regwaitauth( pk );
       return;
     }
-    
+
     r->regstart( pk );
     return;
   }
@@ -545,7 +545,7 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
       response.addheader( projectwebdocument::Content_Type, "text/json" );
       return;
     }
-    
+
     projectsipdirusers::iterator uit;
 
     if( 3 == pathsize )
@@ -556,7 +556,7 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
     {
       uit = d->users.begin();
     }
-    
+
     for( ; uit != d->users.end(); uit++ )
     {
       JSON::Object v;
@@ -574,7 +574,7 @@ void projectsipregistration::httpget( stringvector &path, projectwebdocument &re
         v[ "registered" ] = ( JSON::Bool ) true;
 
         v[ "outstandingping" ] = ( JSON::Integer ) ( *it )->outstandingping;
-        
+
         JSON::Object r;
         r[ "host" ] = ( *it )->authacceptpacket->getremotehost();
         r[ "port" ] = ( JSON::Integer ) ( *it )->authacceptpacket->getremoteport();
@@ -645,5 +645,3 @@ bool projectsipregistration::sendtoregisteredclient( std::string &user, projects
 
   return false;
 }
-
-
