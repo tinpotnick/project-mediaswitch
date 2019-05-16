@@ -454,6 +454,15 @@ void projectsipdialog::waitforackanddie( projectsippacketptr pk )
   }
 }
 
+void projectsipdialog::waitfor200anddie( projectsippacketptr pk )
+{
+  if( 200 == pk->getstatuscode() )
+  {
+    this->updatecontrol();
+    this->untrack();
+  }
+}
+
 /*******************************************************************************
 Function: waitfornextinstruction
 Purpose: We have received an INVITE and sent a trying, if the client has
@@ -801,7 +810,7 @@ void projectsipdialog::sendbye( void )
 
   this->invitepacket->respond( bye.strptr() );
 
-  this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
+  this->nextstate = std::bind( &projectsipdialog::waitfor200anddie, this, std::placeholders::_1 );
 
   this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::resendbye, this, std::placeholders::_1 ) );
@@ -1004,6 +1013,7 @@ bool projectsipdialog::updatecontrol( void )
     v[ "to" ] = this->invitepacket->getuser( projectsippacket::To ).str();
     v[ "from" ] = this->invitepacket->getuser( projectsippacket::From ).str();
     v[ "contact" ] = this->invitepacket->getheader( projectsippacket::Contact ).str();
+    v[ "maxforwards" ] = ( JSON::Integer ) this->invitepacket->getheader( projectsippacket::Max_Forwards ).toint();
   }
   v[ "authenticated" ] = ( JSON::Bool ) this->authenticated;
   v[ "ring" ] = ( JSON::Bool ) this->callringing;

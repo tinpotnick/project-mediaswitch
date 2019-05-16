@@ -310,15 +310,15 @@ bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
   char paramvalue[ DEFAULTHEADERLINELENGTH ];
   memcpy( &paramvalue[ 0 ], "SIP/2.0/UDP ", 12 );
   memcpy( &paramvalue[ 12 ], host, lh );
-  paramvalue[ lh + 12 ] = ';';
+  memcpy( &paramvalue[ lh + 12 ], ";rport;", 7 );
 
   stringptr br;
   if( NULL == ref )
   {
     br = projectsippacket::branch();
     stringptr bptr = projectsippacket::branch();
-    memcpy( &paramvalue[ lh + 12 + 1 ], bptr->c_str(), bptr->length() );
-    paramvalue[ lh + 12 + 1 + bptr->length() ] = 0;
+    memcpy( &paramvalue[ lh + 12 + 7 ], bptr->c_str(), bptr->length() );
+    paramvalue[ lh + 12 + 7 + bptr->length() ] = 0;
 
     this->addheader( projectsippacket::Via, paramvalue );
   }
@@ -335,10 +335,10 @@ bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
 
     if( 0 != lb )
     {
-      memcpy( &paramvalue[ lh + 12 + 1 ], "branch=", 7 );
+      memcpy( &paramvalue[ lh + 12 + 7 ], "branch=", 7 );
       const char *branchsrc = branch.c_str();
-      memcpy( &paramvalue[ lh + 12 + 1 + 7 ], branchsrc, lb );
-      paramvalue[ lh + 12 + 1 + 7 + lb ] = 0;
+      memcpy( &paramvalue[ lh + 12 + 7 + 7 ], branchsrc, lb );
+      paramvalue[ lh + 12 + 7 + 7 + lb ] = 0;
 
       this->addheader( projectsippacket::Via, paramvalue );
     }

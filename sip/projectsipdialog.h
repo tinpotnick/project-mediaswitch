@@ -54,6 +54,7 @@ public:
   void waitfornextinstruction( projectsippacketptr pk );
   void waitforack( projectsippacketptr pk );
   void waitforackanddie( projectsippacketptr pk );
+  void waitfor200anddie( projectsippacketptr pk );
 
   /* outbound invite */
   void waitforinviteprogress( projectsippacketptr pk );

@@ -309,6 +309,8 @@ The server will return a JSON document. Including stats regarding the workload o
 * RFC 2616: Hypertext Transfer Protocol -- HTTP/1.1
 * RFC 2617: HTTP Authentication: Basic and Digest Access Authentication
 * RFC 3261: SIP: Session Initiation Protocol
+* RFC 3881: An Extension to the Session Initiation Protocol (SIP) for Symmetric Response Routing
+* RFC 4028: Session Timers in the Session Initiation Protocol (SIP)
 * RFC 4566: SDP: Session Description Protocol
 * RFC 3550: RTP: A Transport Protocol for Real-Time Applications
 * RFC 3551: RTP Profile for Audio and Video Conferences with Minimal Control
@@ -357,6 +359,10 @@ To upload test data to the sip server use
 ## Invite
 
 sipp 127.0.0.1 -sf uaclateoffer.xml -m 1 -l 1
+
+# TODO
+
+- [ ] Impliment session timers (RFC 4028)
 
 # License
 
