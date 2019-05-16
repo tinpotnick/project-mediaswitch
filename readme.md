@@ -304,33 +304,6 @@ curl -X  POST --data-raw '{}' -H "Content-Type:application/json" http://rtp/
 
 The server will return a JSON document. Including stats regarding the workload of the server so that the control server can make decisions based on workload as well as routing.
 
-# Control Server
-
-A control server can be written in any language. The first one (the only one and the one provided) is written in Javascript for Node. The reason for this, whilst it is not as efficient as C++ it has much more access to create business logic as required.
-
-Having to recompile a project when you need to change a small amount of logic is not great for most.
-
-A simple example.
-
-We register our new call handler (onnewcall), send directory information to the SIP server so the client can authenticate. Then listen (wait) for new calls.
-
-```js
-const projectcontrol = require( "./projectcontrol/index.js" );
-
-projectcontrol.onnewcall( function( call )
-{
-  call.ring();
-} );
-
-/* Register our user */
-projectcontrol.directory( "bling.babblevoice.com", [{ "username": "1003", "secret": "1123654789" } ] );
-
-/* Wait for requests */
-projectcontrol.run();
-
-```
-
-
 # RFCs used in this project
 
 * RFC 2616: Hypertext Transfer Protocol -- HTTP/1.1
