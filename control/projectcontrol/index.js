@@ -222,7 +222,7 @@ class call
       return;
     }
 
-    this.postrequest( "hangup" );
+    this.postrequest( "hangup", {} );
   }
 
 
