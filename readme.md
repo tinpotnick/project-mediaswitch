@@ -4,7 +4,7 @@
 
 Project mediaswitch is designed to be a scalable VOIP switch. Forget a Swiss-army knife supporting 20 protocols bridging old ISDN routes with H323 or SIP. This project is designed to be slim, efficient and fast using an event-driven, asynchronous architecture. SIP, call control and RTP.
 
-The design is be broken down into 3 core components. Each component is primarily a single threaded architecture with I/O completion ports for network (think Nginx over Apache). This is to:
+The design is broken down into 3 core components. Each component is primarily a single threaded architecture with I/O completion ports for network (think Nginx over Apache). This is to:
 
 1. Increase reliability by removing the possibility of race conditions
 2. Reduce the need to lock threads using mutex's or equivalents

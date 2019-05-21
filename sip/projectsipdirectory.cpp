@@ -87,9 +87,9 @@ void projectsipdirdomain::removeuser( std::string &user )
 
 /*******************************************************************************
 Function: lookuppassword
-Purpose: Looks up the users password from our directory. Our data must be 
+Purpose: Looks up the users password from our directory. Our data must be
 populated via the http server. This also then limits the look up on rogue
-clients trying to randomly lookup username/password combos. This may create a 
+clients trying to randomly lookup username/password combos. This may create a
 slower load on startup and greater memory requirement. But seems to be the best
 option.
 Updated: 22.01.2019
@@ -166,6 +166,25 @@ bool projectsipdirdomain::userexist( std::string &domain, std::string &user )
   }
 
   return false;
+}
+
+
+/*!md
+# userexist
+Does the user exist in this domain.
+*/
+bool projectsipdirdomain::userexist( std::string &user )
+{
+  projectsipdirusers::iterator uit;
+  uit = this->users.find( user );
+
+  if( this->users.end() == uit )
+  {
+    /* Does not exist. */
+    return false;
+  }
+
+  return true;
 }
 
 
@@ -278,7 +297,7 @@ if
 com ---> babblevoice ---> bling
          yadaya      ---> bling
 removedomain( bling.babblevoice.com ) will remove babblevoice.bling i.e. you are
-left with 
+left with
 com ---> yadaya      ---> bling
 
 It ill remove the specified domain regardless of it having children, however
@@ -305,8 +324,8 @@ bool projectsipdirdomain::removedomain( std::string &domain, bool force )
     map::iterator domit = ptr->subdomains.find( hostdom );
     if( ptr->subdomains.end() != domit )
     {
-      if( force || 
-          ( 0 == domit->second->users.size() && 0 == domit->second->subdomains.size() ) 
+      if( force ||
+          ( 0 == domit->second->users.size() && 0 == domit->second->subdomains.size() )
         )
       {
         ptr->subdomains.erase( domit );
@@ -328,7 +347,7 @@ bool projectsipdirdomain::removedomain( std::string &domain, bool force )
       }
     }
   }
-  
+
   return false;
 }
 
@@ -384,7 +403,7 @@ void projectsipdirdomain::httpget( stringvector &path, projectwebdocument &respo
     {
       v[ "control" ] = JSON::as_string( *ptr->controlhost );;
     }
-    
+
     std::string t = JSON::to_string( v );
 
     response.setstatusline( 200, "Ok" );
@@ -402,10 +421,10 @@ Function: httpput
 Purpose: Respods to put requests form our control server.
 It needs to handle the following array:
 HTTP PUT /dir/bling.babblevoice.com
-{ 
+{
   "control": "http://127.0.0.1:9000",
-  "users": 
-  [ 
+  "users":
+  [
     { "username": "1003", "secret": "mysecret"}
   ]
 }
@@ -467,14 +486,14 @@ void projectsipdirdomain::httpput( stringvector &path, JSON::Value &body, projec
 
 /*******************************************************************************
 Function: httppatch
-Purpose: Responds to patch requests form our control server. The domain must 
+Purpose: Responds to patch requests form our control server. The domain must
 already exist.
 It needs to handle the following array:
 HTTP PUT /dir/bling.babblevoice.com
-{ 
+{
   "control": "http://127.0.0.1:9001".
-  "users": 
-  [ 
+  "users":
+  [
     { "username": "1003", "secret": "mysecret"}
   ]
 }
@@ -490,7 +509,7 @@ Updated: 20.02.2019
 *******************************************************************************/
 void projectsipdirdomain::httppatch( stringvector &path, JSON::Value &body, projectwebdocument &response )
 {
-  
+
   if( 2 != path.size() || 3 != path.size() )
   {
     response.setstatusline( 400, "Path wrong length" );
@@ -519,7 +538,7 @@ void projectsipdirdomain::httppatch( stringvector &path, JSON::Value &body, proj
     }
 
     domentry->adduser( path[ 2 ], JSON::as_string( u[ "secret" ] ) );
-          
+
     response.setstatusline( 200, "Updated" );
     response.addheader( projectwebdocument::Content_Length, 0 );
     return;
@@ -583,7 +602,7 @@ void projectsipdirdomain::httpdelete( stringvector &path, projectwebdocument &re
     response.addheader( projectwebdocument::Content_Length, 0 );
     return;
   }
-  
+
   if( 2 == path.size() )
   {
     if( projectsipdirdomain::removedomain( path[ 1 ] ) )
@@ -597,6 +616,5 @@ void projectsipdirdomain::httpdelete( stringvector &path, projectwebdocument &re
   response.setstatusline( 400, "Bad path" );
   response.addheader( projectwebdocument::Content_Length, 0 );
   return;
-  
-}
 
+}

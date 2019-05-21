@@ -46,7 +46,7 @@ Function: contact
 Purpose: Generate a contact parameter.
 Updated: 22.01.2019
 *******************************************************************************/
-stringptr projectsippacket::contact( stringptr user, stringptr host, int expires, int port )
+stringptr projectsippacket::contact( stringptr user, stringptr host, int expires )
 {
   stringptr s = stringptr( new std::string() );
   s->reserve( DEFAULTHEADERLINELENGTH );
@@ -55,12 +55,6 @@ stringptr projectsippacket::contact( stringptr user, stringptr host, int expires
   *s += *user;
   *s += '@';
   *s += *host;
-
-  if( 5060 != port )
-  {
-    *s += ":";
-    *s += std::to_string( port );
-  }
 
   *s += '>';
   if( 0 != expires )
@@ -108,32 +102,20 @@ stringptr projectsippacket::branch( void )
 
 /*******************************************************************************
 Function: tag
-Purpose: Generate a tag parameter.
+Purpose: Generate a tag.
 Updated: 03.01.2019
 *******************************************************************************/
 stringptr projectsippacket::tag( void )
 {
-  std::string tg;
+  stringptr s = stringptr( new std::string() );
+  s->reserve( DEFAULTHEADERLINELENGTH );
+
   boost::random::random_device rng;
   boost::random::uniform_int_distribution<> index_dist( 0, randomcharbase.size() - 1 );
   for( int i = 0; i < 8; ++i )
   {
-    tg += randomcharbase[ index_dist( rng ) ];
+    *s += randomcharbase[ index_dist( rng ) ];
   }
-
-  stringptr s = stringptr( new std::string() );
-
-  s->reserve( DEFAULTHEADERLINELENGTH );
-
-  try
-  {
-    *s = "tag=" + tg;
-  }
-  catch( boost::bad_lexical_cast &e )
-  {
-    // This shouldn't happen
-  }
-
   return s;
 }
 

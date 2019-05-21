@@ -42,6 +42,7 @@ public:
   static bool invitesippacket( projectsippacketptr pk );
   static void httpget( stringvector &path, projectwebdocument &response );
   static void httpput( stringvector &path, JSON::Value &body, projectwebdocument &response );
+  static void httppost( stringvector &path, JSON::Value &body, projectwebdocument &response );
 
   std::string callid;
   std::string alertinfo;
@@ -87,6 +88,7 @@ private:
   void answer( std::string body );
   void hangup( void );
   void send200( std::string body = "", bool final = false );
+  void sendack( void );
   void senderror( void );
 
   /* Verbs */
@@ -123,8 +125,7 @@ private:
   int errorcode;
   std::string errorreason;
 
-  bool finished;
-  stringptr totag;
+  stringptr ourtag;
 };
 
 

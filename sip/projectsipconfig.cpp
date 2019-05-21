@@ -33,17 +33,19 @@ projectsipconfig::projectsipconfig()
   this->sipport = 5060;
 
   /* Work out a default IP. */
-  char *IPbuffer; 
-  struct hostent *host_entry; 
+  char *IPbuffer;
+  struct hostent *host_entry;
 
-  // To retrieve host information 
-  host_entry = ::gethostbyname( this->hostname.c_str() ); 
+  // To retrieve host information
+  host_entry = ::gethostbyname( this->hostname.c_str() );
 
-  // To convert an Internet network 
-  // address into ASCII string 
-  IPbuffer = inet_ntoa(*((struct in_addr*) 
-                          host_entry->h_addr_list[0])); 
+  // To convert an Internet network
+  // address into ASCII string
+  IPbuffer = inet_ntoa(*((struct in_addr*)
+                          host_entry->h_addr_list[0]));
   this->hostip = IPbuffer;
+
+  this->hostipsipport = this->hostip;
 }
 
 /*******************************************************************************
@@ -66,6 +68,14 @@ const char* projectsipconfig::gethostip( void )
   return cnf.hostip.c_str();
 }
 
+/*!md
+# gethostipsipport
+*/
+const char* projectsipconfig::gethostipsipport( void )
+{
+  return cnf.hostipsipport.c_str();
+}
+
 /*******************************************************************************
 Function: getsipport
 Purpose: Getour sip port - used in SIP comms.
@@ -84,4 +94,11 @@ Updated: 05.03.2019
 const void projectsipconfig::setsipport( short port )
 {
   cnf.sipport = port;
+
+  cnf.hostipsipport = cnf.hostip;
+  if( 5060 != port )
+  {
+    cnf.hostipsipport += ":";
+    cnf.hostipsipport += std::to_string( cnf.sipport );
+  }
 }

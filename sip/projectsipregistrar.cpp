@@ -82,9 +82,7 @@ void projectsipregistration::regstart( projectsippacketptr pk )
                 pk->getheader( projectsippacket::CSeq ) );
     toobrief.addheader( projectsippacket::Contact,
                 projectsippacket::contact( pk->getuser().strptr(),
-                stringptr( new std::string( projectsipconfig::gethostip() ) ),
-                0,
-                projectsipconfig::getsipport() ) );
+                stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
     toobrief.addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
     toobrief.addheader( projectsippacket::Content_Type,
@@ -119,9 +117,7 @@ void projectsipregistration::regstart( projectsippacketptr pk )
                       pk->getheader( projectsippacket::CSeq ) );
   this->authrequest->addheader( projectsippacket::Contact,
                       projectsippacket::contact( pk->getuser().strptr(),
-                      stringptr( new std::string( projectsipconfig::gethostip() ) ),
-                      0,
-                      projectsipconfig::getsipport() ) );
+                      stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
   this->authrequest->addheader( projectsippacket::Allow,
                       "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   this->authrequest->addheader( projectsippacket::Content_Type,
@@ -175,9 +171,7 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
                 this->currentpacket->getheader( projectsippacket::CSeq ) );
     failedauth.addheader( projectsippacket::Contact,
                 projectsippacket::contact( this->currentpacket->getuser().strptr(),
-                stringptr( new std::string( projectsipconfig::gethostip() ) ),
-                0,
-                projectsipconfig::getsipport() ) );
+                stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
     failedauth.addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
     failedauth.addheader( projectsippacket::Content_Type,
@@ -247,9 +241,8 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
 
   p.addheader( projectsippacket::Contact,
               projectsippacket::contact( this->currentpacket->getuser().strptr(),
-                stringptr( new std::string( projectsipconfig::gethostip() ) ),
-                expires,
-                projectsipconfig::getsipport() ) );
+                stringptr( new std::string( projectsipconfig::gethostipsipport() ) ),
+                expires ) );
   p.addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   p.addheader( projectsippacket::Content_Type,
@@ -426,7 +419,7 @@ void projectsipregistration::sendoptions( void )
 
   std::string from = "<sip:";
   from += this->user;
-  from += ">;";
+  from += ">;tag=";
   from += *projectsippacket::tag();
 
   request.addheader( projectsippacket::From,
@@ -437,9 +430,7 @@ void projectsipregistration::sendoptions( void )
                       std::to_string( this->optionscseq ) + " OPTIONS" );
   request.addheader( projectsippacket::Contact,
                       projectsippacket::contact( this->authacceptpacket->getuser().strptr(),
-                      stringptr( new std::string( projectsipconfig::gethostip() ) ),
-                      0,
-                      projectsipconfig::getsipport() ) );
+                      stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
   request.addheader( projectsippacket::Allow,
                       "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   request.addheader( projectsippacket::Content_Length,

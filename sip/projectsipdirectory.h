@@ -35,7 +35,7 @@ typedef std::unordered_map< std::string, projectsipdiruser::pointer > projectsip
 
 /*******************************************************************************
 Class: projectsipdirdomain
-Purpose: Store information about a domains. For example, com would point to a 
+Purpose: Store information about a domains. For example, com would point to a
 subdomain or potentially users.
 Updated: 22.01.2019
 *******************************************************************************/
@@ -56,6 +56,7 @@ public:
   projectsipdirusers users;
 
   static bool userexist( std::string &domain, std::string &user );
+  bool userexist( std::string &user );
   static stringptr lookuppassword( substring domain, substring user );
   static stringptr lookuppassword( std::string &domain, std::string &user );
   static projectsipdirdomain::pointer lookupdomain( substring domain );
@@ -77,4 +78,3 @@ public:
 
 
 #endif /* PROJECTSIPDIRECTORY_H */
-

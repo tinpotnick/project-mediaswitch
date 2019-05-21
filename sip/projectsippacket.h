@@ -73,7 +73,7 @@ public:
   static stringptr branch( void );
   static stringptr tag( void );
   static stringptr callid( void );
-  static stringptr contact( stringptr user, stringptr host, int expires, int port );
+  static stringptr contact( stringptr user, stringptr host, int expires = 0 );
 
   substring getheaderparam( int header, const char *param );
   substring getuser( int tofrom = To );

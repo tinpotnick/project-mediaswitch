@@ -112,7 +112,6 @@ class call
     this.onringingcallback = [];
     this.onanswercallback = [];
     this.onhangupcallback = [];
-    this.onhangupcallback = [];
   }
 
   set info( callinf )
@@ -241,6 +240,7 @@ class projectcontrol
     this.onregcallbacks = [];
     this.onderegcallbacks = [];
     this.onnewcallcallbacks = [];
+    this.onhangupcallbacks = [];
 
     this.handlers = { 'PUT': {}, 'POST': {}, 'DELETE': {}, 'GET': {} };
 
@@ -302,6 +302,11 @@ class projectcontrol
 
         if( c.hungup )
         {
+          for( var i = 0; i < this.onhangupcallbacks.length; i ++ )
+          {
+            this.onhangupcallbacks[ i ]( c );
+          }
+
           for( var i = 0; i < c.onhangupcallback.length; i ++ )
           {
             c.onhangupcallback[ i ]();
@@ -363,7 +368,12 @@ class projectcontrol
     this.onnewcallcallbacks.push( callback );
   }
 
-  sipserver( request, path, method = "PUT" )
+  set onhangup( callback )
+  {
+    this.onhangupcallbacks.push( callback );
+  }
+
+  sipserver( request, path, method = "PUT", callback )
   {
     var data = JSON.stringify( request );
     var post_options = {
@@ -379,27 +389,76 @@ class projectcontrol
 
     var post_req = http.request( post_options );
 
-    post_req.on( "error", (e) =>
+    post_req.on( "error", ( e ) =>
     {
       console.error( `Problem with request: ${e.message}, for ${method} ${path}` );
+    } );
+
+
+    post_req.on( "response", ( req ) =>
+    {
+      if ( undefined != callback )
+      {
+        req.on( "data", ( chunk ) =>
+        {
+          if( !( "bodyparts" in this ) )
+          {
+            this.collatedbody = [];
+          }
+          this.collatedbody.push( chunk );
+        } );
+
+        req.on( "end", () =>
+        {
+          var body = {};
+          if( Array.isArray( this.collatedbody ) )
+          {
+            body = JSON.parse( Buffer.concat( this.collatedbody ).toString() );
+          }
+          this.collatedbody = [];
+          callback( req.statusCode, req.statusMessage, body );
+        } );
+      }
     } );
 
     post_req.write( data );
     post_req.end();
   }
 
-  invite( request, callback )
+  newcall( request, onnewcall, onerror )
   {
-    this.sipserver( request, "/dialog/invite" );
+    if( !( "maxforwards" in request ) )
+    {
+      request.maxforwards = 70;
+    }
+
+    this.sipserver( request, "/dialog/invite", "POST", ( code, status, bodyobj ) =>
+    {
+      if( 200 == code )
+      {
+        var callinfo = {};
+        callinfo.callid = bodyobj.callid;
+
+        var c = new call( this, callinfo );
+        this.calls[ callinfo.callid ] = c;
+
+        onnewcall( c );
+        return;
+      }
+      if( undefined != onerror )
+      {
+        onerror( code, status );
+      }
+    } );
   }
 
   run()
   {
     this.httpserver = http.createServer( ( req, res ) =>
     {
-      /*********************************************
+      /*
        Gather our body.
-      ********************************************/
+      */
       req.on( "data", ( chunk ) =>
       {
         if( !( "collatedbody" in this ) )
