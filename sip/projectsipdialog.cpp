@@ -935,6 +935,8 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
   invite->addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
 
+  invite->addheader( projectsippacket::Content_Type,
+                      "application/sdp" );
   invite->addheader( projectsippacket::Content_Length,
                       sdp.length() );
 
