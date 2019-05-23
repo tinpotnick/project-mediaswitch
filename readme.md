@@ -312,6 +312,7 @@ The server will return a JSON document. Including stats regarding the workload o
 * RFC 3881: An Extension to the Session Initiation Protocol (SIP) for Symmetric Response Routing
 * RFC 4028: Session Timers in the Session Initiation Protocol (SIP)
 * RFC 4566: SDP: Session Description Protocol
+* RFC 4317: Session Description Protocol (SDP) Offer/Answer Examples
 * RFC 3550: RTP: A Transport Protocol for Real-Time Applications
 * RFC 3551: RTP Profile for Audio and Video Conferences with Minimal Control
 

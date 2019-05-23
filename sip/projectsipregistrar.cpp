@@ -285,6 +285,8 @@ void projectsipregistration::regwaitauth( projectsippacketptr pk )
     v[ "agent" ] = this->authacceptpacket->getheader( projectsippacket::User_Agent ).str();
   }
 
+  v[ "user" ] = this->user;
+
   std::string t = JSON::to_string( v );
   d->addheader( projectwebdocument::Content_Length, t.length() );
   d->addheader( projectwebdocument::Content_Type, "text/json" );

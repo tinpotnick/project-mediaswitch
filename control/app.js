@@ -10,38 +10,26 @@ projectcontrol.onhangup = ( call ) =>
 projectcontrol.onnewcall = ( call ) =>
 {
   console.log( "new call" );
-  //console.log( call.callinfo.sdp )
+
+  if( call.originator ) return;
 
   call.onhangup = () =>
   {
     console.log( "hung up" );
   }
 
-  call.ring();
-
-  setTimeout( () =>
+  call.onanswer = () =>
   {
-    var sdp = projectcontrol.sdp( 20518, "127.0.0.1", 54400 );
-    projectcontrol.addmedia( sdp, "pcmu" );
+    console.log( "Answered" );
+    setTimeout( () => { call.hangup(); }, 2000 );
+  }
 
-    call.answer( sdp, () =>
-    {
-      console.log( "Answered" );
-
-      setTimeout( () =>
-      {
-        call.hangup();
-      }, 2000 );
-
-    } );
-
-  }, 2000 );
+  call.ring();
+  setTimeout( () => { call.answer(); }, 2000 );
 }
 
 setTimeout( () =>
 {
-  var sdp = projectcontrol.sdp( 20518, "127.0.0.1", 54400 );
-  projectcontrol.addmedia( sdp, "pcmu" );
 
   var callobj = {
     from: {
@@ -50,39 +38,39 @@ setTimeout( () =>
     },
     to: {
       user: "1003",
-      domain: "bling.babblevoice.com"
     },
     cid: {
       number: "1003",
       name: "Nick Knight"
-    },
-    sdp: sdp
+    }
   };
 
-  projectcontrol.newcall( callobj,
-    ( call ) =>
+  var call = projectcontrol.newcall( callobj )
+  call.onnewcall = ( call ) =>
+  {
+    if( call.haserror )
     {
+      console.log( call.error )
+      return;
+    }
 
-      call.onringing = () =>
-      {
-        console.log( "Call is ringing Yaya" )
-      }
-
-      call.onanswer = () =>
-      {
-        console.log( "outbound call answered :)" )
-      }
-
-      call.onhangup = () =>
-      {
-        console.log( "yay - hung up" );
-      }
-    },
-    ( code, errormessage ) =>
+    call.onringing = () =>
     {
-      console.log( code )
-      console.log( errormessage )
-    } );
+      console.log( "Call is ringing Yaya" )
+    }
+
+    call.onanswer = () =>
+    {
+      console.log( "outbound call answered :)" )
+    }
+
+    call.onhangup = () =>
+    {
+      console.log( "yay - hung up" );
+    }
+  }
+
+  console.log( "Call originated" );
 
 }, 1000 );
 

@@ -28,32 +28,29 @@ typedef std::unordered_map<std::string, projectrtpchannel::pointer> activertpcha
 rtpchannels dormantchannels;
 activertpchannels activechannels;
 
-/*******************************************************************************
-Function: stopserver
-Purpose: Actually do the stopping
-Updated: 12.12.2018
-*******************************************************************************/
+/*!md
+# stopserver
+Actually do the stopping
+*/
 static void stopserver( void )
 {
-	io_service.stop();
+  io_service.stop();
 }
 
-/*******************************************************************************
-Function: killServer
-Purpose: As it says...
-Updated: 12.12.2018
-*******************************************************************************/
+/*!md
+# killServer
+As it says...
+*/
 static void killserver( int signum )
 {
-	std::cout << "OUCH" << std::endl;
-	stopserver();
+  std::cout << "OUCH" << std::endl;
+  stopserver();
 }
 
-/*******************************************************************************
-Function: handlewebrequest
-Purpose: As it says...
-Updated: 28.02.2019
-*******************************************************************************/
+/*!md
+# handlewebrequest
+As it says...
+*/
 static void handlewebrequest( projectwebdocument &request, projectwebdocument &response )
 {
   std::string path = request.getrequesturi().str();
@@ -66,7 +63,7 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
 
   path.erase( 0, 1 ); /* remove the leading / */
   stringvector pathparts = splitstring( path, '/' );
-  
+
 
   if( projectwebdocument::POST == request.getmethod() )
   {
@@ -90,13 +87,15 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
 
       JSON::Object v;
       v[ "channel" ] = u;
+      v[ "port" ] = ( JSON::Integer ) p->getport();
+      v[ "ip" ] = "127.0.0.1";
       std::string t = JSON::to_string( v );
 
       response.setstatusline( 200, "Ok" );
       response.addheader( projectwebdocument::Content_Length, t.size() );
       response.addheader( projectwebdocument::Content_Type, "text/json" );
       response.setbody( t.c_str() );
-    }    
+    }
   }
   else
   {
@@ -104,34 +103,32 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
   }
 }
 
-/*******************************************************************************
-Function: startserver
-Purpose: As it says...
-Updated: 12.12.2018
-*******************************************************************************/
+/*!md
+# startserver
+As it says...
+*/
 void startserver( short port )
 {
-	try
-	{
+  try
+  {
     projecthttpserver h( io_service, port, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
-		io_service.run();
-	}
-	catch( std::exception& e )
-	{
-		std::cerr << e.what() << std::endl;
-	}
+  io_service.run();
+  }
+  catch( std::exception& e )
+  {
+  std::cerr << e.what() << std::endl;
+  }
 
-	// Clean up
-	std::cout << "Cleaning up" << std::endl;
-	return;
+  // Clean up
+  std::cout << "Cleaning up" << std::endl;
+  return;
 }
 
 
-/*******************************************************************************
-Function: initchannels
-Purpose: Create our channel objects and pre allocate any memory.
-Updated: 01.03.2019
-*******************************************************************************/
+/*!md
+# initchannels
+Create our channel objects and pre allocate any memory.
+*/
 void initchannels( short startport, short endport )
 {
   int i;
@@ -159,32 +156,31 @@ void initchannels( short startport, short endport )
   }
 }
 
-/*******************************************************************************
-Function: main
-Purpose: As it says...
-Updated: 01.03.2019
-*******************************************************************************/
+/*!md
+# main
+As it says...
+*/
 int main( int argc, const char* argv[] )
 {
-  short port = 9001;
+  short port = 9002;
 
   short startrtpport = 10000;
   short endrtpport = 20000;
 
   srand( time( NULL ) );
 
-	bool fg = false;
+  bool fg = false;
 
-	for ( int i = 1; i < argc ; i++ )
-	{
-		if ( argv[i] != NULL )
-		{
-			std::string argvstr = argv[ i ];
+  for ( int i = 1; i < argc ; i++ )
+  {
+    if ( argv[i] != NULL )
+    {
+      std::string argvstr = argv[ i ];
 
-			if ( "--fg" == argvstr)
-			{
-				fg = true;
-			}
+      if ( "--fg" == argvstr)
+      {
+        fg = true;
+      }
       else if( "--port" == argvstr )
       {
         try
@@ -202,24 +198,24 @@ int main( int argc, const char* argv[] )
         std::cerr << "What port was that?" << std::endl;
         return -1;
       }
-		}
-	}
+    }
+  }
 
-	// Register our CTRL-C handler
-	signal( SIGINT, killserver );
+  // Register our CTRL-C handler
+  signal( SIGINT, killserver );
   std::cout << "Starting Project RTP server with control port listening on port " << port << std::endl;
   std::cout << "RTP ports "  << startrtpport << " => " << endrtpport << ": " << (int) ( ( endrtpport - startrtpport ) / 2 ) << " channels" << std::endl;
 
   initchannels( startrtpport, endrtpport );
 
-	if ( !fg )
-	{
-		daemonize();
-	}
+  if ( !fg )
+  {
+    daemonize();
+  }
 
   std::cout << "Started RTP server, waiting for requests." << std::endl;
 
-	startserver( port );
+  startserver( port );
 
-	return 0;
+  return 0;
 }

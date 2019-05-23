@@ -5,12 +5,12 @@
 
 #include "projectrtpchannel.h"
 
-/*******************************************************************************
-Function: projectrtpchannel constructor
-Purpose: Create the socket then wait for data
-Updated: 01.03.2019
+/*!md
+# projectrtpchannel constructor
+Create the socket then wait for data
+
 echo "This is my data" > /dev/udp/127.0.0.1/10000
-*******************************************************************************/
+*/
 projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, short port )
   : port( port ),
   rtpsocket( io_service ),
@@ -21,11 +21,10 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, short
 {
 }
 
-/*******************************************************************************
-Function: projectrtpchannel destructor
-Purpose: Clean up
-Updated: 05.03.2019
-*******************************************************************************/
+/*!md
+# projectrtpchannel destructor
+Clean up
+*/
 projectrtpchannel::~projectrtpchannel( void )
 {
   if( NULL != this->rtpdata )
@@ -39,21 +38,19 @@ projectrtpchannel::~projectrtpchannel( void )
   }
 }
 
-/*******************************************************************************
-Function: create
-Purpose: 
-Updated: 01.03.2019
-*******************************************************************************/
+/*!md
+# create
+
+*/
 projectrtpchannel::pointer projectrtpchannel::create( boost::asio::io_service &io_service, short port )
 {
   return pointer( new projectrtpchannel( io_service, port ) );
 }
 
-/*******************************************************************************
-Function: open
-Purpose: Open the channel to read network data. Setup memory and pointers.
-Updated: 01.03.2019
-*******************************************************************************/
+/*!md
+# open
+Open the channel to read network data. Setup memory and pointers.
+*/
 void projectrtpchannel::open( int codec )
 {
   switch( codec )
@@ -61,27 +58,27 @@ void projectrtpchannel::open( int codec )
     case PCMA:
     case PCMU:
     {
-      this->rtpdata = new char[ G711PAYLOADBYTES * BUFFERPACKETCOUNT ];
+      this->rtpdata = new unsigned char[ G711PAYLOADBYTES * BUFFERPACKETCOUNT ];
       break;
     }
     case G722:
     {
-      this->rtpdata = new char[ G722PAYLOADBYTES * BUFFERPACKETCOUNT ];
+      this->rtpdata = new unsigned char[ G722PAYLOADBYTES * BUFFERPACKETCOUNT ];
       break;
     }
     case ILBC20:
     {
-      this->rtpdata = new char[ ILBC20PAYLOADBYTES * BUFFERPACKETCOUNT ];
+      this->rtpdata = new unsigned char[ ILBC20PAYLOADBYTES * BUFFERPACKETCOUNT ];
       break;
     }
     case ILBC30:
     {
-      this->rtpdata = new char[ ILBC30PAYLOADBYTES * BUFFERPACKETCOUNT ];
+      this->rtpdata = new unsigned char[ ILBC30PAYLOADBYTES * BUFFERPACKETCOUNT ];
       break;
     }
   }
 
-  this->rtcpdata = new char[ RTCPMAXLENGTH ];
+  this->rtcpdata = new unsigned char[ RTCPMAXLENGTH ];
   this->rtpindex = 0;
 
   this->rtpsocket.open( boost::asio::ip::udp::v4() );
@@ -96,11 +93,15 @@ void projectrtpchannel::open( int codec )
   this->readsomertcp();
 }
 
-/*******************************************************************************
-Function: close
-Purpose: Closes the channel.
-Updated: 05.03.2019
-*******************************************************************************/
+short projectrtpchannel::getport( void )
+{
+  return this->port;
+}
+
+/*!md
+# close
+Closes the channel.
+*/
 void projectrtpchannel::close( void )
 {
   try
@@ -126,11 +127,10 @@ void projectrtpchannel::close( void )
   }
 }
 
-/*******************************************************************************
-Function: handlereadsomertp
-Purpose: Wait for RTP data
-Updated: 01.03.2019
-*******************************************************************************/
+/*!md
+# handlereadsomertp
+Wait for RTP data. We have to re-order when required.
+*/
 void projectrtpchannel::readsomertp( void )
 {
   this->rtpsocket.async_receive_from(
@@ -140,6 +140,7 @@ void projectrtpchannel::readsomertp( void )
         if ( !ec && bytes_recvd > 0 && bytes_recvd <= RTPMAXLENGTH )
         {
           this->handlertpdata();
+          this->rtpindex = ( this->rtpindex + 1 ) % BUFFERPACKETCOUNT;
         }
 
         if( !ec )
@@ -149,11 +150,10 @@ void projectrtpchannel::readsomertp( void )
       } );
 }
 
-/*******************************************************************************
-Function: handlereadsomertcp
-Purpose: Wait for RTP data
-Updated: 01.03.2019
-*******************************************************************************/
+/*!md
+# handlereadsomertcp
+Wait for RTP data
+*/
 void projectrtpchannel::readsomertcp( void )
 {
   this->rtcpsocket.async_receive_from(
@@ -173,91 +173,84 @@ void projectrtpchannel::readsomertcp( void )
 }
 
 
-/*******************************************************************************
-Function: handlertpdata
-Purpose: We have received some RTP data - now do something with it.
-Updated: 01.03.2019
-*******************************************************************************/
+/*!md
+# handlertpdata
+We have received some RTP data - now do something with it.
+*/
 void projectrtpchannel::handlertpdata( void )
 {
   /* first check we have received the correct one and move if necessary */
+  unsigned char ver = this->getpacketversion( &this->rtpdata[ this->rtpindex ] );
+  std::cout << "rtp:" << static_cast<unsigned>( ver ) << std::endl;
 }
 
-/*******************************************************************************
-Function: handlertcpdata
-Purpose: We have received some RTCP data - now do something with it.
-Updated: 01.03.2019
-*******************************************************************************/
+/*!md
+# handlertcpdata
+We have received some RTCP data - now do something with it.
+*/
 void projectrtpchannel::handlertcpdata( void )
 {
-  
+
 }
 
-/*******************************************************************************
-Function: getpacketversion
-Purpose: As it says.
-Updated: 06.03.2019
-*******************************************************************************/
+/*!md
+# getpacketversion
+As it says.
+*/
 unsigned char projectrtpchannel::getpacketversion( unsigned char *pk )
 {
   return ( pk[ 0 ] & 0xb0 ) >> 6;
 }
 
-/*******************************************************************************
-Function: getpacketpadding
-Purpose: As it says.
-Updated: 06.03.2019
-*******************************************************************************/
+/*!md
+# getpacketpadding
+As it says.
+*/
 unsigned char projectrtpchannel::getpacketpadding( unsigned char *pk )
 {
   return ( pk[ 0 ] & 0x20 ) >> 5;
 }
 
-/*******************************************************************************
-Function: getpacketextension
-Purpose: As it says.
-Updated: 06.03.2019
-*******************************************************************************/
+/*!md
+# getpacketextension
+As it says.
+*/
 unsigned char projectrtpchannel::getpacketextension( unsigned char *pk )
 {
   return ( pk[ 0 ] & 0x10 ) >> 4;
 }
 
-/*******************************************************************************
-Function: getpacketcsrccount
-Purpose: As it says.
-Updated: 06.03.2019
-*******************************************************************************/
+/*!md
+# getpacketcsrccount
+As it says.
+*/
 unsigned char projectrtpchannel::getpacketcsrccount( unsigned char *pk )
 {
   return ( pk[ 0 ] & 0x0f );
 }
 
-/*******************************************************************************
-Function: getpacketmarker
-Purpose: As it says.
-Updated: 06.03.2019
-*******************************************************************************/
+/*!md
+# getpacketmarker
+As it says.
+*/
 unsigned char projectrtpchannel::getpacketmarker( unsigned char *pk )
 {
   return ( pk[ 1 ] & 0x80 ) >> 7;
 }
 
-/*******************************************************************************
-Function: getpayloadtype
-Purpose: As it says.
-Updated: 06.03.2019
-*******************************************************************************/
+/*!md
+# getpayloadtype
+As it says.
+*/
 unsigned char projectrtpchannel::getpayloadtype( unsigned char *pk )
 {
   return ( pk[ 1 ] & 0x7f );
 }
 
-/*******************************************************************************
-Function: getsequencenumber
-Purpose: As it says.
-Updated: 06.03.2019
-*******************************************************************************/
+/*!md
+# getsequencenumber
+As it says.
+*/
 unsigned short projectrtpchannel::getsequencenumber( unsigned char *pk )
 {
   unsigned short *tmp = ( unsigned short * )pk;
@@ -265,11 +258,10 @@ unsigned short projectrtpchannel::getsequencenumber( unsigned char *pk )
   return *tmp;
 }
 
-/*******************************************************************************
-Function: gettimestamp
-Purpose: As it says.
-Updated: 06.03.2019
-*******************************************************************************/
+/*!md
+# gettimestamp
+As it says.
+*/
 unsigned int projectrtpchannel::gettimestamp( unsigned char *pk )
 {
   unsigned int *tmp = ( unsigned int * )pk;
@@ -277,11 +269,10 @@ unsigned int projectrtpchannel::gettimestamp( unsigned char *pk )
   return *tmp;
 }
 
-/*******************************************************************************
-Function: getssrc
-Purpose: As it says.
-Updated: 06.03.2019
-*******************************************************************************/
+/*!md
+# getssrc
+As it says.
+*/
 unsigned int projectrtpchannel::getssrc( unsigned char *pk )
 {
   unsigned int *tmp = ( unsigned int * )pk;
@@ -289,12 +280,12 @@ unsigned int projectrtpchannel::getssrc( unsigned char *pk )
   return *tmp;
 }
 
-/*******************************************************************************
-Function: getcsrc
-Purpose: As it says. Use getpacketcsrccount to return the number of available
+/*!md
+# getcsrc
+As it says. Use getpacketcsrccount to return the number of available
 0-15. This function doesn't check bounds.
-Updated: 06.03.2019
-*******************************************************************************/
+
+*/
 unsigned int projectrtpchannel::getcsrc( unsigned char *pk, unsigned char index )
 {
   unsigned int *tmp = ( unsigned int * )pk;

@@ -12,10 +12,10 @@ Function: projecthttpserver
 Purpose: Constructor
 Updated: 22.01.2019
 *******************************************************************************/
-projecthttpserver::projecthttpserver( boost::asio::io_service& io_service, 
-                                        short port, 
+projecthttpserver::projecthttpserver( boost::asio::io_service& io_service,
+                                        short port,
                                         std::function<void ( projectwebdocument &request, projectwebdocument &response )> callback ) :
-		httpacceptor( io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port ) ),
+  httpacceptor( io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port ) ),
     callback( callback )
 {
   this->waitaccept();
@@ -42,7 +42,7 @@ Function: handleaccept
 Purpose: We have a new connection.
 Updated: 22.01.2019
 *******************************************************************************/
-void projecthttpserver::handleaccept( 
+void projecthttpserver::handleaccept(
         projecthttpconnection::pointer newconnection,
         const boost::system::error_code& error )
 {
@@ -98,15 +98,15 @@ void projecthttpconnection::start( std::function<void ( projectwebdocument &requ
   this->callback = callback;
 
   this->timer.expires_after( std::chrono::seconds( HTTPCLIENTDEFAULTTIMEOUT ) );
-  this->timer.async_wait( boost::bind( &projecthttpconnection::handletimeout, 
-                                        shared_from_this(), 
+  this->timer.async_wait( boost::bind( &projecthttpconnection::handletimeout,
+                                        shared_from_this(),
                                         boost::asio::placeholders::error ) );
 
   this->tcpsocket.async_read_some(
     boost::asio::buffer( this->inbuffer, this->inbuffer.size() - 1 ),
     boost::bind(&projecthttpconnection::handleread, shared_from_this(),
-			boost::asio::placeholders::error,
-			boost::asio::placeholders::bytes_transferred) );
+  boost::asio::placeholders::error,
+  boost::asio::placeholders::bytes_transferred) );
 }
 
 /*******************************************************************************
@@ -115,8 +115,8 @@ Purpose: Wait for data then parses and acts. We must be able to handle multiple
 writes to our socket.
 Updated: 22.01.2019
 *******************************************************************************/
-void projecthttpconnection::handleread( 
-    const boost::system::error_code& error, 
+void projecthttpconnection::handleread(
+    const boost::system::error_code& error,
     std::size_t bytes_transferred )
 {
 
@@ -142,25 +142,25 @@ void projecthttpconnection::handleread(
 
       this->outbuffer = response.strptr();
     }
-
-    boost::asio::async_write( this->tcpsocket,
-      boost::asio::buffer( *this->outbuffer ),
-      boost::bind(&projecthttpconnection::handlewrite, shared_from_this(),
-			boost::asio::placeholders::error,
-			boost::asio::placeholders::bytes_transferred) );
+  }
+  catch( std::exception& e )
+  {
+    response.setstatusline( 500, e.what() );
+    response.addheader( projectwebdocument::Content_Length, 0 );
+    this->outbuffer = response.strptr();
   }
   catch(...)
   {
     response.setstatusline( 500, "Bad request" );
     response.addheader( projectwebdocument::Content_Length, 0 );
     this->outbuffer = response.strptr();
-
-    boost::asio::async_write( this->tcpsocket,
-        boost::asio::buffer( *this->outbuffer ),
-        boost::bind(&projecthttpconnection::handlewrite, shared_from_this(),
-        boost::asio::placeholders::error,
-        boost::asio::placeholders::bytes_transferred) );
   }
+
+  boost::asio::async_write( this->tcpsocket,
+      boost::asio::buffer( *this->outbuffer ),
+      boost::bind(&projecthttpconnection::handlewrite, shared_from_this(),
+      boost::asio::placeholders::error,
+      boost::asio::placeholders::bytes_transferred) );
 }
 
 /*******************************************************************************
@@ -168,8 +168,8 @@ Function: handlewrite
 Purpose: Once we have finished...
 Updated: 22.01.2019
 *******************************************************************************/
-void projecthttpconnection::handlewrite( 
-    const boost::system::error_code& error, 
+void projecthttpconnection::handlewrite(
+    const boost::system::error_code& error,
     std::size_t bytes_transferred )
 {
   this->tcpsocket.close();
@@ -187,5 +187,3 @@ void projecthttpconnection::handletimeout( const boost::system::error_code& erro
     this->tcpsocket.close();
   }
 }
-
-

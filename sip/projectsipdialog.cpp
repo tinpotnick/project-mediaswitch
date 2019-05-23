@@ -799,7 +799,7 @@ invite object:=
 
   from = {
     user: "1000",
-    domain: "bling.babblevoice.com"
+    domain: "bling.babblevoice.com" // If not present it will take the domain from to.
   }
 
   autoanswer = true ( for intercom=true and answer-after=0 )
@@ -885,7 +885,15 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
     fromuser = JSON::as_string( from[ "user" ] );
 
     JSON::Object &to = JSON::as_object( request[ "to" ] );
-    todomain = JSON::as_string( to[ "domain" ] );
+    if( to.has_key( "domain" ) )
+    {
+      todomain = JSON::as_string( to[ "domain" ] );
+    }
+    else
+    {
+      todomain = this->domain;
+    }
+
     touser = JSON::as_string( to[ "user" ] );
 
     maxforwards = JSON::as_int64( request[ "maxforwards" ] );
@@ -901,11 +909,11 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
 
     sdp = *( jsontosdp( JSON::as_object( request[ "sdp" ] ) ) );
   }
-  catch( const std::out_of_range& oor )
+  catch( const boost::bad_get &e )
   {
     // We have not got enough params.
     this->untrack();
-    response.setstatusline( 500, "Error not enough params" );
+    response.setstatusline( 500, "Missing param or params in invite" );
     response.addheader( projectwebdocument::Content_Length, 0 );
     return;
   }

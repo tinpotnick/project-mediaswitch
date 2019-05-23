@@ -24,7 +24,7 @@
 
 /*******************************************************************************
 Class: projectrtpchannel
-Purpose: RTP Channel - which represents RTP and RTCP. This is here we include 
+Purpose: RTP Channel - which represents RTP and RTCP. This is here we include
 our jitter buffer. We create a cyclic window to write data into and then read
 out of.
 
@@ -51,6 +51,8 @@ public:
   void open( int codec );
   void close( void );
 
+  short getport( void );
+
 private:
   short port;
   boost::asio::ip::udp::socket rtpsocket;
@@ -59,8 +61,8 @@ private:
   boost::asio::ip::udp::endpoint rtpsenderendpoint;
   boost::asio::ip::udp::endpoint rtcpsenderendpoint;
 
-  char *rtpdata;
-  char *rtcpdata;
+  unsigned char *rtpdata;
+  unsigned char *rtcpdata;
 
   int rtpindex;
 
@@ -90,4 +92,3 @@ private:
 };
 
 #endif
-
