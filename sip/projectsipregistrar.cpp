@@ -136,9 +136,12 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
 {
   this->currentpacket = pk;
 
+  substring realm = pk->getheaderparam( projectsippacket::Authorization, "realm" );
+  substring user = pk->getheaderparam( projectsippacket::Authorization, "username" );
+
   stringptr password = projectsipdirdomain::lookuppassword(
-                pk->geturihost(),
-                pk->getuser() );
+                realm,
+                user );
 
   if( !this->authrequest )
   {
