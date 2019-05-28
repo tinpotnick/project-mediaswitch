@@ -396,7 +396,6 @@ TODO
     {
       this.onanswer = () =>
       {
-        console.log( "Now going to bridge" )
         this.bridge( call );
       }
       this.answer();
@@ -404,7 +403,18 @@ TODO
 
     call.onhangup = () =>
     {
-      call.metadata.family.parent.hangup();
+      /* we only hangup the parent, if the parent only has us as a child */
+      var filtered = call.metadata.family.parent.metadata.family.children.filter( ( value ) =>
+      {
+        return value != call;
+      } );
+      call.metadata.family.parent.metadata.family.children = filtered;
+
+      /* We may want to alter this. There may be occasions where we wish further processing of the originating call after any child may hang up. The reason could be passed back into hanup of the parent who then makes the decision. */
+      if( 0 == filtered.length )
+      {
+        call.metadata.family.parent.hangup();
+      }
     }
 
     this.onhangup = () =>

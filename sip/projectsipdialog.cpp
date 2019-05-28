@@ -229,39 +229,17 @@ void projectsipdialog::invitestart( projectsippacket::pointer pk )
 {
   this->lastreceivedpk = pk;
 
-  // Do we need authenticating?
+  /* Do we need authenticating? Currently force authentication. But we will need also friendly IP to allow inbound calls. */
 #warning finish off auth
-  if ( 0 /* do we need authenticating */ )
+  if ( 1 /* do we need authenticating */ )
   {
-    this->authrequest = projectsippacket::create();
+    this->retries = 3;
+    this->send401();
 
-    this->authrequest->setstatusline( 401, "Unauthorized" );
-    this->authrequest->addviaheader( projectsipconfig::gethostipsipport(), pk.get() );
+    this->nextstate = std::bind( &projectsipdialog::waitforacktheninviteauth, this, std::placeholders::_1 );
 
-    this->authrequest->addwwwauthenticateheader( pk.get() );
-
-    this->authrequest->addheader( projectsippacket::To,
-                        pk->getheader( projectsippacket::To ) );
-    this->authrequest->addheader( projectsippacket::From,
-                        pk->getheader( projectsippacket::From ) );
-    this->authrequest->addheader( projectsippacket::Call_ID,
-                        pk->getheader( projectsippacket::Call_ID ) );
-    this->authrequest->addheader( projectsippacket::CSeq,
-                        pk->getheader( projectsippacket::CSeq ) );
-    this->authrequest->addheader( projectsippacket::Contact,
-                        projectsippacket::contact( pk->getuser().strptr(),
-                        stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-
-    this->authrequest->addheader( projectsippacket::Allow,
-                        "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-    this->authrequest->addheader( projectsippacket::Content_Type,
-                        "application/sdp" );
-    this->authrequest->addheader( projectsippacket::Content_Length,
-                        "0" );
-
-    this->sendpk( this->authrequest );
-
-    this->nextstate = std::bind( &projectsipdialog::inviteauth, this, std::placeholders::_1 );
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
+        std::bind( &projectsipdialog::resend401, this, std::placeholders::_1 ) );
     return;
   }
 
@@ -280,15 +258,93 @@ void projectsipdialog::invitestart( projectsippacket::pointer pk )
 }
 
 /*!md
+# waitforacktheninviteauth
+We have (probably) sent a auth request via an invite responce. We now have to get an Ack then the client will proceed to invite with auth.
+*/
+void projectsipdialog::waitforacktheninviteauth( projectsippacket::pointer pk )
+{
+  this->lastackpacket = pk;
+  if( projectsippacket::ACK == pk->getmethod() )
+  {
+    this->ackpk = pk;
+    this->canceltimer();
+    this->nextstate = std::bind( &projectsipdialog::inviteauth, this, std::placeholders::_1 );
+  }
+}
+
+
+/*!md
+# send401
+Send a 201 - request auth
+*/
+void projectsipdialog::send401( void )
+{
+  this->authrequest = projectsippacket::create();
+
+  this->authrequest->setstatusline( 401, "Unauthorized" );
+  this->authrequest->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk.get() );
+
+  this->authrequest->addwwwauthenticateheader( this->lastreceivedpk.get() );
+
+  this->authrequest->addheader( projectsippacket::To,
+                      this->lastreceivedpk->getheader( projectsippacket::To ) );
+  this->authrequest->addheader( projectsippacket::From,
+                      this->lastreceivedpk->getheader( projectsippacket::From ) );
+  this->authrequest->addheader( projectsippacket::Call_ID,
+                      this->lastreceivedpk->getheader( projectsippacket::Call_ID ) );
+  this->authrequest->addheader( projectsippacket::CSeq,
+                      this->lastreceivedpk->getheader( projectsippacket::CSeq ) );
+  this->authrequest->addheader( projectsippacket::Contact,
+                      projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
+                      stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
+
+  this->authrequest->addheader( projectsippacket::Allow,
+                      "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  this->authrequest->addheader( projectsippacket::Content_Length, "0" );
+
+  this->sendpk( this->authrequest );
+}
+
+/*!md
+# resend401
+Send a 401
+*/
+void projectsipdialog::resend401( const boost::system::error_code& error )
+{
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    if( 0 == this->retries )
+    {
+      this->untrack();
+      return;
+    }
+
+    this->send401();
+    this->retries--;
+
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
+        std::bind( &projectsipdialog::resend401, this, std::placeholders::_1 ) );
+  }
+}
+
+/*!md
 # inviteauth
-We have requested authentication.
+We have requested authentication so this packet should contain auth information.
 */
 void projectsipdialog::inviteauth( projectsippacket::pointer pk )
 {
-  stringptr password = projectsipdirdomain::lookuppassword(
-                pk->geturihost(),
-                pk->getuser() );
 
+  if( projectsippacket::INVITE != pk->getmethod() )
+  {
+    return;
+  }
+
+  substring user = pk->getheaderparam( projectsippacket::Authorization, "username" );
+  substring realm = pk->getheaderparam( projectsippacket::Authorization, "realm" );
+
+  stringptr password = projectsipdirdomain::lookuppassword(
+                realm,
+                user );
 
   if( !password ||
         !pk->checkauth( this->authrequest.get(), password ) )
@@ -311,12 +367,15 @@ void projectsipdialog::inviteauth( projectsippacket::pointer pk )
                 stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
     failedauth->addheader( projectsippacket::Allow,
                 "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-    failedauth->addheader( projectsippacket::Content_Type,
-                "application/sdp" );
     failedauth->addheader( projectsippacket::Content_Length,
                         "0" );
 
     this->sendpk( failedauth );
+
+    this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
+
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
+        std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
 
     return;
   }
@@ -329,6 +388,7 @@ void projectsipdialog::inviteauth( projectsippacket::pointer pk )
     sdptojson( pk->getbody(), this->remotesdp );
   }
 
+  this->invitepk = pk;
   this->lastauthenticatedpk = pk;
   this->authenticated = true;
   this->updatecontrol();
@@ -473,7 +533,7 @@ Send a 180 ringing
 */
 void projectsipdialog::ringing( void )
 {
-  if( !this->callringing )
+  if( !this->callringing && !this->callanswered && !this->callhungup )
   {
     projectsippacket::pointer ringing = projectsippacket::create();
 
@@ -1152,6 +1212,7 @@ bool projectsipdialog::updatecontrol( void )
   v[ "authenticated" ] = ( JSON::Bool ) this->authenticated;
   v[ "ring" ] = ( JSON::Bool ) this->callringing;
   v[ "answered" ] = ( JSON::Bool ) this->callanswered;
+  v[ "originator" ] = ( JSON::Bool ) this->originator;
   v[ "hangup" ] = ( JSON::Bool ) this->callhungup;
 
   JSON::Object er;

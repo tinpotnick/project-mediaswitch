@@ -58,6 +58,7 @@ public:
   void waitforack( projectsippacket::pointer pk );
   void waitforackanddie( projectsippacket::pointer pk );
   void waitfor200anddie( projectsippacket::pointer pk );
+  void waitforacktheninviteauth( projectsippacket::pointer pk );
 
   /* outbound invite */
   void waitforinviteprogress( projectsippacket::pointer pk );
@@ -78,6 +79,7 @@ public:
   void ontimeoutenddialog( const boost::system::error_code& error );
   void ontimeout486andenddialog( const boost::system::error_code& error );
   void resend200( const boost::system::error_code& error );
+  void resend401( const boost::system::error_code& error );
   void resenderror( const boost::system::error_code& error );
   void resendbye( const boost::system::error_code& error );
 
@@ -90,6 +92,7 @@ private:
   void answer( std::string body );
   void hangup( void );
   void send200( std::string body = "", bool final = false );
+  void send401( void );
   void sendack( void );
   void senderror( void );
 

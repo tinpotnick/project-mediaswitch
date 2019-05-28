@@ -120,8 +120,6 @@ void projectsipregistration::regstart( projectsippacket::pointer pk )
                       stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
   this->authrequest->addheader( projectsippacket::Allow,
                       "INVITE, ACK, CANCEL, OPTIONS, BYE" );
-  this->authrequest->addheader( projectsippacket::Content_Type,
-                      "application/sdp" );
   this->authrequest->addheader( projectsippacket::Content_Length,
                       "0" );
 

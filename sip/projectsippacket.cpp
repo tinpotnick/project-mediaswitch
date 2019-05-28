@@ -515,7 +515,7 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
   substring cnonce = this->getheaderparam( projectsippacket::Authorization, "cnonce" );
   substring noncecount = this->getheaderparam( projectsippacket::Authorization, "nc" );
   substring qop = this->getheaderparam( projectsippacket::Authorization, "qop" );
-  substring user = this->getuser();
+  substring user = this->getheaderparam( projectsippacket::Authorization, "username" );
 
   substring realm = this->getheaderparam( projectsippacket::Authorization, "realm" );
   if( 0 == realm.end() )
