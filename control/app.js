@@ -9,9 +9,17 @@ projectcontrol.onhangup = ( call ) =>
 
 projectcontrol.onnewcall = ( call ) =>
 {
-  console.log( "new call" );
-
   if( call.originator ) return;
+
+  console.log( "new call inbound call" );
+  if( call.haserror ) console.log( call.error );
+
+  if( "3" == call.destination )
+  {
+    call.newcall( "1003" );
+    return;
+  }
+
 
   call.onhangup = () =>
   {
@@ -28,7 +36,7 @@ projectcontrol.onnewcall = ( call ) =>
   setTimeout( () => { call.answer(); }, 2000 );
 }
 
-setTimeout( () =>
+if(0) setTimeout( () =>
 {
 
   var callobj = {
@@ -88,7 +96,11 @@ projectcontrol.ondereg = ( reg ) =>
 }
 
 /* Register our user */
-projectcontrol.directory( "bling.babblevoice.com", [ { "username": "1003", "secret": "1123654789" } ] );
+projectcontrol.directory( "bling.babblevoice.com",
+  [
+    { "username": "1003", "secret": "1123654789" },
+    { "username": "1000", "secret": "1123654789" }
+  ] );
 
 /* Wait for requests */
 projectcontrol.run();

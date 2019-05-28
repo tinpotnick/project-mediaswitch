@@ -1,7 +1,7 @@
 /*******************************************************************************
 File: test.cpp
 Purpose: Test framework. run "make clean; make test" to build this test file.
-../Debug/test can then be run to functionaliy test parts of the program. 
+../Debug/test can then be run to functionaliy test parts of the program.
 To test for memory leakage use "valgrind ../Debug/test --leak-check=yes"
 Updated: 30.12.2018
 *******************************************************************************/
@@ -174,7 +174,7 @@ void testsippacket( void )
     testpacket.addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
     testpacket.addheader( projectsippacket::CSeq, "314159 INVITE" );
 
-    projecttest( *testpacket.strptr(), 
+    projecttest( *testpacket.strptr(),
                   "SIP/2.0 180 Ringing\r\n"
                   "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
                   "CSeq: 314159 INVITE\r\n"
@@ -186,7 +186,7 @@ void testsippacket( void )
     testpacket.setbody( "Some SDP?" );
     testpacket.addheader( projectsippacket::Via, "SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1" );
 
-    projecttest( *testpacket.strptr(), 
+    projecttest( *testpacket.strptr(),
                   "SIP/2.0 180 Ringing\r\n"
                   "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
                   "CSeq: 314159 INVITE\r\n"
@@ -209,7 +209,7 @@ void testsippacket( void )
     testpacket2.addviaheader( "myhost", &testpacket );
     testpacket2.setbody( "Some SDP" );
 
-    projecttest( *testpacket2.strptr(), 
+    projecttest( *testpacket2.strptr(),
                   "REGISTER sip:registrar.biloxi.com SIP/2.0\r\n"
                   "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
                   "CSeq: 314159 INVITE\r\n"
@@ -222,7 +222,7 @@ void testsippacket( void )
   }
 
   {
-    
+
     projectsippacket testpacket( gettestchunk( testdata, "AUTHREGISTER5" ) );
 
     projecttest(
@@ -423,7 +423,7 @@ void testurl( void )
 /*******************************************************************************
 Function: stringtest
 Purpose: Test some of our string classes. We have our own substring class
-so we can maintain one string with indexes into it to save on both memory and 
+so we can maintain one string with indexes into it to save on both memory and
 allocations.
 Updated: 30.12.2018
 *******************************************************************************/
@@ -533,8 +533,8 @@ void optionstest( void )
   std::string testdata = readfile( "../testfiles/siptest1.txt" );
 
   projectsipservertestpacket *p = new projectsipservertestpacket( gettestchunk( testdata, "OPTIONSTEST1" ) );
-  projectsippacketptr request( p );
-  
+  projectsippacket::pointer request( p );
+
   projectsipsm::handlesippacket( request );
 
   std::cout << "Packet size: " << p->response->length() << std::endl;
@@ -545,7 +545,7 @@ void optionstest( void )
 
 /*******************************************************************************
 Function: authtest
-Purpose: Test authenticating a SIP packet. Adds user to directory then looks 
+Purpose: Test authenticating a SIP packet. Adds user to directory then looks
 up and checks authentication.
 Updated: 20.02.2019
 *******************************************************************************/
@@ -556,14 +556,14 @@ void authtest( void )
   std::string s = "123654789";
   projectsipdirdomain::pointer domentry = projectsipdirdomain::adddomain( dom );
   domentry->adduser( u, s );
-  
+
   std::string testdata = readfile( "../testfiles/siptest1.txt" );
 
   projectsipservertestpacket *p = new projectsipservertestpacket( gettestchunk( testdata, "AUTHREGISTER3" ) );
-  projectsippacketptr request( p );
+  projectsippacket::pointer request( p );
 
   projectsipservertestpacket *auth = new projectsipservertestpacket( gettestchunk( testdata, "AUTHREGISTER4" ) );
-  projectsippacketptr authrequest( auth );
+  projectsippacket::pointer authrequest( auth );
 
   projecttest( authrequest->getmethod(), projectsippacket::REGISTER , "Invalid method");
 
@@ -655,7 +655,3 @@ int runtests( void )
 
   return 0;
 }
-
-
-
-

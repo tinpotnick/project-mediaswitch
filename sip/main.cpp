@@ -152,6 +152,7 @@ int main( int argc, const char* argv[] )
         std::cout << "--fg - run the server in the foreground" << std::endl;
         std::cout << "--cp - set the control server listening port (default 9000)" << std::endl;
         std::cout << "--sp - set the sip server listening port (default 5060)" << std::endl;
+        std::cout << "--pa - set the sip server listening ip address (default 127.0.0.1)" << std::endl;
         return 1;
       }
       else if ( "--fg" == argvstr )
@@ -197,6 +198,23 @@ int main( int argc, const char* argv[] )
         std::cerr << "What port was that?" << std::endl;
         return -1;
       }
+      else if( "--pa" == argvstr ) /* [P]ublic SIP [A]ddress */
+      {
+        try
+        {
+          if( argc > ( i + 1 ) )
+          {
+            projectsipconfig::setsiphostip( argv[ i + 1 ] );
+            i++;
+            continue;
+          }
+        }
+        catch( boost::bad_lexical_cast &e )
+        {
+        }
+        std::cerr << "What address was that?" << std::endl;
+        return -1;
+      }
     }
   }
 
@@ -215,7 +233,8 @@ int main( int argc, const char* argv[] )
 
   std::cout << "Starting Project SIP server." << std::endl;
   std::cout << "Control port listening on port " << port << std::endl;
-  std::cout << "SIP port listening on port " << sipport << std::endl;
+  std::cout << "SIP listening on port " << sipport << std::endl;
+  std::cout << "SIP Contact IP used is " << projectsipconfig::gethostipsipport() << std::endl;
 
   if ( !fg )
   {

@@ -38,7 +38,7 @@ Function: regstart
 Purpose: Our start state. We wait to receive a REGISTER packet.
 Updated: 10.01.2019
 *******************************************************************************/
-void projectsipregistration::regstart( projectsippacketptr pk )
+void projectsipregistration::regstart( projectsippacket::pointer pk )
 {
   /*
     What is the expires the client is requesting.
@@ -95,7 +95,7 @@ void projectsipregistration::regstart( projectsippacketptr pk )
     return;
   }
 
-  this->authrequest = projectsippacketptr( new projectsippacket() );
+  this->authrequest = projectsippacket::create();
 
   this->authrequest->setstatusline( 401, "Unauthorized" );
 
@@ -134,7 +134,7 @@ Function: regwaitauth
 Purpose: The next packet we will receive is a REGISTER with credentials.
 Updated: 10.01.2019
 *******************************************************************************/
-void projectsipregistration::regwaitauth( projectsippacketptr pk )
+void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
 {
   this->currentpacket = pk;
 
@@ -449,7 +449,7 @@ Purpose: We received a SIP 200 OK in response to our OPTIONS request. We only
 (at the moment) senauthrequestd out options.
 Updated: 17.01.2019
 *******************************************************************************/
-void projectsipregistration::handleresponse( projectsippacketptr pk )
+void projectsipregistration::handleresponse( projectsippacket::pointer pk )
 {
   if( !this->authacceptpacket )
   {
@@ -475,7 +475,7 @@ the packet must have already been checked as a REGISTER packet and has all
 of the required headers.
 Updated: 10.01.2019
 *******************************************************************************/
-void projectsipregistration::registrarsippacket( projectsippacketptr pk )
+void projectsipregistration::registrarsippacket( projectsippacket::pointer pk )
 {
   /*
     Work out who this registration is for.
@@ -486,7 +486,7 @@ void projectsipregistration::registrarsippacket( projectsippacketptr pk )
     return;
   }
 
-  std::string s = pk->getuserhost();
+  std::string s = pk->getuserhost().str();
 
   projectsipregistrationptr r;
   projectsipregistrations::index< regindexuser >::type::iterator it = regs.get< regindexuser >().find( s );
@@ -623,7 +623,7 @@ Function: sendtoregisteredclient
 Purpose: Forward a packet onto a registered client
 Updated: 20.02.2019
 *******************************************************************************/
-bool projectsipregistration::sendtoregisteredclient( std::string &user, projectsippacketptr pk )
+bool projectsipregistration::sendtoregisteredclient( std::string &user, projectsippacket::pointer pk )
 {
   projectsipregistrations::index< regindexuser >::type::iterator it = regs.get< regindexuser >().find( user );
   if( it != regs.get< regindexuser >().end() )

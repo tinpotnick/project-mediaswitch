@@ -28,6 +28,11 @@ typedef std::unordered_map<std::string, projectrtpchannel::pointer> activertpcha
 rtpchannels dormantchannels;
 activertpchannels activechannels;
 
+#warning TODO
+// We probably need a config class
+short port;
+std::string publicaddress;
+
 /*!md
 # stopserver
 Actually do the stopping
@@ -65,42 +70,51 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
   stringvector pathparts = splitstring( path, '/' );
 
 
-  if( projectwebdocument::POST == request.getmethod() )
+  if( "channel" == pathparts[ 0 ] )
   {
-    JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
-    if( !body.has_key( "channel" ) )
+    if( 1 == pathparts.size() )
     {
-      if( dormantchannels.size() == 0 )
+      if( projectwebdocument::POST == request.getmethod() )
       {
-        response.setstatusline( 503, "Currently out of channels" );
-        response.addheader( projectwebdocument::Content_Length, 0 );
-        response.addheader( projectwebdocument::Content_Type, "text/json" );
-        return;
+        JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
+        if( !body.has_key( "channel" ) )
+        {
+          if( dormantchannels.size() == 0 )
+          {
+            response.setstatusline( 503, "Currently out of channels" );
+            response.addheader( projectwebdocument::Content_Length, 0 );
+            response.addheader( projectwebdocument::Content_Type, "text/json" );
+            return;
+          }
+
+          std::string u = uuid();
+
+          projectrtpchannel::pointer p = *dormantchannels.begin();
+          dormantchannels.pop_front();
+          activechannels[ u ] = p;
+          p->open( projectrtpchannel::PCMA );
+
+          JSON::Object v;
+          v[ "channel" ] = u;
+          v[ "port" ] = ( JSON::Integer ) p->getport();
+          v[ "ip" ] = publicaddress;
+          std::string t = JSON::to_string( v );
+
+          response.setstatusline( 200, "Ok" );
+          response.addheader( projectwebdocument::Content_Length, t.size() );
+          response.addheader( projectwebdocument::Content_Type, "text/json" );
+          response.setbody( t.c_str() );
+          return;
+        }
       }
-
-      std::string u = uuid();
-
-      projectrtpchannel::pointer p = *dormantchannels.begin();
-      dormantchannels.pop_front();
-      activechannels[ u ] = p;
-      p->open( projectrtpchannel::PCMA );
-
-      JSON::Object v;
-      v[ "channel" ] = u;
-      v[ "port" ] = ( JSON::Integer ) p->getport();
-      v[ "ip" ] = "127.0.0.1";
-      std::string t = JSON::to_string( v );
-
-      response.setstatusline( 200, "Ok" );
-      response.addheader( projectwebdocument::Content_Length, t.size() );
-      response.addheader( projectwebdocument::Content_Type, "text/json" );
-      response.setbody( t.c_str() );
+    }
+    else if( pathparts.size() > 1 && "bridge"  == pathparts[ 1 ] )
+    {
+      return;
     }
   }
-  else
-  {
-    response.setstatusline( 404, "Not found" );
-  }
+
+  response.setstatusline( 404, "Not found" );
 }
 
 /*!md
@@ -162,7 +176,8 @@ As it says...
 */
 int main( int argc, const char* argv[] )
 {
-  short port = 9002;
+  port = 9002;
+  publicaddress = "127.0.0.1";
 
   short startrtpport = 10000;
   short endrtpport = 20000;
@@ -198,12 +213,30 @@ int main( int argc, const char* argv[] )
         std::cerr << "What port was that?" << std::endl;
         return -1;
       }
+      else if( "--pa" == argvstr ) /* [P]ublic RTP [A]ddress */
+      {
+        try
+        {
+          if( argc > ( i + 1 ) )
+          {
+            publicaddress = argv[ i + 1 ];
+            i++;
+            continue;
+          }
+        }
+        catch( boost::bad_lexical_cast &e )
+        {
+        }
+        std::cerr << "What port was that?" << std::endl;
+        return -1;
+      }
     }
   }
 
   // Register our CTRL-C handler
   signal( SIGINT, killserver );
   std::cout << "Starting Project RTP server with control port listening on port " << port << std::endl;
+  std::cout << "RTP published address is " << publicaddress << std::endl;
   std::cout << "RTP ports "  << startrtpport << " => " << endrtpport << ": " << (int) ( ( endrtpport - startrtpport ) / 2 ) << " channels" << std::endl;
 
   initchannels( startrtpport, endrtpport );

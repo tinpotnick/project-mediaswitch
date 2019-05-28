@@ -24,7 +24,7 @@ Function: handlesippacket
 Purpose: Handle a SIP packet.
 Updated: 17.12.2018
 *******************************************************************************/
-void projectsipsm::handlesippacket( projectsippacketptr pk )
+void projectsipsm::handlesippacket( projectsippacket::pointer pk )
 {
   switch( pk->getmethod() )
   {
@@ -59,7 +59,7 @@ Function: handleoptions
 Purpose: As it says. RFC 3261 section 11.
 Updated: 03.01.2019
 *******************************************************************************/
-void projectsipsm::handleoptions( projectsippacketptr pk )
+void projectsipsm::handleoptions( projectsippacket::pointer pk )
 {
     /* Required headers - section 8.1.1 */
   if( false == pk->hasheader( projectsippacket::To ) ||
@@ -80,7 +80,7 @@ void projectsipsm::handleoptions( projectsippacketptr pk )
   projectsippacket response;
 
   response.setstatusline( 200, "OK" );
-  response.addviaheader( projectsipconfig::gethostname(), pk.get() );
+  response.addviaheader( projectsipconfig::gethostip(), pk.get() );
 
   response.addheader( projectsippacket::To,
                       pk->getheader( projectsippacket::To ) );
@@ -108,7 +108,7 @@ Purpose: As it says. RFC 3261 section 10. We do not support anonymous
 registrations.
 Updated: 17.12.2018
 *******************************************************************************/
-void projectsipsm::handleregister( projectsippacketptr pk )
+void projectsipsm::handleregister( projectsippacket::pointer pk )
 {
   /* Required headers */
   if( false == pk->hasheader( projectsippacket::To ) ||
@@ -135,7 +135,7 @@ Function: handleinvite
 Purpose: Handle INVITE
 Updated: 23.12.2018
 *******************************************************************************/
-void projectsipsm::handleinvite( projectsippacketptr pk )
+void projectsipsm::handleinvite( projectsippacket::pointer pk )
 {
   /* Required headers */
   if( false == pk->hasheader( projectsippacket::To ) ||
@@ -161,7 +161,7 @@ Function: handleresponse
 Purpose: Handle responses to our requests.
 Updated: 23.12.2018
 *******************************************************************************/
-void projectsipsm::handleresponse( projectsippacketptr pk )
+void projectsipsm::handleresponse( projectsippacket::pointer pk )
 {
   if( false == projectsipdialog::invitesippacket( pk ) )
   {

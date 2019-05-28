@@ -37,7 +37,7 @@ void projectsipserver::handlereadsome( void )
           this->bytesreceived = bytes_recvd;
           this->handledata();
         }
-        
+
         if( !ec )
         {
           this->handlereadsome();
@@ -59,7 +59,7 @@ void projectsipserver::handledata( void )
   try
   {
     stringptr pk( new std::string( this->data, this->bytesreceived ) );
-    projectsippacketptr packet( new projectsipserverpacket( this, this->sender_endpoint, pk ) );
+    projectsippacket::pointer packet( new projectsipserverpacket( this, this->sender_endpoint, pk ) );
     projectsipsm::handlesippacket( packet );
   }
   catch(...)
@@ -93,6 +93,3 @@ void projectsipserverpacket::handlesend( boost::shared_ptr<std::string> message,
 {
 
 }
-
-
-

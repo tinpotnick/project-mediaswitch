@@ -11,14 +11,14 @@ class projectsipconfig
 {
 public:
   projectsipconfig();
-  static const char* gethostname( void );
   static const char* gethostip( void );
   static const short getsipport( void );
   static const char* gethostipsipport( void );
 
   static const void setsipport( short );
+  static const void setsiphostip( std::string );
+
 private:
-  std::string hostname;
   std::string hostip;
   short sipport;
   std::string hostipsipport;

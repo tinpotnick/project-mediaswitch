@@ -15,11 +15,9 @@
 
 #include "projectsippacket.h"
 
-/*******************************************************************************
-Function: projectsippacket constructor
-Purpose:
-Updated: 12.12.2018
-*******************************************************************************/
+/*!md
+# projectsippacket constructor
+*/
 projectsippacket::projectsippacket( stringptr pk )
   : projectwebdocument( pk )
 {
@@ -31,21 +29,32 @@ projectsippacket::projectsippacket()
 {
 }
 
-/*******************************************************************************
-Function: projectsippacket destructor
-Purpose:
-Updated: 16.12.2018
-*******************************************************************************/
+/*!md
+# projectsippacket destructor
+*/
 projectsippacket::~projectsippacket()
 {
 }
 
 
-/*******************************************************************************
-Function: contact
-Purpose: Generate a contact parameter.
-Updated: 22.01.2019
-*******************************************************************************/
+/*!md
+# Create
+Create a pointer to a new object
+*/
+projectsippacket::pointer projectsippacket::create()
+{
+  return pointer( new projectsippacket() );
+}
+
+projectsippacket::pointer projectsippacket::create( stringptr packet )
+{
+  return pointer( new projectsippacket( packet ) );
+}
+
+/*!md
+# contact
+Generate a contact parameter.
+*/
 stringptr projectsippacket::contact( stringptr user, stringptr host, int expires )
 {
   stringptr s = stringptr( new std::string() );
@@ -66,11 +75,10 @@ stringptr projectsippacket::contact( stringptr user, stringptr host, int expires
   return s;
 }
 
-/*******************************************************************************
-Function: branch
-Purpose: Generate a branch parameter.
-Updated: 03.01.2019
-*******************************************************************************/
+/*!md
+# branch
+Generate a branch parameter.
+*/
 static std::string randomcharbase(
         "abcdefghijklmnopqrstuvwxyz"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -100,11 +108,10 @@ stringptr projectsippacket::branch( void )
   return s;
 }
 
-/*******************************************************************************
-Function: tag
-Purpose: Generate a tag.
-Updated: 03.01.2019
-*******************************************************************************/
+/*!md
+# tag
+Generate a tag.
+*/
 stringptr projectsippacket::tag( void )
 {
   stringptr s = stringptr( new std::string() );
@@ -119,11 +126,10 @@ stringptr projectsippacket::tag( void )
   return s;
 }
 
-/*******************************************************************************
-Function: branch
-Purpose: Generate a new call id.
-Updated: 17.01.2019
-*******************************************************************************/
+/*!md
+# branch
+Generate a new call id.
+*/
 stringptr projectsippacket::callid()
 {
   boost::uuids::basic_random_generator<boost::mt19937> gen;
@@ -145,13 +151,12 @@ stringptr projectsippacket::callid()
   return s;
 }
 
-/*******************************************************************************
-Function: getheaderparam
-Purpose: Returns a param from the header, for example:
+/*!md
+# getheaderparam
+Returns a param from the header, for example:
 Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
 "z9hG4bK4b43c2ff8.1" == getheaderparam( projectsippacket::Via, "branch" )
-Updated: 08.01.2019
-*******************************************************************************/
+*/
 substring projectsippacket::getheaderparam( int header, const char *param )
 {
   substring retval( document );
@@ -209,13 +214,12 @@ substring projectsippacket::getheaderparam( int header, const char *param )
   return retval;
 }
 
-/*******************************************************************************
-Function: addremotepartid
-Purpose: Add a remotepatyid header:
+/*!md
+# addremotepartid
+Add a remotepatyid header:
 setheaderparam( "server10.biloxi.com" "z9hG4bK4b43c2ff8.1" );
 Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
-Updated: 09.01.2019
-*******************************************************************************/
+*/
 bool projectsippacket::addremotepartyid( const char *realm,
                                           const char *calleridname,
                                           const char *callerid,
@@ -279,13 +283,12 @@ bool projectsippacket::addremotepartyid( const char *realm,
   return true;
 }
 
-/*******************************************************************************
-Function: addviaheader
-Purpose: Add a via header:
+/*!md
+# addviaheader
+Add a via header:
 setheaderparam( "server10.biloxi.com" "z9hG4bK4b43c2ff8.1" );
 Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
-Updated: 09.01.2019
-*******************************************************************************/
+*/
 bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
 {
   size_t lh = strlen( host );
@@ -329,12 +332,11 @@ bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
   return true;
 }
 
-/*******************************************************************************
-Function: addauthenticateheader
-Purpose: Generate a nonce parameter used for auth and add the authenticate
+/*!md
+# addauthenticateheader
+Generate a nonce parameter used for auth and add the authenticate
 header. Ref RFC 2617 section 3.2.1.
-Updated: 03.01.2019
-*******************************************************************************/
+*/
 bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
 {
 
@@ -373,12 +375,11 @@ bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
   return true;
 }
 
-/*******************************************************************************
-Function: md5hashtostring
-Purpose: Converts input 16 bytes hex to string hex. buf need to be 33 bytes to
+/*!md
+# md5hashtostring
+Converts input 16 bytes hex to string hex. buf need to be 33 bytes to
 include null terminator.
-Updated: 08.01.2019
-*******************************************************************************/
+*/
 static inline void md5hashtostring( char* buf )
 {
   char *in = buf + 15;
@@ -396,12 +397,11 @@ static inline void md5hashtostring( char* buf )
   buf[ 33 ] = 0;
 }
 
-/*******************************************************************************
-Function: ha1
-Purpose: Calculate the h(a1) using cnonce and cnonce (algorithm = "MD5-sess").
+/*!md
+# ha1
+Calculate the h(a1) using cnonce and cnonce (algorithm = "MD5-sess").
 Ref RFC 2617.
-Updated: 11.01.2019
-*******************************************************************************/
+*/
 static inline char * ha1( const char *username, size_t ul,
                           const char *realm, size_t rl,
                           const char *password, size_t pl,
@@ -435,11 +435,11 @@ static inline char * ha1( const char *username, size_t ul,
   return buf;
 }
 
-/*******************************************************************************
-Function: ha2
-Purpose: Calculate the h(a2). Ref RFC 2617.
-Updated: 11.01.2019
-*******************************************************************************/
+/*!md
+# ha2
+Calculate the h(a2). Ref RFC 2617.
+
+*/
 static inline char * ha2( const char *method, size_t ml,
                                     const char *uri, size_t ul,
                                     char *buf )
@@ -456,11 +456,11 @@ static inline char * ha2( const char *method, size_t ml,
   return buf;
 }
 
-/*******************************************************************************
-Function: kd
-Purpose: Calculate the kd. Ref RFC 2617.
-Updated: 11.01.2019
-*******************************************************************************/
+/*!md
+# kd
+Calculate the kd. Ref RFC 2617.
+
+*/
 static inline char *kd( const char *ha1,
                                   const char *nonce, size_t nl,
                                   const char *nc, size_t ncl,
@@ -492,54 +492,13 @@ static inline char *kd( const char *ha1,
 
   return buf;
 }
-#if 0
-/*******************************************************************************
-Function: requestdigest
-Purpose: The 1 call to calculate the SIP request digest.
-Updated: 11.01.2019
-*******************************************************************************/
-char * requestdigest( const char *username, size_t ul,
-                      const char *realm, size_t rl,
-                      const char *password, size_t pl,
-                      const char *nonce, size_t nl,
-                      const char *nc, size_t ncl,
-                      const char *cnonce, size_t cnl,
-                      const char *method, size_t ml,
-                      const char *uri, size_t url,
-                      const char *qop, size_t ql,
-                      const char *alg,
-                      char *buf )
-{
-  char h1[ 33 ];
-  char h2[ 33 ];
 
-  kd(
-    ha1( username, ul,
-         realm, rl,
-         password, pl,
-         nonce, nl,
-         cnonce, cnl,
-         alg,
-         h1 ),
-    nonce, nl,
-    nc, ncl,
-    cnonce, cnl,
-    qop, ql,
-    ha2( method, ml,
-         uri, url,
-         h2 ),
-    buf );
-
-  return buf;
-}
-#endif
-
-/*******************************************************************************
-Function: checkauth
-Purpose: Check the auth of this packet. The reference contans the nonce to check
+/*!md
+# checkauth
+Check the auth of this packet. The reference contans the nonce to check
 we set the nonce and it is not a replay.
-Updated: 10.01.2019
-*******************************************************************************/
+
+*/
 bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
 {
   char h1[ 33 ];
@@ -598,62 +557,62 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
   return false;
 }
 
-/*******************************************************************************
-Function: gettouser
-Purpose: Get the user addressed in the To header.
-Updated: 15.01.2019
-*******************************************************************************/
+/*!md
+# gettouser
+Get the user addressed in the To header.
+
+*/
 substring projectsippacket::getuser( int tofrom )
 {
   return sipuri( this->getheader( tofrom ) ).user;
 }
 
-/*******************************************************************************
-Function: gettohost
-Purpose: Get the host addressed in the To header.
-Updated: 17.01.2019
-*******************************************************************************/
+/*!md
+# gettohost
+Get the host addressed in the To header.
+
+*/
 substring projectsippacket::gethost( int tofrom )
 {
   return sipuri( this->getheader( tofrom ) ).host;
 }
 
-/*******************************************************************************
-Function: getdisplayname
-Purpose: Returns the diaply name.
-Updated: 29.01.2019
-*******************************************************************************/
+/*!md
+# getdisplayname
+Returns the diaply name.
+
+*/
 substring projectsippacket::getdisplayname( int tofrom )
 {
   return sipuri( this->getheader( tofrom ) ).displayname;
 }
 
-/*******************************************************************************
-Function: getuserhost
-Purpose: Get the user@host addressed in the either To header and or URI
+/*!md
+# getuserhost
+Get the user@host addressed in the either To header and or URI
 based on request/response.
-Updated: 17.01.2019
-*******************************************************************************/
-std::string projectsippacket::getuserhost( int tofrom )
+
+*/
+substring projectsippacket::getuserhost( int tofrom )
 {
-  return sipuri( this->getheader( tofrom ) ).userhost.str();
+  return sipuri( this->getheader( tofrom ) ).userhost;
 }
 
-/*******************************************************************************
-Function: geturihost
-Purpose: Get the host part from the uri addressed in the To header.
-Updated: 15.01.2019
-*******************************************************************************/
+/*!md
+# geturihost
+Get the host part from the uri addressed in the To header.
+
+*/
 substring projectsippacket::geturihost( void )
 {
   return sipuri( this->uri ).host;
 }
 
-/*******************************************************************************
-Function: getexpires
-Purpose: Get the expires value from the different placesit might be.
-Updated: 17.01.2019
-*******************************************************************************/
+/*!md
+# getexpires
+Get the expires value from the different placesit might be.
+
+*/
 int projectsippacket::getexpires( void )
 {
   int expires = -1;
@@ -675,11 +634,11 @@ int projectsippacket::getexpires( void )
   return expires;
 }
 
-/*******************************************************************************
-Function: getcseq
-Purpose: Get the cseq value from teh cseq header (the number value)
-Updated: 15.05.2019
-*******************************************************************************/
+/*!md
+# getcseq
+Get the cseq value from teh cseq header (the number value)
+
+*/
 int projectsippacket::getcseq( void )
 {
   substring ex;
@@ -691,22 +650,22 @@ int projectsippacket::getcseq( void )
   return -1;
 }
 
-/*******************************************************************************
-Function: projectsippacket destructor
-Purpose:
-Updated: 16.12.2018
-*******************************************************************************/
+/*!md
+# projectsippacket destructor
+
+
+*/
 const char* projectsippacket::getversion( void )
 {
   return "SIP/2.0";
 }
 
-/*******************************************************************************
-Function: getmethodfromcrc
-Purpose: Converts crc to header value. Switch statement comes from
+/*!md
+# getmethodfromcrc
+Converts crc to header value. Switch statement comes from
 gensipheadercrc.py. We only store references to the supported headers.
-Updated: 12.12.2018
-*******************************************************************************/
+
+*/
 int projectsippacket::getmethodfromcrc( int crc )
 {
   switch( crc )
@@ -739,11 +698,11 @@ int projectsippacket::getmethodfromcrc( int crc )
   return -1;
 }
 
-/*******************************************************************************
-Function: projectsippacket getheaderstr
-Purpose: Convert a header id to a string.
-Updated: 02.01.2019
-*******************************************************************************/
+/*!md
+# projectsippacket getheaderstr
+Convert a header id to a string.
+
+*/
 const char *projectsippacket::getmethodstr( int method )
 {
   switch( method )
@@ -766,12 +725,12 @@ const char *projectsippacket::getmethodstr( int method )
 }
 
 
-/*******************************************************************************
-Function: getheaderfromcrc
-Purpose: Converts crc to header value. Switch statement comes from
+/*!md
+# getheaderfromcrc
+Converts crc to header value. Switch statement comes from
 gensipheadercrc.py. We only store references to the supported headers.
-Updated: 12.12.2018
-*******************************************************************************/
+
+*/
 int projectsippacket::getheaderfromcrc( int crc )
 {
   switch( crc )
@@ -880,11 +839,11 @@ int projectsippacket::getheaderfromcrc( int crc )
   return -1;
 }
 
-/*******************************************************************************
-Function: projectsippacket getheaderstr
-Purpose: Convert a header id to a string.
-Updated: 02.01.2019
-*******************************************************************************/
+/*!md
+# projectsippacket getheaderstr
+Convert a header id to a string.
+
+*/
 const char *projectsippacket::getheaderstr( int header )
 {
   switch( header )
@@ -944,11 +903,11 @@ const char *projectsippacket::getheaderstr( int header )
 
 
 
-/*******************************************************************************
-Function: sipuri constructor
-Purpose: Parse a SIP URI.
-Updated: 03.01.2019
-*******************************************************************************/
+/*!md
+# sipuri constructor
+Parse a SIP URI.
+
+*/
 sipuri::sipuri( substring s ) :
    s( s ),
    uri( s ),
@@ -1036,12 +995,12 @@ sipuri::sipuri( substring s ) :
 
 
 /*****************************************************************************
-Function: getparameter
-Purpose: Returns the substring index into s for the given param name.
+# getparameter
+Returns the substring index into s for the given param name.
 std::string s = From: sip:+12125551212@server.phone2net.com;tag=887s
 getparameter( s, "tag" );
 Will return a substring index to '887s'.
-Updated: 18.12.2018
+
 *****************************************************************************/
 substring sipuri::getparameter( std::string name )
 {
@@ -1060,10 +1019,10 @@ substring sipuri::getparameter( std::string name )
 
 
 /*****************************************************************************
-Function: getheader
-Purpose: Similar to get parameter but for headers. In a SIP URI anything after
+# getheader
+Similar to get parameter but for headers. In a SIP URI anything after
 the ? is considered a header. Name value pairs.
-Updated: 18.12.2018
+
 *****************************************************************************/
 substring sipuri::getheader( std::string name )
 {

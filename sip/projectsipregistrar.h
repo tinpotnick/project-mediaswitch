@@ -25,11 +25,10 @@
 #include "projectsippacket.h"
 #include "projecthttpclient.h"
 
-/*******************************************************************************
-Class: projectsipregistration
-Purpose: Class to hold details about a specific registration.
-Updated: 18.12.2018
-*******************************************************************************/
+/*!md
+# projectsipregistration
+Class to hold details about a specific registration.
+*/
 class projectsipregistration
 {
 public:
@@ -46,24 +45,24 @@ public:
   /* Maintain packets of interest */
 
   /* The packet we send to request they authenticate */
-  projectsippacketptr authrequest;
+  projectsippacket::pointer authrequest;
 
   /* This is the packet we have authenticated and accepted */
-  projectsippacketptr authacceptpacket;
+  projectsippacket::pointer authacceptpacket;
 
   /* Used in situations where we have to make an asynchronous call elsewhere */
-  projectsippacketptr currentpacket;
+  projectsippacket::pointer currentpacket;
 
   /* our state functions */
-  void regstart( projectsippacketptr pk );
-  void regwaitauth( projectsippacketptr pk );
-  void handleresponse( projectsippacketptr pk );
+  void regstart( projectsippacket::pointer pk );
+  void regwaitauth( projectsippacket::pointer pk );
+  void handleresponse( projectsippacket::pointer pk );
 
   void timerhandler( const boost::system::error_code& error );
 
-  static void registrarsippacket( projectsippacketptr pk );
+  static void registrarsippacket( projectsippacket::pointer pk );
   static void httpget( stringvector &path, projectwebdocument &response );
-  static bool sendtoregisteredclient( std::string &user, projectsippacketptr pk );
+  static bool sendtoregisteredclient( std::string &user, projectsippacket::pointer pk );
 
   void httpcallback( int errorcode );
   void httpcallbackanddie( int errorcode );
@@ -83,12 +82,11 @@ typedef boost::shared_ptr< projectsipregistration > projectsipregistrationptr;
 /* tags for multi index */
 struct regindexuser{};
 
-/*******************************************************************************
-Class: projectsipregistrations
-Purpose: Boost multi index set to store our registrations. Indexed by user
+/*!md
+# projectsipregistrations
+Boost multi index set to store our registrations. Indexed by user
 (hashed unique), expires (ordered none unique) and nextping (ordered none unique).
-Updated: 18.12.2018
-*******************************************************************************/
+*/
 typedef boost::multi_index::multi_index_container<
   projectsipregistrationptr,
   boost::multi_index::indexed_by

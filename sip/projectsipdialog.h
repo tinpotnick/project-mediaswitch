@@ -21,25 +21,27 @@
 #include "projectsipstring.h"
 #include "projectsippacket.h"
 #include "projecthttpclient.h"
+#include "projectsipendpoint.h"
 #include "json.hpp"
 
 #define DIALOGSETUPTIMEOUT 180000  /* 3 minutes */
 #define DIALOGACKTIMEOUT 3000  /* 3 seconds */
 
-/*******************************************************************************
-Class: projectsipdialog
-Purpose: Class to hold details about a specific dialog (INVITE).
-Updated: 23.12.2018
-*******************************************************************************/
+/*!md
+# projectsipdialog
+Class to hold details about a specific dialog (INVITE).
+
+*/
 class projectsipdialog :
-  public boost::enable_shared_from_this< projectsipdialog >
+  public projectsipendpoint,
+  public boost::enable_shared_from_this< projectsipendpoint >
 {
 public:
   projectsipdialog();
   ~projectsipdialog();
   typedef boost::shared_ptr< projectsipdialog > pointer;
-  static pointer create();
-  static bool invitesippacket( projectsippacketptr pk );
+  static projectsipdialog::pointer create();
+  static bool invitesippacket( projectsippacket::pointer pk );
   static void httpget( stringvector &path, projectwebdocument &response );
   static void httpput( stringvector &path, JSON::Value &body, projectwebdocument &response );
   static void httppost( stringvector &path, JSON::Value &body, projectwebdocument &response );
@@ -50,21 +52,21 @@ public:
   /* our state functions */
 
   /* inbound invite */
-  void invitestart( projectsippacketptr pk );
-  void inviteauth( projectsippacketptr pk  );
-  void waitfornextinstruction( projectsippacketptr pk );
-  void waitforack( projectsippacketptr pk );
-  void waitforackanddie( projectsippacketptr pk );
-  void waitfor200anddie( projectsippacketptr pk );
+  void invitestart( projectsippacket::pointer pk );
+  void inviteauth( projectsippacket::pointer pk  );
+  void waitfornextinstruction( projectsippacket::pointer pk );
+  void waitforack( projectsippacket::pointer pk );
+  void waitforackanddie( projectsippacket::pointer pk );
+  void waitfor200anddie( projectsippacket::pointer pk );
 
   /* outbound invite */
-  void waitforinviteprogress( projectsippacketptr pk );
+  void waitforinviteprogress( projectsippacket::pointer pk );
 
-  std::function<void ( projectsippacketptr pk ) > laststate;
-  std::function<void ( projectsippacketptr pk ) > nextstate;
+  std::function<void ( projectsippacket::pointer pk ) > laststate;
+  std::function<void ( projectsippacket::pointer pk ) > nextstate;
 
   /* non state function */
-  void handlebye( projectsippacketptr pk );
+  void handlebye( projectsippacket::pointer pk );
   bool updatecontrol( void );
   void httpcallback( int errorcode );
 
@@ -100,18 +102,21 @@ private:
 
   projecthttpclient::pointer controlrequest;
 
-  projectsippacketptr invitepacket;
-  projectsippacketptr authrequest;
-  projectsippacketptr lastpacket;
-  projectsippacketptr lastackpacket;
+  projectsippacket::pointer invitepk;
+  projectsippacket::pointer ackpk;
+
+  projectsippacket::pointer authrequest;
+  projectsippacket::pointer lastackpacket;
 
   boost::asio::steady_timer timer;
 
   int retries;
   bool authenticated;
+  bool originator;
 
   std::string domain;
   JSON::Value remotesdp;
+  JSON::Value oursdp;
 
   bool callringing;
   bool callanswered;
@@ -122,9 +127,6 @@ private:
   std::time_t answerat;
   std::time_t endat;
 
-  int errorcode;
-  std::string errorreason;
-
   stringptr ourtag;
 };
 
@@ -132,11 +134,11 @@ private:
 /* tags for multi index */
 struct projectsipdialogcallid{};
 
-/*******************************************************************************
-Class: projectsipdialogs
-Purpose: Boost multi index set to store our dialogs.
-Updated: 23.01.2019
-*******************************************************************************/
+/*!md
+# projectsipdialogs
+Boost multi index set to store our dialogs.
+
+*/
 typedef boost::multi_index::multi_index_container<
   projectsipdialog::pointer,
   boost::multi_index::indexed_by

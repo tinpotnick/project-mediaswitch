@@ -14,18 +14,15 @@ class projectsipsm
 {
 public:
   projectsipsm();
-  static void handlesippacket( projectsippacketptr pk );
+  static void handlesippacket( projectsippacket::pointer pk );
 
 private:
-  void handleregister( projectsippacketptr pk );
-  void handleoptions( projectsippacketptr pk );
-  void handleinvite( projectsippacketptr pk );
-  void handleresponse( projectsippacketptr pk );
+  void handleregister( projectsippacket::pointer pk );
+  void handleoptions( projectsippacket::pointer pk );
+  void handleinvite( projectsippacket::pointer pk );
+  void handleresponse( projectsippacket::pointer pk );
 };
 
 
 
 #endif  /* PROJECTSIPSM_H */
-
-
-

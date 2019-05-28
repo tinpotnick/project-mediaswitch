@@ -15,20 +15,18 @@
 
 projectsipconfig cnf;
 
-/*******************************************************************************
-Function: projectsipconfig
-Purpose: Constructor
-Updated: 10.01.2019
-*******************************************************************************/
+/*!md
+# projectsipconfig
+Constructor
+*/
 projectsipconfig::projectsipconfig()
 {
   char b[ 200 ];
+
   if( -1 == ::gethostname( b, sizeof( b ) ) )
   {
-    this->hostname = "unknown";
     return;
   }
-  this->hostname = b;
 
   this->sipport = 5060;
 
@@ -37,7 +35,7 @@ projectsipconfig::projectsipconfig()
   struct hostent *host_entry;
 
   // To retrieve host information
-  host_entry = ::gethostbyname( this->hostname.c_str() );
+  host_entry = ::gethostbyname( b );
 
   // To convert an Internet network
   // address into ASCII string
@@ -48,21 +46,10 @@ projectsipconfig::projectsipconfig()
   this->hostipsipport = this->hostip;
 }
 
-/*******************************************************************************
-Function: gethostname
-Purpose: Getour hostname.
-Updated: 10.01.2019
-*******************************************************************************/
-const char* projectsipconfig::gethostname( void )
-{
-  return cnf.hostname.c_str();
-}
-
-/*******************************************************************************
-Function: gethostip
-Purpose: Getour host ip - used in SIP comms especially in the contact field
-Updated: 10.01.2019
-*******************************************************************************/
+/*!md
+# gethostip
+Getour host ip - used in SIP comms especially in the contact field
+*/
 const char* projectsipconfig::gethostip( void )
 {
   return cnf.hostip.c_str();
@@ -76,27 +63,41 @@ const char* projectsipconfig::gethostipsipport( void )
   return cnf.hostipsipport.c_str();
 }
 
-/*******************************************************************************
-Function: getsipport
-Purpose: Getour sip port - used in SIP comms.
-Updated: 10.01.2019
-*******************************************************************************/
+/*!md
+# getsipport
+Getour sip port - used in SIP comms.
+*/
 const short projectsipconfig::getsipport( void )
 {
   return cnf.sipport;
 }
 
-/*******************************************************************************
-Function: setsipport
-Purpose: Set our sip port - used in SIP comms.
-Updated: 05.03.2019
-*******************************************************************************/
+/*!md
+# setsipport
+Set our sip port - used in SIP comms.
+*/
 const void projectsipconfig::setsipport( short port )
 {
   cnf.sipport = port;
 
   cnf.hostipsipport = cnf.hostip;
   if( 5060 != port )
+  {
+    cnf.hostipsipport += ":";
+    cnf.hostipsipport += std::to_string( cnf.sipport );
+  }
+}
+
+/*!md
+# setsiphost
+Set our sip host - used in SIP comms.
+*/
+const void projectsipconfig::setsiphostip( std::string a )
+{
+  cnf.hostip = a;
+
+  cnf.hostipsipport = cnf.hostip;
+  if( 5060 != cnf.sipport )
   {
     cnf.hostipsipport += ":";
     cnf.hostipsipport += std::to_string( cnf.sipport );

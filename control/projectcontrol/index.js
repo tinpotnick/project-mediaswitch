@@ -120,16 +120,41 @@ class call
   {
     this.control = control;
     this.callinfo = callinfo;
+    this.metadata = {};
 
+    /* A call's family. It can only have 1 parent but can have multiple children */
+    this.metadata.family = {};
+    this.metadata.family.children = [];
+
+    /* Our callback handlers */
     this.onnewcallcallback = [];
     this.onringingcallback = [];
     this.onanswercallback = [];
     this.onhangupcallback = [];
+
+
+    this.onhangup = () =>
+    {
+      console.log("hanging up from call onhangup")
+      for( var i = 0; i < this.metadata.family.children.length; i++ )
+      {
+        this.metadata.family.children[ i ].hangup();
+        if( "parent" in this.metadata.family )
+        {
+          this.metadata.family.parent.hangup();
+        }
+      }
+    }
   }
 
   set info( callinf )
   {
     this.callinfo = callinf;
+  }
+
+  get info()
+  {
+    return this.callinfo;
   }
 
   set onnewcall( cb )
@@ -184,6 +209,15 @@ class call
   }
 
 /*!md
+### destination
+Get the destination the user has dialled.
+*/
+  get destination()
+  {
+    return this.callinfo.to;
+  }
+
+/*!md
 ### originator
 Did we originate the call?
 */
@@ -213,8 +247,9 @@ request = { codecs: [ 'pcmu' ] }
       request = {};
     }
 
-    this.control.createchannel( request, () =>
+    this.control.createchannel( request, ( channel ) =>
     {
+      this.metadata.channel = channel;
       this.postrequest( "answer", { "sdp": request.sdp } );
     } );
   }
@@ -277,15 +312,46 @@ request = { codecs: [ 'pcmu' ] }
   }
 
 /*!md
-# newcall
+### newcall
 
 Similar to the newcall method on the control object except this method calls 'from' an exsisting call. The caller only needs to set the desitnation. This method sets up the call, then if sucsessful will bridge RTP.
+
+request can be:
+
+* A simple string ie. "1000" where user 1000 in the same domain as the caller domain
+* A SIP URL i.e. "sip://1000@bling.babblevoice.com"
+* A request object as defined in projectsipcontrol.newcall.
 
 TODO
 - [] Improve CID
 */
   newcall( request )
   {
+    if( "string" == typeof request )
+    {
+      var tourl = url.parse( request );
+
+      var newrequest = {};
+      newrequest.to = {};
+      if( tourl.href == request )
+      {
+        newrequest.to.user = request;
+      }
+      else
+      {
+        var authparts = tourl.auth.split( ':' );
+        this.username = authparts[0];
+        newrequest.to.user = decodeURIComponent( authparts[ 0 ] );
+        newrequest.to.domain = tourl.host;
+        if( 2 == authparts.length )
+        {
+          newrequest.to.secret = decodeURIComponent( authparts[ 1 ] );
+        }
+      }
+
+      request = newrequest;
+    }
+
     if( !( "maxforwards" in request ) )
     {
       if( "maxforwards" in this.callinfo )
@@ -299,8 +365,8 @@ TODO
     }
 
     request.from = {};
-    request.from.domain = "";
-    request.from.user = "";
+    request.from.domain = this.callinfo.domain;
+    request.from.user = this.callinfo.from;
 
     if( !( "cid" in request ) )
     {
@@ -317,10 +383,71 @@ TODO
       request.cid.name = request.from.user;
     }
 
-    return this.control.newcall( request );
+    var call = this.control.newcall( request );
+    call.metadata.family.parent = this;
+    this.metadata.family.children.push( call );
+
+    call.onringing = () =>
+    {
+      this.ring();
+    }
+
+    call.onanswer = () =>
+    {
+      this.onanswer = () =>
+      {
+        console.log( "Now going to bridge" )
+        this.bridge( call );
+      }
+      this.answer();
+    }
+
+    call.onhangup = () =>
+    {
+      call.metadata.family.parent.hangup();
+    }
+
+    this.onhangup = () =>
+    {
+      for( var i = 0; i < this.metadata.family.children.length; i++ )
+      {
+        this.metadata.family.children[ i ].hangup();
+      }
+    }
+
+    return call;
   }
 
+/*!md
+### Media functions.
+*/
 
+/*!md
+### bridge
+We have 2 calls, us (this) and othercall. Both have channels. We ask our RTP server to bridge the 2.
+
+There is currently a limit on the fact that both channels have to exist on the same server.
+*/
+  bridge( othercall, onbridge )
+  {
+    this.metadata.bridged = othercall;
+    othercall.metadata.bridged = this;
+
+    var request = {};
+    request.channels = [];
+    request.channels.push( this.metadata.channel.uuid );
+    request.channels.push( othercall.metadata.channel.uuid );
+
+    this.control.server( request, "/channel/bridge", "POST", this.metadata.channel.control, ( response ) =>
+    {
+      if( undefined != onbridge ) onbridge( response );
+    } );
+  }
+
+/*!md
+### postrequest
+Generic purpose fuction to post data to a SIP server.
+*/
   postrequest( action, data )
   {
     data.callid = this.callinfo.callid;
@@ -357,6 +484,7 @@ class projectcontrol
     this.rtp.port = 9002;
 
     this.codecs = [ "pcmu" ];
+    this.sessionidcounter = 0;
 
     this.handlers.PUT.dialog = ( pathparts, req, res, body ) =>
     {
@@ -600,7 +728,7 @@ request object
       request.maxforwards = 70;
     }
 
-    this.createchannel( request, () =>
+    this.createchannel( request, ( channel ) =>
     {
       if( !( "sdp" in request ) )
       {
@@ -612,12 +740,13 @@ request object
         return;
       }
 
+      c.metadata.channel = channel;
+
       this.sipserver( request, "/dialog/invite", "POST", ( response ) =>
       {
         if( 200 == response.code )
         {
           c.callinfo.callid = response.json.callid;
-          c.callinfo.oursdp = request.sdp;
 
           this.calls[ c.callinfo.callid ] = c;
 
@@ -634,9 +763,14 @@ request object
         else
         {
           c.error = { code: response.code, message: response.message };
-          for( var i = 0; i < c.onnewcallcallbacks.length; i++ )
+          for( var i = 0; i < this.onnewcallcallbacks.length; i ++ )
           {
-            c.onnewcallcallbacks[ i ].call( c, c );
+            this.onnewcallcallbacks[ i ].call( c, c );
+          }
+
+          for( var i = 0; i < c.onnewcallcallback.length; i++ )
+          {
+            c.onnewcallcallback[ i ].call( c, c );
           }
         }
       } );
@@ -647,20 +781,31 @@ request object
 
 /*!md
 # createchannel
-Negotiates a channel with an RTP server then creates the corrosponding SDP object with CODECS requested.
+Negotiates a channel with an RTP server then creates the corrosponding SDP object with CODECS requested. The SDP object is added to the request (as it is required in the SIP INVITE) and then we pass in the channel object to the callback. Currently our RTP servers return:
+{
+  ip: "",
+  port: 10000,
+  channel: "uuid"
+}
 */
   createchannel( request, callback )
   {
-    this.rtpserver( {}, "/channel/", "POST", ( response ) =>
+    this.server( {}, "/channel/", "POST", this.rtp, ( response ) =>
     {
       if( 200 == response.code )
       {
+        var ch = {};
+        ch.ip = response.json.ip;
+        ch.port = response.json.port;
+        ch.control = this.rtp;
+        ch.uuid = response.json.channel;
+
         request.sdp = {
           v: 0,
           t: { start: 0, stop: 0 },
           o: {
             username: "-",
-            sessionid: 1234112, /* TODO - make dynamic */
+            sessionid: this.sessionidcounter,
             sessionversion: 0,
             nettype: "IN",
             ipver: 4,
@@ -690,6 +835,7 @@ Negotiates a channel with an RTP server then creates the corrosponding SDP objec
         {
           request.codecs = this.codecs;
         }
+        ch.codecs = request.codecs;
 
         if( Array.isArray( request.codecs ) )
         {
@@ -698,9 +844,11 @@ Negotiates a channel with an RTP server then creates the corrosponding SDP objec
             this.addmedia( request.sdp, request.codecs[ i ] );
           }
         }
+
+        this.sessionidcounter = ( this.sessionidcounter + 1 ) % 4294967296;
       }
 
-      callback();
+      callback( ch );
     } );
   }
 
