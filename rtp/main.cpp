@@ -69,12 +69,12 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
   path.erase( 0, 1 ); /* remove the leading / */
   stringvector pathparts = splitstring( path, '/' );
 
-
+  int method = request.getmethod();
   if( "channel" == pathparts[ 0 ] )
   {
     if( 1 == pathparts.size() )
     {
-      if( projectwebdocument::POST == request.getmethod() )
+      if( projectwebdocument::POST == method )
       {
         JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
         if( !body.has_key( "channel" ) )
@@ -107,10 +107,54 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
           return;
         }
       }
+      else if( projectwebdocument::DELETE == method )
+      {
+        JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
+        if ( body.has_key( "channel" ) )
+        {
+          std::string channel = JSON::as_string( body[ "channel" ] );
+          activertpchannels::iterator chan = activechannels.find( channel );
+          if ( activechannels.end() != chan )
+          {
+            chan->second->close();
+            activechannels.erase( chan );
+            dormantchannels.push_back( chan->second );
+
+            response.setstatusline( 200, "Ok" );
+            response.addheader( projectwebdocument::Content_Length, "0" );
+            return;
+          }
+        }
+      }
     }
     else if( pathparts.size() > 1 && "bridge"  == pathparts[ 1 ] )
     {
-      return;
+      if( projectwebdocument::POST == method )
+      {
+        JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
+        if ( body.has_key( "channels" ) )
+        {
+          JSON::Array channels = JSON::as_array( body[ "channels" ] );
+          if( 2 == channels.values.size() )
+          {
+            std::string uuid1 = JSON::as_string( channels.values[ 0 ] );
+            std::string uuid2 = JSON::as_string( channels.values[ 1 ] );
+
+            activertpchannels::iterator chan1 = activechannels.find( uuid1 );
+            activertpchannels::iterator chan2 = activechannels.find( uuid2 );
+
+            if ( activechannels.end() != chan1  && activechannels.end() != chan2 )
+            {
+              chan1->second->bridgeto( chan2->second );
+              chan2->second->bridgeto( chan1->second );
+
+              response.setstatusline( 200, "Ok" );
+              response.addheader( projectwebdocument::Content_Length, "0" );
+              return;
+            }
+          }
+        }
+      }
     }
   }
 

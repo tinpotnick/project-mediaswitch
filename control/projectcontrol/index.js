@@ -249,7 +249,20 @@ request = { codecs: [ 'pcmu' ] }
 
     this.control.createchannel( request, ( channel ) =>
     {
+      if ( undefined == channel )
+      {
+        return;
+      }
+      
       this.metadata.channel = channel;
+
+      this.onhangup = () =>
+      {
+        this.control.server( { "channel": channel.uuid }, "/channel/", "DELETE", this.metadata.channel.control, ( response ) =>
+        {
+
+        } );
+      }
       this.postrequest( "answer", { "sdp": request.sdp } );
     } );
   }

@@ -10,6 +10,9 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <stdint.h>
+#include <arpa/inet.h>
+
 #define RTPMAXLENGTH 1500
 #define RTCPMAXLENGTH 1500
 
@@ -53,6 +56,8 @@ public:
 
   short getport( void );
 
+  void bridgeto( pointer other );
+
 private:
   short port;
   boost::asio::ip::udp::socket rtpsocket;
@@ -72,22 +77,16 @@ private:
   void handlertpdata( void );
   void handlertcpdata( void );
 
-  /*
-    For the following to works:
-    char = 8 bits
-    short = 16 bits
-    int= 32 bits
-  */
-  inline unsigned char getpacketversion( unsigned char *pk );
-  inline unsigned char getpacketpadding( unsigned char *pk );
-  inline unsigned char getpacketextension( unsigned char *pk );
-  inline unsigned char getpacketcsrccount( unsigned char *pk );
-  inline unsigned char getpacketmarker( unsigned char *pk );
-  inline unsigned char getpayloadtype( unsigned char *pk );
-  inline unsigned short getsequencenumber( unsigned char *pk );
-  inline unsigned int gettimestamp( unsigned char *pk );
-  inline unsigned int getssrc( unsigned char *pk );
-  inline unsigned int getcsrc( unsigned char *pk, unsigned char index );
+  inline uint8_t getpacketversion( uint8_t *pk );
+  inline uint8_t getpacketpadding( uint8_t *pk );
+  inline uint8_t getpacketextension( uint8_t *pk );
+  inline uint8_t getpacketcsrccount( uint8_t *pk );
+  inline uint8_t getpacketmarker( uint8_t *pk );
+  inline uint8_t getpayloadtype( uint8_t *pk );
+  inline uint16_t getsequencenumber( uint8_t *pk );
+  inline uint32_t gettimestamp( uint8_t *pk );
+  inline uint32_t getssrc( uint8_t *pk );
+  inline uint32_t getcsrc( uint8_t *pk, uint8_t index );
 
 };
 

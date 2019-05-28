@@ -180,8 +180,9 @@ We have received some RTP data - now do something with it.
 void projectrtpchannel::handlertpdata( void )
 {
   /* first check we have received the correct one and move if necessary */
-  unsigned char ver = this->getpacketversion( &this->rtpdata[ this->rtpindex ] );
-  std::cout << "rtp:" << static_cast<unsigned>( ver ) << std::endl;
+  uint32_t ts = this->gettimestamp( &this->rtpdata[ this->rtpindex ] );
+  uint8_t cccount = this->getpacketcsrccount( &this->rtpdata[ this->rtpindex ] );
+  std::cout << "rtp:" << static_cast<unsigned>( cccount ) << ":" << ts << std::endl;
 }
 
 /*!md
@@ -194,10 +195,19 @@ void projectrtpchannel::handlertcpdata( void )
 }
 
 /*!md
+# bridgeto
+Another channel we write data to.
+*/
+void projectrtpchannel::bridgeto( pointer other )
+{
+
+}
+
+/*!md
 # getpacketversion
 As it says.
 */
-unsigned char projectrtpchannel::getpacketversion( unsigned char *pk )
+uint8_t projectrtpchannel::getpacketversion( uint8_t *pk )
 {
   return ( pk[ 0 ] & 0xb0 ) >> 6;
 }
@@ -206,7 +216,7 @@ unsigned char projectrtpchannel::getpacketversion( unsigned char *pk )
 # getpacketpadding
 As it says.
 */
-unsigned char projectrtpchannel::getpacketpadding( unsigned char *pk )
+uint8_t projectrtpchannel::getpacketpadding( uint8_t *pk )
 {
   return ( pk[ 0 ] & 0x20 ) >> 5;
 }
@@ -215,7 +225,7 @@ unsigned char projectrtpchannel::getpacketpadding( unsigned char *pk )
 # getpacketextension
 As it says.
 */
-unsigned char projectrtpchannel::getpacketextension( unsigned char *pk )
+uint8_t projectrtpchannel::getpacketextension( uint8_t *pk )
 {
   return ( pk[ 0 ] & 0x10 ) >> 4;
 }
@@ -224,7 +234,7 @@ unsigned char projectrtpchannel::getpacketextension( unsigned char *pk )
 # getpacketcsrccount
 As it says.
 */
-unsigned char projectrtpchannel::getpacketcsrccount( unsigned char *pk )
+uint8_t projectrtpchannel::getpacketcsrccount( uint8_t *pk )
 {
   return ( pk[ 0 ] & 0x0f );
 }
@@ -233,7 +243,7 @@ unsigned char projectrtpchannel::getpacketcsrccount( unsigned char *pk )
 # getpacketmarker
 As it says.
 */
-unsigned char projectrtpchannel::getpacketmarker( unsigned char *pk )
+uint8_t projectrtpchannel::getpacketmarker( uint8_t *pk )
 {
   return ( pk[ 1 ] & 0x80 ) >> 7;
 }
@@ -242,7 +252,7 @@ unsigned char projectrtpchannel::getpacketmarker( unsigned char *pk )
 # getpayloadtype
 As it says.
 */
-unsigned char projectrtpchannel::getpayloadtype( unsigned char *pk )
+uint8_t projectrtpchannel::getpayloadtype( uint8_t *pk )
 {
   return ( pk[ 1 ] & 0x7f );
 }
@@ -251,33 +261,33 @@ unsigned char projectrtpchannel::getpayloadtype( unsigned char *pk )
 # getsequencenumber
 As it says.
 */
-unsigned short projectrtpchannel::getsequencenumber( unsigned char *pk )
+uint16_t projectrtpchannel::getsequencenumber( uint8_t *pk )
 {
-  unsigned short *tmp = ( unsigned short * )pk;
+  uint16_t *tmp = ( uint16_t * )pk;
   tmp++;
-  return *tmp;
+  return ntohs( *tmp );
 }
 
 /*!md
 # gettimestamp
 As it says.
 */
-unsigned int projectrtpchannel::gettimestamp( unsigned char *pk )
+uint32_t projectrtpchannel::gettimestamp( uint8_t *pk )
 {
-  unsigned int *tmp = ( unsigned int * )pk;
+  uint32_t *tmp = ( uint32_t * )pk;
   tmp++;
-  return *tmp;
+  return ntohl( *tmp );
 }
 
 /*!md
 # getssrc
 As it says.
 */
-unsigned int projectrtpchannel::getssrc( unsigned char *pk )
+uint32_t projectrtpchannel::getssrc( uint8_t *pk )
 {
-  unsigned int *tmp = ( unsigned int * )pk;
+  uint32_t *tmp = ( uint32_t * )pk;
   tmp += 2;
-  return *tmp;
+  return ntohl( *tmp );
 }
 
 /*!md
@@ -286,9 +296,9 @@ As it says. Use getpacketcsrccount to return the number of available
 0-15. This function doesn't check bounds.
 
 */
-unsigned int projectrtpchannel::getcsrc( unsigned char *pk, unsigned char index )
+uint32_t projectrtpchannel::getcsrc( uint8_t *pk, uint8_t index )
 {
-  unsigned int *tmp = ( unsigned int * )pk;
+  uint32_t *tmp = ( uint32_t * )pk;
   tmp += 3 + index;
-  return *tmp;
+  return ntohl( *tmp );
 }
