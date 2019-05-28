@@ -21,7 +21,6 @@ Constructor
 Updated: 23.01.2019
 */
 projectsipdialog::projectsipdialog() :
-  laststate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
   nextstate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
   controlrequest( projecthttpclient::create( io_service ) ),
   timer( io_service ),
@@ -1083,7 +1082,6 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
 
   this->invitepk = invite;
 
-  this->laststate = std::bind( &projectsipdialog::waitforinviteprogress, this, std::placeholders::_1 );
   this->nextstate = std::bind( &projectsipdialog::waitforinviteprogress, this, std::placeholders::_1 );
 
 }

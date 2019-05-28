@@ -63,7 +63,7 @@ public:
   /* outbound invite */
   void waitforinviteprogress( projectsippacket::pointer pk );
 
-  std::function<void ( projectsippacket::pointer pk ) > laststate;
+  /* Our state */
   std::function<void ( projectsippacket::pointer pk ) > nextstate;
 
   /* non state function */
