@@ -58,13 +58,22 @@ public:
 
   void bridgeto( pointer other );
 
+  void writepacket( uint8_t *pk, size_t length );
+  void handlesend(
+        const boost::system::error_code& error,
+        std::size_t bytes_transferred);
+
 private:
+  projectrtpchannel::pointer bridgedto;
   short port;
   boost::asio::ip::udp::socket rtpsocket;
   boost::asio::ip::udp::socket rtcpsocket;
 
   boost::asio::ip::udp::endpoint rtpsenderendpoint;
+  boost::asio::ip::udp::endpoint confirmedrtpsenderendpoint;
   boost::asio::ip::udp::endpoint rtcpsenderendpoint;
+
+  bool receivedrtp;
 
   unsigned char *rtpdata;
   unsigned char *rtcpdata;
@@ -74,19 +83,19 @@ private:
   void readsomertp( void );
   void readsomertcp( void );
 
-  void handlertpdata( void );
+  void handlertpdata( std::size_t );
   void handlertcpdata( void );
 
-  inline uint8_t getpacketversion( uint8_t *pk );
-  inline uint8_t getpacketpadding( uint8_t *pk );
-  inline uint8_t getpacketextension( uint8_t *pk );
-  inline uint8_t getpacketcsrccount( uint8_t *pk );
-  inline uint8_t getpacketmarker( uint8_t *pk );
-  inline uint8_t getpayloadtype( uint8_t *pk );
-  inline uint16_t getsequencenumber( uint8_t *pk );
-  inline uint32_t gettimestamp( uint8_t *pk );
-  inline uint32_t getssrc( uint8_t *pk );
-  inline uint32_t getcsrc( uint8_t *pk, uint8_t index );
+  uint8_t getpacketversion( uint8_t *pk );
+  uint8_t getpacketpadding( uint8_t *pk );
+  uint8_t getpacketextension( uint8_t *pk );
+  uint8_t getpacketcsrccount( uint8_t *pk );
+  uint8_t getpacketmarker( uint8_t *pk );
+  uint8_t getpayloadtype( uint8_t *pk );
+  uint16_t getsequencenumber( uint8_t *pk );
+  uint32_t gettimestamp( uint8_t *pk );
+  uint32_t getssrc( uint8_t *pk );
+  uint32_t getcsrc( uint8_t *pk, uint8_t index );
 
 };
 

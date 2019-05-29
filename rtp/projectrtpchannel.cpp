@@ -2,11 +2,22 @@
 
 #include <iostream>
 
+#include <boost/bind.hpp>
+
 
 #include "projectrtpchannel.h"
 
 /*!md
-# projectrtpchannel constructor
+# Project RTP Channel
+
+This file (class) represents an RP channel. That is an RTP stream (UDP) with its pair RTCP socket. Basic functions for
+
+1. Opening and closing channels
+2. bridging 2 channels
+3. Sending data to an endpoint based on us receiving data first or (to be implimented) the address and port given to us when opening in the channel.
+
+
+## projectrtpchannel constructor
 Create the socket then wait for data
 
 echo "This is my data" > /dev/udp/127.0.0.1/10000
@@ -15,6 +26,7 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, short
   : port( port ),
   rtpsocket( io_service ),
   rtcpsocket( io_service ),
+  receivedrtp( false ),
   rtpdata( NULL ),
   rtcpdata( NULL ),
   rtpindex( 0 )
@@ -22,7 +34,7 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, short
 }
 
 /*!md
-# projectrtpchannel destructor
+## projectrtpchannel destructor
 Clean up
 */
 projectrtpchannel::~projectrtpchannel( void )
@@ -48,7 +60,7 @@ projectrtpchannel::pointer projectrtpchannel::create( boost::asio::io_service &i
 }
 
 /*!md
-# open
+## open
 Open the channel to read network data. Setup memory and pointers.
 */
 void projectrtpchannel::open( int codec )
@@ -89,6 +101,8 @@ void projectrtpchannel::open( int codec )
   this->rtcpsocket.bind( boost::asio::ip::udp::endpoint(
       boost::asio::ip::udp::v4(), this->port + 1 ) );
 
+  this->receivedrtp = false;
+
   this->readsomertp();
   this->readsomertcp();
 }
@@ -99,7 +113,7 @@ short projectrtpchannel::getport( void )
 }
 
 /*!md
-# close
+## close
 Closes the channel.
 */
 void projectrtpchannel::close( void )
@@ -108,6 +122,7 @@ void projectrtpchannel::close( void )
   {
     this->rtpsocket.close();
     this->rtcpsocket.close();
+    this->bridgedto.reset();
   }
   catch(...)
   {
@@ -128,18 +143,25 @@ void projectrtpchannel::close( void )
 }
 
 /*!md
-# handlereadsomertp
+## handlereadsomertp
 Wait for RTP data. We have to re-order when required.
 */
 void projectrtpchannel::readsomertp( void )
 {
   this->rtpsocket.async_receive_from(
-    boost::asio::buffer( &this->rtpdata[ this->rtpindex ], RTPMAXLENGTH ), this->rtpsenderendpoint,
+    boost::asio::buffer( &this->rtpdata[ this->rtpindex ], RTPMAXLENGTH ),
+                          this->rtpsenderendpoint,
       [ this ]( boost::system::error_code ec, std::size_t bytes_recvd )
       {
         if ( !ec && bytes_recvd > 0 && bytes_recvd <= RTPMAXLENGTH )
         {
-          this->handlertpdata();
+          if( !this->receivedrtp )
+          {
+            this->confirmedrtpsenderendpoint = this->rtpsenderendpoint;
+            this->receivedrtp = true;
+          }
+
+          this->handlertpdata( bytes_recvd );
           this->rtpindex = ( this->rtpindex + 1 ) % BUFFERPACKETCOUNT;
         }
 
@@ -151,7 +173,7 @@ void projectrtpchannel::readsomertp( void )
 }
 
 /*!md
-# handlereadsomertcp
+## handlereadsomertcp
 Wait for RTP data
 */
 void projectrtpchannel::readsomertcp( void )
@@ -174,19 +196,56 @@ void projectrtpchannel::readsomertcp( void )
 
 
 /*!md
-# handlertpdata
+## handlertpdata
 We have received some RTP data - now do something with it.
 */
-void projectrtpchannel::handlertpdata( void )
+void projectrtpchannel::handlertpdata( std::size_t length )
 {
   /* first check we have received the correct one and move if necessary */
   uint32_t ts = this->gettimestamp( &this->rtpdata[ this->rtpindex ] );
   uint8_t cccount = this->getpacketcsrccount( &this->rtpdata[ this->rtpindex ] );
   std::cout << "rtp:" << static_cast<unsigned>( cccount ) << ":" << ts << std::endl;
+
+  if( this->bridgedto )
+  {
+    std::cout << "yeay" << std::endl;
+    this->bridgedto->writepacket( &this->rtpdata[ this->rtpindex ], length );
+  }
 }
 
 /*!md
-# handlertcpdata
+## writepacket
+Send a [RTP] packet to our endpoint.
+*/
+void projectrtpchannel::writepacket( uint8_t *pk, size_t length )
+{
+  if( !this->receivedrtp )
+  {
+    return;
+  }
+
+  this->rtpsocket.async_send_to(
+                    boost::asio::buffer( pk, length ),
+                    this->confirmedrtpsenderendpoint,
+                    boost::bind( &projectrtpchannel::handlesend,
+                                  this,
+                                  boost::asio::placeholders::error,
+                                  boost::asio::placeholders::bytes_transferred ) );
+}
+
+/*!md
+## handlesend
+What is called once we have sent something.
+*/
+void projectrtpchannel::handlesend(
+      const boost::system::error_code& error,
+      std::size_t bytes_transferred)
+{
+
+}
+
+/*!md
+## handlertcpdata
 We have received some RTCP data - now do something with it.
 */
 void projectrtpchannel::handlertcpdata( void )
@@ -195,16 +254,16 @@ void projectrtpchannel::handlertcpdata( void )
 }
 
 /*!md
-# bridgeto
+## bridgeto
 Another channel we write data to.
 */
 void projectrtpchannel::bridgeto( pointer other )
 {
-
+  this->bridgedto = other;
 }
 
 /*!md
-# getpacketversion
+## getpacketversion
 As it says.
 */
 uint8_t projectrtpchannel::getpacketversion( uint8_t *pk )
@@ -213,7 +272,7 @@ uint8_t projectrtpchannel::getpacketversion( uint8_t *pk )
 }
 
 /*!md
-# getpacketpadding
+## getpacketpadding
 As it says.
 */
 uint8_t projectrtpchannel::getpacketpadding( uint8_t *pk )
@@ -222,7 +281,7 @@ uint8_t projectrtpchannel::getpacketpadding( uint8_t *pk )
 }
 
 /*!md
-# getpacketextension
+## getpacketextension
 As it says.
 */
 uint8_t projectrtpchannel::getpacketextension( uint8_t *pk )
@@ -231,7 +290,7 @@ uint8_t projectrtpchannel::getpacketextension( uint8_t *pk )
 }
 
 /*!md
-# getpacketcsrccount
+## getpacketcsrccount
 As it says.
 */
 uint8_t projectrtpchannel::getpacketcsrccount( uint8_t *pk )
@@ -240,7 +299,7 @@ uint8_t projectrtpchannel::getpacketcsrccount( uint8_t *pk )
 }
 
 /*!md
-# getpacketmarker
+## getpacketmarker
 As it says.
 */
 uint8_t projectrtpchannel::getpacketmarker( uint8_t *pk )
@@ -249,7 +308,7 @@ uint8_t projectrtpchannel::getpacketmarker( uint8_t *pk )
 }
 
 /*!md
-# getpayloadtype
+## getpayloadtype
 As it says.
 */
 uint8_t projectrtpchannel::getpayloadtype( uint8_t *pk )
@@ -258,7 +317,7 @@ uint8_t projectrtpchannel::getpayloadtype( uint8_t *pk )
 }
 
 /*!md
-# getsequencenumber
+## getsequencenumber
 As it says.
 */
 uint16_t projectrtpchannel::getsequencenumber( uint8_t *pk )
@@ -269,7 +328,7 @@ uint16_t projectrtpchannel::getsequencenumber( uint8_t *pk )
 }
 
 /*!md
-# gettimestamp
+## gettimestamp
 As it says.
 */
 uint32_t projectrtpchannel::gettimestamp( uint8_t *pk )
@@ -280,7 +339,7 @@ uint32_t projectrtpchannel::gettimestamp( uint8_t *pk )
 }
 
 /*!md
-# getssrc
+## getssrc
 As it says.
 */
 uint32_t projectrtpchannel::getssrc( uint8_t *pk )
@@ -291,7 +350,7 @@ uint32_t projectrtpchannel::getssrc( uint8_t *pk )
 }
 
 /*!md
-# getcsrc
+## getcsrc
 As it says. Use getpacketcsrccount to return the number of available
 0-15. This function doesn't check bounds.
 

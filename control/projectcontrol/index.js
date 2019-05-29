@@ -242,18 +242,16 @@ request = { codecs: [ 'pcmu' ] }
 */
   answer( request )
   {
-    if( undefined == request )
-    {
-      request = {};
-    }
+    if( undefined == request ) request = {};
 
     this.control.createchannel( request, ( channel ) =>
     {
       if ( undefined == channel )
       {
+        this.hangup();
         return;
       }
-      
+
       this.metadata.channel = channel;
 
       this.onhangup = () =>
@@ -269,10 +267,7 @@ request = { codecs: [ 'pcmu' ] }
 
   ring( alertinfo )
   {
-    if( this.ringing || this.answered )
-    {
-      return;
-    }
+    if( this.ringing || this.answered ) return;
 
     var postdata = {};
 
@@ -286,40 +281,28 @@ request = { codecs: [ 'pcmu' ] }
 
   notfound()
   {
-    if( this.hungup )
-    {
-      return;
-    }
+    if( this.hungup ) return;
 
     this.postrequest( "hangup", { "reason": "Not found", "code": 404 } );
   }
 
   paymentrequired()
   {
-    if( this.hungup )
-    {
-      return;
-    }
+    if( this.hungup ) return;
 
     this.postrequest( "hangup", { "reason": "Payment required", "code": 402 } );
   }
 
   busy()
   {
-    if( this.hungup )
-    {
-      return;
-    }
+    if( this.hungup ) return;
 
     this.postrequest( "hangup", { "reason": "Busy here", "code": 486 } );
   }
 
   hangup()
   {
-    if( this.hungup )
-    {
-      return;
-    }
+    if( this.hungup ) return;
 
     this.postrequest( "hangup", {} );
   }
@@ -381,20 +364,9 @@ TODO
     request.from.domain = this.callinfo.domain;
     request.from.user = this.callinfo.from;
 
-    if( !( "cid" in request ) )
-    {
-      request.cid = {};
-    }
-
-    if( !( "number" in request.cid ) )
-    {
-      request.cid.number = request.from.user;
-    }
-
-    if( !( "name" in request.cid ) )
-    {
-      request.cid.name = request.from.user;
-    }
+    if( !( "cid" in request ) ) request.cid = {};
+    if( !( "number" in request.cid ) ) request.cid.number = request.from.user;
+    if( !( "name" in request.cid ) ) request.cid.name = request.from.user;
 
     var call = this.control.newcall( request );
     call.metadata.family.parent = this;
@@ -424,10 +396,8 @@ TODO
       call.metadata.family.parent.metadata.family.children = filtered;
 
       /* We may want to alter this. There may be occasions where we wish further processing of the originating call after any child may hang up. The reason could be passed back into hanup of the parent who then makes the decision. */
-      if( 0 == filtered.length )
-      {
-        call.metadata.family.parent.hangup();
-      }
+      if( 0 == filtered.length ) call.metadata.family.parent.hangup();
+
     }
 
     this.onhangup = () =>
@@ -682,10 +652,7 @@ Send a request to our rtp server. This is work in progress. Simple for now but t
     {
       req.on( "data", ( chunk ) =>
       {
-        if( !( "bodyparts" in this ) )
-        {
-          this.collatedbody = [];
-        }
+        if( !( "collatedbody" in this ) ) this.collatedbody = [];
         this.collatedbody.push( chunk );
       } );
 
@@ -746,10 +713,7 @@ request object
   {
     var c = new call( this, { originator: true } );
 
-    if( !( "maxforwards" in request ) )
-    {
-      request.maxforwards = 70;
-    }
+    if( !( "maxforwards" in request ) ) request.maxforwards = 70;
 
     this.createchannel( request, ( channel ) =>
     {
@@ -854,10 +818,8 @@ Negotiates a channel with an RTP server then creates the corrosponding SDP objec
             ]
         };
 
-        if( !( "codecs" in request ) )
-        {
-          request.codecs = this.codecs;
-        }
+        if( !( "codecs" in request ) ) request.codecs = this.codecs;
+
         ch.codecs = request.codecs;
 
         if( Array.isArray( request.codecs ) )
