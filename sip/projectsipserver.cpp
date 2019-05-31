@@ -9,23 +9,23 @@
 #include "projectsipsm.h"
 #include "projectsipdirectory.h"
 
-/*******************************************************************************
-Function: projectsipserver constructor
-Purpose: Create the socket then wait for data
-Updated: 12.12.2018
+/*!md
+## projectsipserver constructor
+Create the socket then wait for data
+
 echo "This is my data" > /dev/udp/127.0.0.1/5060
-*******************************************************************************/
+*/
 projectsipserver::projectsipserver( boost::asio::io_service &io_service, short port )
   : socket( io_service, boost::asio::ip::udp::endpoint( boost::asio::ip::udp::v4(), port ) )
 {
   this->handlereadsome();
 }
 
-/*******************************************************************************
-Function: handlereadsome
-Purpose: Wait for data
-Updated: 12.12.2018
-*******************************************************************************/
+/*!md
+## handlereadsome
+Wait for data
+
+*/
 void projectsipserver::handlereadsome( void )
 {
   socket.async_receive_from(
@@ -46,11 +46,11 @@ void projectsipserver::handlereadsome( void )
 }
 
 
-/*******************************************************************************
-Function: handledata
-Purpose: Do something with the data.
-Updated: 12.12.2018
-*******************************************************************************/
+/*!md
+## handledata
+Do something with the data.
+
+*/
 void projectsipserver::handledata( void )
 {
   //std::cout << "Peer IP: " << this->sender_endpoint.address().to_string() << std::endl;
@@ -69,24 +69,26 @@ void projectsipserver::handledata( void )
 
 }
 
-/*******************************************************************************
-Function: respond
-Purpose: Called by our state machine in response to timers/data etc.
-Updated: 03.01.2019
-*******************************************************************************/
+/*!md
+## respond
+Called by our state machine in response to timers/data etc.
+
+*/
 void projectsipserverpacket::respond( stringptr doc )
 {
   sipserver->getsocket()->async_send_to( boost::asio::buffer( *doc ), this->sender_endpoint,
-          boost::bind( &projectsipserverpacket::handlesend, this, doc,
+          boost::bind( &projectsipserverpacket::handlesend,
+            shared_from_this(),
+            doc,
             boost::asio::placeholders::error,
             boost::asio::placeholders::bytes_transferred) );
 }
 
-/*******************************************************************************
-Function: handlesend
-Purpose: Just placeholder for now - we should perhaps track errors.
-Updated: 03.01.2019
-*******************************************************************************/
+/*!md
+## handlesend
+Just placeholder for now - we should perhaps track errors.
+
+*/
 void projectsipserverpacket::handlesend( boost::shared_ptr<std::string> message,
       const boost::system::error_code& error,
       std::size_t bytes_transferred)

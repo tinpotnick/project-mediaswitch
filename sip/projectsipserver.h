@@ -10,14 +10,13 @@
 #include "projectsippacket.h"
 
 
-/*******************************************************************************
-Class: projectsipserver
-Purpose: Our simple UDP SIP server
-Updated: 12.12.2018
-*******************************************************************************/
-class projectsipserver
+/*!md
+# projectsipserver
+Our simple UDP SIP server
+*/
+class projectsipserver :
+  public boost::enable_shared_from_this< projectsipserver >
 {
-
 public:
   projectsipserver( boost::asio::io_service &io_service, short port );
   boost::asio::ip::udp::socket *getsocket( void ){ return &this->socket; }
@@ -34,13 +33,13 @@ private:
 };
 
 
-/*******************************************************************************
-Class: projectsipserverpacket
-Purpose: Used to parse SIP packets - but allows us to send the response to
-the correct place.
-Updated: 03.01.2019
-*******************************************************************************/
-class projectsipserverpacket : public projectsippacket
+/*!md
+# projectsipserverpacket
+Used to parse SIP packets - but allows us to send the response to the correct place.
+*/
+class projectsipserverpacket :
+  public projectsippacket,
+  public boost::enable_shared_from_this< projectsipserverpacket >
 {
 public:
   projectsipserverpacket( projectsipserver *sipserver, boost::asio::ip::udp::endpoint sender_endpoint, stringptr pk ) :

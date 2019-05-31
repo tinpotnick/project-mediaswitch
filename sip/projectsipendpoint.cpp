@@ -13,6 +13,9 @@ projectsipendpoint::projectsipendpoint() :
 
 }
 
+projectsipendpoint::~projectsipendpoint()
+{
+}
 
 /*!md
 # sendpk
@@ -64,11 +67,48 @@ bool projectsipendpoint::sendpk( projectsippacket::pointer pk )
     this->errorreason = "To user not found";
     return false;
   }
+std::cout << "attempting resolve" << std::endl;
+  if( !this->srvresolver )
+  {
+    this->srvresolver = projectsipdnssrvresolver::create();
+  }
+std::cout << "resolver created" << std::endl;
+  this->srvresolver->query( std::string( "_sip._udp." ) + pk->gethost().str(), std::bind( &projectsipendpoint::handlesrvresolve, this, std::placeholders::_1 ) );
+std::cout << "query ran" << std::endl;
 
 #warning TODO - DNS implimentation.
   /* Failing all of the above, we need perform DNS. */
   this->errorcode = 500;
   this->errorreason = "External calls not yet impl";
+
+  /* Delay the release of this object in case we get a response from our DNS resolver */
+  //this->locker = us.lock();
+
+  // we can only destroy ourselves once the callback has happened.
   return false;
 
+}
+
+void projectsipendpoint::handlesrvresolve( dnssrvrealm::pointer answer )
+{
+  std::cout << "handlesrvresolve" << std::endl;
+  if( answer )
+  {
+    std::cout << answer->realm << std::endl;
+
+    dnssrvrecords::iterator it;
+    for( it = answer->records.begin(); it != answer->records.end(); it++ )
+    {
+      std::cout << it->host << std::endl;
+      std::cout << it->priority << std::endl;
+      std::cout << it->weight << std::endl;
+      std::cout << it->port << std::endl;
+      std::cout << it->expires << std::endl;
+      std::cout << it->port << std::endl;
+    }
+
+  }
+
+  /* We should be ok to free us if we are no longer being tracked elsewhere */
+  //this->locker.reset();
 }

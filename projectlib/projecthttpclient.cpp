@@ -8,21 +8,21 @@
 #include <iostream>
 
 
-/*******************************************************************************
-Function: create
-Purpose: Static function to create a shared pointer.
-Updated: 18.01.2019
-*******************************************************************************/
+/*!md
+## create
+Static function to create a shared pointer.
+
+*/
 projecthttpclient::pointer projecthttpclient::create( boost::asio::io_context& iocontext )
 {
   return pointer( new projecthttpclient( iocontext ) );
 }
 
-/*******************************************************************************
-Function: projecthttpclient
-Purpose: Constructor
-Updated: 18.01.2019
-*******************************************************************************/
+/*!md
+## projecthttpclient
+Constructor
+
+*/
 projecthttpclient::projecthttpclient( boost::asio::io_service &ioservice ) :
   ioservice( ioservice ),
   socket( ioservice ),
@@ -32,32 +32,32 @@ projecthttpclient::projecthttpclient( boost::asio::io_service &ioservice ) :
 {
 }
 
-/*******************************************************************************
-Function: projecthttpclient
-Purpose: Destructor
-Updated: 29.01.2019
-*******************************************************************************/
+/*!md
+## projecthttpclient
+Destructor
+
+*/
 projecthttpclient::~projecthttpclient()
 {
 }
 
 
-/*******************************************************************************
-Function: asynccancel
-Purpose: Cancel any requests
-Updated: 06.02.2019
-*******************************************************************************/
+/*!md
+## asynccancel
+Cancel any requests
+
+*/
 void projecthttpclient::asynccancel( void )
 {
   this->callback = std::bind( &projecthttpclient::nullfunction, this, std::placeholders::_1 );
   this->timer.cancel();
 }
 
-/*******************************************************************************
-Function: asyncrequest
-Purpose: Make a HTTP request with callback.
-Updated: 18.01.2019
-*******************************************************************************/
+/*!md
+## asyncrequest
+Make a HTTP request with callback.
+
+*/
 void projecthttpclient::asyncrequest( projectwebdocumentptr request,
       std::function< void ( int errorcode ) > callback )
 {
@@ -70,8 +70,6 @@ void projecthttpclient::asyncrequest( projectwebdocumentptr request,
   this->timer.async_wait( boost::bind( &projecthttpclient::handletimeout,
                                         shared_from_this(),
                                         boost::asio::placeholders::error ) );
-
-  boost::asio::ip::tcp::resolver resolver( this->ioservice );
 
   std::string port = "80";
   if( 0 != this->uri.port.end() )
@@ -98,11 +96,11 @@ void projecthttpclient::asyncrequest( projectwebdocumentptr request,
   }
 }
 
-/*******************************************************************************
-Function: handleresolve
-Purpose: We have resolved (or not)
-Updated: 18.01.2019
-*******************************************************************************/
+/*!md
+## handleresolve
+We have resolved (or not)
+
+*/
 void projecthttpclient::handleresolve(
             boost::system::error_code e,
             boost::asio::ip::tcp::resolver::iterator it )
@@ -122,11 +120,11 @@ void projecthttpclient::handleresolve(
 
 }
 
-/*******************************************************************************
-Function: handleread
-Purpose: Our read handler.
-Updated: 29.01.2019
-*******************************************************************************/
+/*!md
+## handleread
+Our read handler.
+
+*/
 void projecthttpclient::handleconnect( boost::system::error_code errorcode )
 {
   if( errorcode != boost::asio::error::already_connected && errorcode )
@@ -146,11 +144,11 @@ void projecthttpclient::handleconnect( boost::system::error_code errorcode )
           boost::asio::placeholders::bytes_transferred ) );
 }
 
-/*******************************************************************************
-Function: handlewrite
-Purpose: Our read handler.
-Updated: 29.01.2019
-*******************************************************************************/
+/*!md
+## handlewrite
+Our read handler.
+
+*/
 void projecthttpclient::handlewrite( boost::system::error_code errorcode, std::size_t bytestransferred )
 {
   if( errorcode )
@@ -168,11 +166,11 @@ void projecthttpclient::handlewrite( boost::system::error_code errorcode, std::s
 
 }
 
-/*******************************************************************************
-Function: handleread
-Purpose: Our read handler.
-Updated: 29.01.2019
-*******************************************************************************/
+/*!md
+## handleread
+Our read handler.
+
+*/
 void projecthttpclient::handleread( boost::system::error_code errorcode, std::size_t bytestransferred )
 {
   if( boost::asio::error::eof == errorcode )
@@ -221,11 +219,11 @@ void projecthttpclient::handleread( boost::system::error_code errorcode, std::si
   return;
 }
 
-/*******************************************************************************
-Function: handletimeout
-Purpose: Our timer callback.
-Updated: 29.01.2019
-*******************************************************************************/
+/*!md
+## handletimeout
+Our timer callback.
+
+*/
 void projecthttpclient::handletimeout( const boost::system::error_code& error )
 {
   if ( error != boost::asio::error::operation_aborted )
@@ -236,11 +234,11 @@ void projecthttpclient::handletimeout( const boost::system::error_code& error )
 }
 
 
-/*******************************************************************************
-Function: getresponse
-Purpose: Return the response document.
-Updated: 18.01.2019
-*******************************************************************************/
+/*!md
+## getresponse
+Return the response document.
+
+*/
 projectwebdocumentptr projecthttpclient::getresponse( void )
 {
   return this->response;

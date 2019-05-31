@@ -3,8 +3,6 @@
 #ifndef PROJECTSIPDIALOG_H
 #define PROJECTSIPDIALOG_H
 
-#include <boost/enable_shared_from_this.hpp>
-
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -33,14 +31,15 @@ Class to hold details about a specific dialog (INVITE).
 
 */
 class projectsipdialog :
-  public projectsipendpoint,
-  public boost::enable_shared_from_this< projectsipendpoint >
+  public projectsipendpoint
 {
 public:
   projectsipdialog();
-  ~projectsipdialog();
+  virtual ~projectsipdialog();
+
   typedef boost::shared_ptr< projectsipdialog > pointer;
   static projectsipdialog::pointer create();
+
   static bool invitesippacket( projectsippacket::pointer pk );
   static void httpget( stringvector &path, projectwebdocument &response );
   static void httpput( stringvector &path, JSON::Value &body, projectwebdocument &response );
@@ -140,7 +139,6 @@ struct projectsipdialogcallid{};
 /*!md
 # projectsipdialogs
 Boost multi index set to store our dialogs.
-
 */
 typedef boost::multi_index::multi_index_container<
   projectsipdialog::pointer,
