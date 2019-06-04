@@ -73,7 +73,12 @@ std::cout << "attempting resolve" << std::endl;
     this->srvresolver = projectsipdnssrvresolver::create();
   }
 std::cout << "resolver created" << std::endl;
-  this->srvresolver->query( std::string( "_sip._udp." ) + pk->gethost().str(), std::bind( &projectsipendpoint::handlesrvresolve, this, std::placeholders::_1 ) );
+  this->srvresolver->query( std::string( "_sip._udp." ) + pk->gethost().str(),
+                            std::bind( &projectsipendpoint::handlesrvresolve,
+                              shared_from_this(),
+                              std::placeholders::_1
+                            ) );
+
 std::cout << "query ran" << std::endl;
 
 #warning TODO - DNS implimentation.
@@ -96,17 +101,16 @@ void projectsipendpoint::handlesrvresolve( dnssrvrealm::pointer answer )
   {
     std::cout << answer->realm << std::endl;
 
-    dnssrvrecords::iterator it;
-    for( it = answer->records.begin(); it != answer->records.end(); it++ )
+    dnssrvrecord::pointer record = answer->getbestrecord();
+    if( record )
     {
-      std::cout << it->host << std::endl;
-      std::cout << it->priority << std::endl;
-      std::cout << it->weight << std::endl;
-      std::cout << it->port << std::endl;
-      std::cout << it->expires << std::endl;
-      std::cout << it->port << std::endl;
+      std::cout << record->host << std::endl;
+      std::cout << record->priority << std::endl;
+      std::cout << record->weight << std::endl;
+      std::cout << record->port << std::endl;
+      std::cout << record->ttl << std::endl;
+      std::cout << record->port << std::endl;
     }
-
   }
 
   /* We should be ok to free us if we are no longer being tracked elsewhere */

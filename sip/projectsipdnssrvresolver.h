@@ -20,6 +20,7 @@
 #include <list>
 
 #define SRVDNSSENDRECEVIEVEBUFFSIZE 1500
+#define DNSRECORDBADFOR 20
 
 typedef std::list< std::string > iplist;
 
@@ -32,24 +33,45 @@ Weight balances out between them. If one record has a weight of 60 and another 4
 
 I have not quite understood why each record has a TTL (hence expires) as they always appear to be the same which makes sense as we will perform a lookup of the whole realm again when any one of them expire.
 */
-class dnssrvrecord
+class dnssrvrecord :
+  public boost::enable_shared_from_this< dnssrvrecord >
 {
 public:
+  dnssrvrecord();
+  ~dnssrvrecord();
+
+  typedef boost::shared_ptr< dnssrvrecord > pointer;
+  static dnssrvrecord::pointer create();
+
   std::string host;
   int priority;
   int weight;
   short port;
-  time_t expires;
+  int ttl;
+  /* We have had a problem with this server - so we mark as bad for a while */
+  time_t baduntil;
+
+  void markasbad( void );
+  bool isgood( void );
 };
 
-typedef std::list< dnssrvrecord > dnssrvrecords;
-class dnssrvrealm
+typedef std::list< dnssrvrecord::pointer > dnssrvrecords;
+
+class dnssrvrealm :
+  public boost::enable_shared_from_this< dnssrvrealm >
 {
 public:
+  dnssrvrealm();
   typedef boost::shared_ptr< dnssrvrealm > pointer;
   static dnssrvrealm::pointer create();
+
+  dnssrvrecord::pointer getbestrecord( void );
+  void goexpiretimer( void );
+  void onexpiretimer( const boost::system::error_code& error );
+
   std::string realm;
   dnssrvrecords records;
+  boost::asio::steady_timer expiretimer;
 };
 
 
@@ -78,19 +100,21 @@ typedef boost::multi_index::multi_index_container<
 > dnssrvrealms;
 
 /*!md
-## projectsipdnssrvresolverinfo
+## projectsipdnssrvresolvercache
 Loads the system resolver libaries and manages the cache of lookups.
 */
-class projectsipdnssrvresolverinfo
+class projectsipdnssrvresolvercache
 {
 public:
-  projectsipdnssrvresolverinfo();
+  projectsipdnssrvresolvercache();
   iplist getdnsiplist();
 
   void addtocache( dnssrvrealm::pointer );
   dnssrvrealm::pointer getfromcache( std::string realm );
+  void removefromcache( dnssrvrealm::pointer );
 private:
   iplist dnsservers;
+  dnssrvrealms cache;
 };
 
 

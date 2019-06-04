@@ -13,7 +13,8 @@
 
 
 
-class projectsipendpoint : public boost::enable_shared_from_this< projectsipendpoint >
+class projectsipendpoint :
+  public boost::enable_shared_from_this< projectsipendpoint >
 {
 public:
   projectsipendpoint();
