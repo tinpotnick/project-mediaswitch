@@ -21,6 +21,9 @@ public:
   projectsipserver( boost::asio::io_service &io_service, short port );
   boost::asio::ip::udp::socket *getsocket( void ){ return &this->socket; }
 
+  typedef boost::shared_ptr< projectsipserver > pointer;
+  static projectsipserver::pointer create(  boost::asio::io_service &io_service, short port );
+
 private:
   boost::asio::ip::udp::socket socket;
   boost::asio::ip::udp::endpoint sender_endpoint;

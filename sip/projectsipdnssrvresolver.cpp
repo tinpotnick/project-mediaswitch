@@ -38,8 +38,8 @@ TODO
 #include <ctime>
 
 #include "projectsipdnssrvresolver.h"
+#include "globals.h"
 
-extern boost::asio::io_service io_service;
 projectsipdnssrvresolvercache dnscache;
 
 
@@ -51,7 +51,6 @@ dnssrvrecord::dnssrvrecord() :
 
 dnssrvrecord::~dnssrvrecord()
 {
-  std::cout << "~dnssrvrecord" << std::endl;
 }
 
 /*!md
@@ -169,10 +168,12 @@ void dnssrvrealm::goexpiretimer( void )
 ## onexpiretimer
 If our timer expires (or errors) then in both csaes we should simply remove us from the cache.
 */
-void dnssrvrealm::onexpiretimer( const boost::system::error_code& error )
+void dnssrvrealm::onexpiretimer( const boost::system::error_code& e )
 {
-  std::cout << "dnssrvrealm::onexpiretimer" << std::endl;
-  dnscache.removefromcache( shared_from_this() );
+  if ( e != boost::asio::error::operation_aborted )
+  {
+    dnscache.removefromcache( shared_from_this() );
+  }
 }
 
 /*!md
@@ -217,7 +218,6 @@ TODO
 */
 void projectsipdnssrvresolvercache::addtocache( dnssrvrealm::pointer realm )
 {
-std::cout << "projectsipdnssrvresolvercache::addtocache: " << realm->realm << std::endl;
   this->cache.insert( realm );
   realm->goexpiretimer();
 }
@@ -245,7 +245,6 @@ Remove our entry from teh cache.
 */
 void projectsipdnssrvresolvercache::removefromcache( dnssrvrealm::pointer r )
 {
-std::cout << "projectsipdnssrvresolvercache::removefromcache: " << r->realm << std::endl;
   dnssrvrealms::index< dnssrvrealmrealm >::type::iterator it;
   it = this->cache.get< dnssrvrealmrealm >().find( r->realm );
   if( this->cache.get< dnssrvrealmrealm >().end() != it )
@@ -261,7 +260,8 @@ Initialse and grab system DNS sevrers.
 */
 projectsipdnssrvresolver::projectsipdnssrvresolver() :
   socket( io_service ),
-  resolver( io_service )
+  resolver( io_service ),
+  timer( io_service )
 {
   this->socket.open( boost::asio::ip::udp::v4() );
 }
@@ -288,13 +288,21 @@ Our main client function. Kick off our resolution. The realm should be in the fo
 void projectsipdnssrvresolver::query( std::string realm, std::function<void ( dnssrvrealm::pointer ) > callback )
 {
   this->onresolve = callback;
+  this->retrycount = DNSRETRYCOUNT;
+
+  /* First start off with settig our time limit */
+  this->timer.cancel();
+  /* expire on ttl - plus a little leaway */
+
+  this->timer.expires_after( std::chrono::seconds( DNSRETRYSECONDS ) );
+  this->timer.async_wait( std::bind( &projectsipdnssrvresolver::handletimeout, shared_from_this(), std::placeholders::_1 ) );
+
+  /* now do our stuff */
 
   this->resolved = dnscache.getfromcache( realm );
   if( this->resolved )
   {
-std::cout << "retreived from cache" << std::endl;
-    this->onresolve( this->resolved );
-    this->onresolve = nullptr;
+    this->callcallback();
     return;
   }
 
@@ -307,8 +315,15 @@ std::cout << "retreived from cache" << std::endl;
     return;
   }
 
-  std::string dnsip = dnscache.getdnsiplist().front();
-  boost::asio::ip::udp::resolver::query query( boost::asio::ip::udp::v4(), dnsip, "domain" );
+  this->dnsiterator = dnscache.getdnsiplist().begin();
+
+  if( this->dnsiterator == dnscache.getdnsiplist().end() )
+  {
+    this->callcallback();
+    return;
+  }
+
+  boost::asio::ip::udp::resolver::query query( boost::asio::ip::udp::v4(), *this->dnsiterator, "domain" );
 
   /* Run through all DNS on failure */
   this->resolver.async_resolve( query,
@@ -317,6 +332,50 @@ std::cout << "retreived from cache" << std::endl;
         boost::asio::placeholders::error,
         boost::asio::placeholders::iterator ) );
 
+}
+
+/*!md
+## callcallback
+Call the callback and perform other cleanups.
+*/
+void projectsipdnssrvresolver::callcallback( void )
+{
+  this->timer.cancel();
+  this->onresolve( this->resolved );
+  this->onresolve = nullptr;
+}
+
+/*!md
+## handletimeout
+We have taken too long on something, try something else.
+*/
+void projectsipdnssrvresolver::handletimeout( const boost::system::error_code& e )
+{
+  if ( e != boost::asio::error::operation_aborted )
+  {
+    this->retrycount--;
+
+    if( 0 == this->retrycount )
+    {
+      this->dnsiterator++;
+      this->retrycount = DNSRETRYCOUNT;
+    }
+
+    if( this->dnsiterator == dnscache.getdnsiplist().end() )
+    {
+      this->callcallback();
+      return;
+    }
+
+    boost::asio::ip::udp::resolver::query query( boost::asio::ip::udp::v4(), *this->dnsiterator, "domain" );
+
+    /* Run through all DNS on failure */
+    this->resolver.async_resolve( query,
+        boost::bind( &projectsipdnssrvresolver::handleresolve,
+          shared_from_this(),
+          boost::asio::placeholders::error,
+          boost::asio::placeholders::iterator ) );
+  }
 }
 
 /*!md
@@ -332,8 +391,7 @@ void projectsipdnssrvresolver::handleresolve (
   if( it == end )
   {
     /* Failure - inform our callback */
-    this->onresolve( dnssrvrealm::pointer() );
-    this->onresolve = nullptr;
+    this->callcallback();
     return;
   }
 
@@ -385,8 +443,7 @@ void projectsipdnssrvresolver::handleanswer( const boost::system::error_code& er
 {
   if ( error )
   {
-    this->onresolve( dnssrvrealm::pointer() );
-    this->onresolve = nullptr;
+    this->callcallback();
     return;
   }
 
@@ -394,8 +451,7 @@ void projectsipdnssrvresolver::handleanswer( const boost::system::error_code& er
   if( ns_initparse( this->answerbuffer, bytes_transferred, &h ) )
   {
     /* Failed to parse thrown error */
-    this->onresolve( dnssrvrealm::pointer() );
-    this->onresolve = nullptr;
+    this->callcallback();
     return;
   }
 
@@ -406,8 +462,7 @@ void projectsipdnssrvresolver::handleanswer( const boost::system::error_code& er
     if ( ns_parserr( &h, ns_s_an, i, &rr ) )
     {
       /* report error */
-      this->onresolve( dnssrvrealm::pointer() );
-      this->onresolve = nullptr;
+      this->callcallback();
       return;
     }
 
@@ -416,8 +471,7 @@ void projectsipdnssrvresolver::handleanswer( const boost::system::error_code& er
       char name[ 1024 ];
       if( -1 == dn_expand( ns_msg_base( h ), ns_msg_end( h ), ns_rr_rdata( rr ) + 6, name, sizeof( name ) ) )
       {
-        this->onresolve( dnssrvrealm::pointer() );
-        this->onresolve = nullptr;
+        this->callcallback();
         return;
       }
 
@@ -433,6 +487,5 @@ void projectsipdnssrvresolver::handleanswer( const boost::system::error_code& er
   }
 
   dnscache.addtocache( this->resolved );
-  this->onresolve( this->resolved );
-  this->onresolve = nullptr;
+  this->callcallback();
 }

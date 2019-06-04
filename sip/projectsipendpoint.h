@@ -8,8 +8,10 @@
 
 #include "projectsipstring.h"
 #include "projectsippacket.h"
+#include "projectsipserver.h"
 
 #include "projectsipdnssrvresolver.h"
+#include "globals.h"
 
 
 
@@ -34,8 +36,22 @@ protected:
 
 private:
   projectsipdnssrvresolver::pointer srvresolver;
-
   void handlesrvresolve( dnssrvrealm::pointer answer );
+
+  /* Resolve host to ip */
+  boost::asio::ip::udp::resolver resolver;
+  void handleresolve(
+            boost::system::error_code e,
+            boost::asio::ip::udp::resolver::iterator it );
+
+  boost::asio::ip::udp::endpoint receiverendpoint;
+  dnssrvrecord::pointer srvrecord;
+
+  /* We have been asked to send a packet */
+  projectsippacket::pointer tosendpk;
+
+  void handlesipendpointsend( const boost::system::error_code& error,
+                      std::size_t bytes_transferred);
 };
 
 

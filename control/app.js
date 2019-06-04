@@ -36,7 +36,7 @@ projectcontrol.onnewcall = ( call ) =>
   setTimeout( () => { call.answer(); }, 2000 );
 }
 
-if(0) setTimeout( () =>
+if(1) setTimeout( () =>
 {
 
   var callobj = {
@@ -46,6 +46,7 @@ if(0) setTimeout( () =>
     },
     to: {
       user: "1003",
+      domain: "sipgw.magrathea.net"
     },
     cid: {
       number: "1003",

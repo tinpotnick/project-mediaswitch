@@ -5,10 +5,11 @@
 #include "projectsipendpoint.h"
 #include "projectsipregistrar.h"
 #include "projectsipdirectory.h"
-
+#include "globals.h"
 
 projectsipendpoint::projectsipendpoint() :
-  errorcode( 0 )
+  errorcode( 0 ),
+  resolver( io_service )
 {
 
 }
@@ -67,52 +68,88 @@ bool projectsipendpoint::sendpk( projectsippacket::pointer pk )
     this->errorreason = "To user not found";
     return false;
   }
-std::cout << "attempting resolve" << std::endl;
+
   if( !this->srvresolver )
   {
     this->srvresolver = projectsipdnssrvresolver::create();
   }
-std::cout << "resolver created" << std::endl;
+
+  this->tosendpk = pk;
+
   this->srvresolver->query( std::string( "_sip._udp." ) + pk->gethost().str(),
                             std::bind( &projectsipendpoint::handlesrvresolve,
                               shared_from_this(),
                               std::placeholders::_1
                             ) );
 
-std::cout << "query ran" << std::endl;
-
-#warning TODO - DNS implimentation.
-  /* Failing all of the above, we need perform DNS. */
-  this->errorcode = 500;
-  this->errorreason = "External calls not yet impl";
-
-  /* Delay the release of this object in case we get a response from our DNS resolver */
-  //this->locker = us.lock();
-
-  // we can only destroy ourselves once the callback has happened.
-  return false;
+  /* we can only destroy ourselves once the callback has happened. */
+  return true;
 
 }
 
+/*!md
+## handlesrvresolve
+For now we pick out a SRV record and then go onto resolve that host. In the future we may (if no SRV records are returned) try and resolve the host on its own. I don't think that is the most correct thing to do though.
+*/
 void projectsipendpoint::handlesrvresolve( dnssrvrealm::pointer answer )
 {
-  std::cout << "handlesrvresolve" << std::endl;
   if( answer )
   {
-    std::cout << answer->realm << std::endl;
-
-    dnssrvrecord::pointer record = answer->getbestrecord();
-    if( record )
+    this->srvrecord = answer->getbestrecord();
+    if( this->srvrecord )
     {
-      std::cout << record->host << std::endl;
-      std::cout << record->priority << std::endl;
-      std::cout << record->weight << std::endl;
-      std::cout << record->port << std::endl;
-      std::cout << record->ttl << std::endl;
-      std::cout << record->port << std::endl;
+      /*std::cout << answer->realm << std::endl;
+      std::cout << this->srvrecord->host << std::endl;
+      std::cout << this->srvrecord->priority << std::endl;
+      std::cout << this->srvrecord->weight << std::endl;
+      std::cout << this->srvrecord->port << std::endl;
+      std::cout << this->srvrecord->ttl << std::endl;
+      std::cout << this->srvrecord->port << std::endl;*/
+
+      boost::asio::ip::udp::resolver::query query( boost::asio::ip::udp::v4(), this->srvrecord->host , std::to_string( this->srvrecord->port ) );
+      this->resolver.async_resolve( query,
+          boost::bind( &projectsipendpoint::handleresolve,
+                        shared_from_this(),
+                        boost::asio::placeholders::error,
+                        boost::asio::placeholders::iterator ) );
     }
   }
+}
 
-  /* We should be ok to free us if we are no longer being tracked elsewhere */
-  //this->locker.reset();
+/*!md
+## handleresolve
+Resolve our host name (or not).
+*/
+void projectsipendpoint::handleresolve(
+          boost::system::error_code e,
+          boost::asio::ip::udp::resolver::iterator it )
+{
+  boost::asio::ip::udp::resolver::iterator end;
+  if( it == end )
+  {
+    /* What to do? For now, allow the upper object to time out */
+    return;
+  }
+
+  this->receiverendpoint = *it;
+
+  sipserver->getsocket()->async_send_to(
+              boost::asio::buffer( *this->tosendpk->strptr() ),
+              this->receiverendpoint,
+              boost::bind(
+                &projectsipendpoint::handlesipendpointsend,
+                shared_from_this(),
+                boost::asio::placeholders::error,
+                boost::asio::placeholders::bytes_transferred) );
+}
+
+/*!md
+## handlesipendpointsend
+Once we have sent, wait for response.
+*/
+void projectsipendpoint::handlesipendpointsend(
+                    const boost::system::error_code& error,
+                    std::size_t bytes_transferred)
+{
+  /* Great! */
 }

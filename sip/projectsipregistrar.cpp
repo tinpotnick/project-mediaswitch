@@ -5,14 +5,13 @@
 #include "projectsipregistrar.h"
 #include "projectsipconfig.h"
 #include "projectsipdirectory.h"
+#include "globals.h"
 #include "test.h"
 
 /* Debuggng */
 #include <iostream>
 
 static projectsipregistrations regs;
-
-extern boost::asio::io_service io_service;
 
 /*******************************************************************************
 Function: projectsipregistration

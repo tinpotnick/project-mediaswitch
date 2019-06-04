@@ -9,11 +9,11 @@
 #include "projectsipregistrar.h"
 #include "projectsipdirectory.h"
 #include "projectsipsdp.h"
+#include "globals.h"
 
 
 static projectsipdialogs dialogs;
 static unsigned int projectsipdialogcounter = 0;
-extern boost::asio::io_service io_service;
 
 /*!md
 # projectsipdialog

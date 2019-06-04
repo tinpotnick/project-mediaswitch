@@ -23,6 +23,7 @@
 #include "test.h"
 
 boost::asio::io_service io_service;
+projectsipserver::pointer sipserver;
 
 static void stopserver( void )
 {
@@ -117,13 +118,13 @@ void startserver( short controlport, short sipport )
 {
   try
   {
-    projectsipserver s( io_service, sipport );
+    sipserver = projectsipserver::create( io_service, sipport );
     projecthttpserver h( io_service, controlport, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
-  io_service.run();
+    io_service.run();
   }
   catch( std::exception& e )
   {
-  std::cerr << e.what() << std::endl;
+    std::cerr << e.what() << std::endl;
   }
 
   // Clean up

@@ -22,6 +22,15 @@ projectsipserver::projectsipserver( boost::asio::io_service &io_service, short p
 }
 
 /*!md
+## create
+Create a new server.
+*/
+projectsipserver::pointer projectsipserver::create(  boost::asio::io_service &io_service, short port  )
+{
+  return pointer( new projectsipserver( io_service, port ) );
+}
+
+/*!md
 ## handlereadsome
 Wait for data
 

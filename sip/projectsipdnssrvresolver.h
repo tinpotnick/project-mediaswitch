@@ -21,6 +21,8 @@
 
 #define SRVDNSSENDRECEVIEVEBUFFSIZE 1500
 #define DNSRECORDBADFOR 20
+#define DNSRETRYCOUNT 3
+#define DNSRETRYSECONDS 3
 
 typedef std::list< std::string > iplist;
 
@@ -80,7 +82,7 @@ struct dnssrvrealmrealm{};
 
 /*!md
 # dnssrvrealms
-Boost multi index set to store our dns lookups.
+Boost multi index set to store our dns lookups. Multi index as we may add inxes in the future.
 */
 typedef boost::multi_index::multi_index_container<
   dnssrvrealm::pointer,
@@ -146,6 +148,9 @@ private:
               boost::system::error_code e,
               boost::asio::ip::udp::resolver::iterator it );
 
+  void handletimeout( const boost::system::error_code& e );
+  void callcallback( void );
+
   boost::asio::ip::udp::socket socket;
   boost::asio::ip::udp::endpoint receiverendpoint;
   boost::asio::ip::udp::endpoint receivedfromendpoint;
@@ -158,6 +163,10 @@ private:
 
   dnssrvrealm::pointer resolved;
   std::function< void ( dnssrvrealm::pointer ) > onresolve;
+
+  boost::asio::steady_timer timer;
+  iplist::iterator dnsiterator;
+  int retrycount;
 
 };
 
