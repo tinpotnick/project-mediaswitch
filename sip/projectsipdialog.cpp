@@ -101,6 +101,7 @@ bool projectsipdialog::invitesippacket( projectsippacket::pointer pk )
         projectsippacket::pointer response = projectsippacket::create();
 
         response->setstatusline( 481, "Call Leg/Transaction Does Not Exist" );
+        response->addcommonheaders();
         response->addviaheader( projectsipconfig::gethostipsipport(), pk );
 
         response->addwwwauthenticateheader( pk );
@@ -116,8 +117,6 @@ bool projectsipdialog::invitesippacket( projectsippacket::pointer pk )
         response->addheader( projectsippacket::Contact,
                             projectsippacket::contact( pk->getuser().strptr(),
                             stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-        response->addheader( projectsippacket::Allow,
-                            "INVITE, ACK, CANCEL, OPTIONS, BYE" );
         response->addheader( projectsippacket::Content_Type,
                             "application/sdp" );
         response->addheader( projectsippacket::Content_Length,
@@ -289,6 +288,7 @@ void projectsipdialog::send401( void )
   this->authrequest = projectsippacket::create();
 
   this->authrequest->setstatusline( 401, "Unauthorized" );
+  this->authrequest->addcommonheaders();
   this->authrequest->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   this->authrequest->addwwwauthenticateheader( this->lastreceivedpk );
@@ -305,8 +305,6 @@ void projectsipdialog::send401( void )
                       projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
                       stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
 
-  this->authrequest->addheader( projectsippacket::Allow,
-                      "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   this->authrequest->addheader( projectsippacket::Content_Length, "0" );
 
   this->sendpk( this->authrequest );
@@ -357,6 +355,7 @@ void projectsipdialog::inviteauth( projectsippacket::pointer pk )
         !pk->checkauth( this->authrequest, password ) )
   {
     projectsippacket::pointer failedauth = projectsippacket::create();
+    failedauth->addcommonheaders();
 
     failedauth->setstatusline( 403, "Failed auth" );
     failedauth->addviaheader( projectsipconfig::gethostipsipport(), pk );
@@ -372,8 +371,6 @@ void projectsipdialog::inviteauth( projectsippacket::pointer pk )
     failedauth->addheader( projectsippacket::Contact,
                 projectsippacket::contact( pk->getuser().strptr(),
                 stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-    failedauth->addheader( projectsippacket::Allow,
-                "INVITE, ACK, CANCEL, OPTIONS, BYE" );
     failedauth->addheader( projectsippacket::Content_Length,
                         "0" );
 
@@ -410,6 +407,7 @@ void projectsipdialog::trying( void )
 {
   projectsippacket::pointer trying = projectsippacket::create();
   trying->setstatusline( 100, "Trying" );
+  trying->addcommonheaders();
 
   trying->addheader( projectsippacket::Via,
               this->lastreceivedpk->getheader( projectsippacket::Via ) );
@@ -424,8 +422,6 @@ void projectsipdialog::trying( void )
   trying->addheader( projectsippacket::Contact,
               projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
               stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-  trying->addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   trying->addheader( projectsippacket::Content_Length,
                       "0" );
 
@@ -444,6 +440,7 @@ void projectsipdialog::temporaryunavailable( void )
   projectsippacket::pointer unavail = projectsippacket::create();
 
   unavail->setstatusline( 480, "Temporarily Unavailable" );
+  unavail->addcommonheaders();
   unavail->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   unavail->addheader( projectsippacket::To,
@@ -457,8 +454,7 @@ void projectsipdialog::temporaryunavailable( void )
   unavail->addheader( projectsippacket::Contact,
               projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
               stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-  unavail->addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+
   unavail->addheader( projectsippacket::Content_Length,
                       "0" );
 
@@ -545,6 +541,7 @@ void projectsipdialog::ringing( void )
     projectsippacket::pointer ringing = projectsippacket::create();
 
     ringing->setstatusline( 180, "Ringing" );
+    ringing->addcommonheaders();
 
     ringing->addheader( projectsippacket::Via,
               this->invitepk->getheader( projectsippacket::Via ) );
@@ -569,8 +566,7 @@ void projectsipdialog::ringing( void )
     ringing->addheader( projectsippacket::Contact,
                 projectsippacket::contact( this->invitepk->getuser().strptr(),
                 stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-    ringing->addheader( projectsippacket::Allow,
-                "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+
     ringing->addheader( projectsippacket::Content_Length,
                         "0" );
 
@@ -626,6 +622,7 @@ void projectsipdialog::send200( std::string body, bool final )
   projectsippacket::pointer ok = projectsippacket::create();
 
   ok->setstatusline( 200, "Ok" );
+  ok->addcommonheaders();
   ok->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   sipuri tu( this->lastreceivedpk->getheader( projectsippacket::To ) );
@@ -648,9 +645,6 @@ void projectsipdialog::send200( std::string body, bool final )
   ok->addheader( projectsippacket::Contact,
               projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
               stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-
-  ok->addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
 
   ok->addheader( projectsippacket::Content_Length,
                       std::to_string( body.length() ) );
@@ -736,6 +730,7 @@ void projectsipdialog::senderror( void )
   projectsippacket::pointer ok = projectsippacket::create();
 
   ok->setstatusline( this->errorcode, this->errorreason );
+  ok->addcommonheaders();
   ok->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   ok->addheader( projectsippacket::To,
@@ -749,8 +744,6 @@ void projectsipdialog::senderror( void )
   ok->addheader( projectsippacket::Contact,
               projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
               stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-  ok->addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   ok->addheader( projectsippacket::Content_Length,
                       "0" );
 
@@ -844,8 +837,7 @@ void projectsipdialog::sendbye( void )
   bye->addheader( projectsippacket::CSeq,
               std::to_string( this->cseq ) + " BYE" );
 
-  bye->addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  bye->addcommonheaders();
 
   bye->addheader( projectsippacket::Content_Length, "0" );
 
@@ -988,6 +980,8 @@ bool projectsipdialog::sendinvite( void )
   projectsippacket::pointer invite = projectsippacket::create();
   // Generate SIP URI i.e. sip:realm
   invite->setrequestline( projectsippacket::INVITE, touri );
+  invite->addcommonheaders();
+
   invite->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   invite->addheader( projectsippacket::Contact,
@@ -998,10 +992,9 @@ bool projectsipdialog::sendinvite( void )
 
   invite->addheader( projectsippacket::CSeq, std::to_string( this->cseq ) + " INVITE" );
   invite->addheader( projectsippacket::Max_Forwards, maxforwards );
-  invite->addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
 
   std::string sdp = *( jsontosdp( JSON::as_object( this->oursdp ) ) );
+
   invite->addheader( projectsippacket::Content_Type, "application/sdp" );
   invite->addheader( projectsippacket::Content_Length, sdp.length() );
 
@@ -1070,6 +1063,7 @@ void projectsipdialog::sendack( void )
   projectsippacket::pointer ack = projectsippacket::create();
   // Generate SIP URI i.e. sip:realm
   ack->setrequestline( projectsippacket::ACK, std::string( "sip:" ) + this->domain );
+  ack->addcommonheaders();
   ack->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   ack->addheader( projectsippacket::To,
@@ -1086,8 +1080,6 @@ void projectsipdialog::sendack( void )
 #warning TODO
   /* TODO - need to correct the number - i.e. re-invite may be different. */
   ack->addheader( projectsippacket::CSeq, std::to_string( this->cseq ) + " ACK" );
-  ack->addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
 
   ack->addheader( projectsippacket::Content_Length, "0" );
 

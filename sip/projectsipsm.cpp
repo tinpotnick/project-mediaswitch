@@ -92,8 +92,7 @@ void projectsipsm::handleoptions( projectsippacket::pointer pk )
                       pk->getheader( projectsippacket::CSeq ) );
   response.addheader( projectsippacket::Contact,
                       pk->getheader( projectsippacket::Contact ) );
-  response.addheader( projectsippacket::Allow,
-                      "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  response.addcommonheaders();
   response.addheader( projectsippacket::Content_Type,
                       "application/sdp" );
   response.addheader( projectsippacket::Content_Length,

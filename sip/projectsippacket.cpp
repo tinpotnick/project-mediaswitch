@@ -215,6 +215,16 @@ substring projectsippacket::getheaderparam( int header, const char *param )
 }
 
 /*!md
+# addcommonheaders
+Add our common headers.
+*/
+void projectsippacket::addcommonheaders( void )
+{
+  this->addheader( projectsippacket::User_Agent, USERAGENT );
+  this->addheader( projectsippacket::Allow, ALLOWSTRING );
+}
+
+/*!md
 # addremotepartid
 Add a remotepatyid header:
 setheaderparam( "server10.biloxi.com" "z9hG4bK4b43c2ff8.1" );

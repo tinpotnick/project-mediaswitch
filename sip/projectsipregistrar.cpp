@@ -61,6 +61,7 @@ void projectsipregistration::regstart( projectsippacket::pointer pk )
     projectsippacket toobrief;
 
     toobrief.setstatusline( 423, "Interval Too Brief" );
+    toobrief.addcommonheaders();
 
     std::string via = projectsipconfig::gethostip() +
                     std::string( ":" ) +
@@ -82,8 +83,6 @@ void projectsipregistration::regstart( projectsippacket::pointer pk )
     toobrief.addheader( projectsippacket::Contact,
                 projectsippacket::contact( pk->getuser().strptr(),
                 stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-    toobrief.addheader( projectsippacket::Allow,
-                "INVITE, ACK, CANCEL, OPTIONS, BYE" );
     toobrief.addheader( projectsippacket::Content_Type,
                 "application/sdp" );
     toobrief.addheader( projectsippacket::Content_Length,
@@ -97,6 +96,7 @@ void projectsipregistration::regstart( projectsippacket::pointer pk )
   this->authrequest = projectsippacket::create();
 
   this->authrequest->setstatusline( 401, "Unauthorized" );
+  this->authrequest->addcommonheaders();
 
   std::string via = projectsipconfig::gethostip() +
                     std::string( ":" ) +
@@ -117,8 +117,6 @@ void projectsipregistration::regstart( projectsippacket::pointer pk )
   this->authrequest->addheader( projectsippacket::Contact,
                       projectsippacket::contact( pk->getuser().strptr(),
                       stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-  this->authrequest->addheader( projectsippacket::Allow,
-                      "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   this->authrequest->addheader( projectsippacket::Content_Length,
                       "0" );
 
@@ -154,7 +152,7 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
     projectsippacket failedauth;
 
     failedauth.setstatusline( 403, "Failed auth" );
-
+    failedauth.addcommonheaders();
     std::string via = projectsipconfig::gethostip() +
                     std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
@@ -172,8 +170,6 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
     failedauth.addheader( projectsippacket::Contact,
                 projectsippacket::contact( this->currentpacket->getuser().strptr(),
                 stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-    failedauth.addheader( projectsippacket::Allow,
-                "INVITE, ACK, CANCEL, OPTIONS, BYE" );
     failedauth.addheader( projectsippacket::Content_Type,
                 "application/sdp" );
     failedauth.addheader( projectsippacket::Content_Length,
@@ -225,6 +221,8 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
 
   p.setstatusline( 200, "Ok" );
 
+  p.addcommonheaders();
+
   std::string via = projectsipconfig::gethostip() +
                     std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
@@ -243,8 +241,6 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
               projectsippacket::contact( this->currentpacket->getuser().strptr(),
                 stringptr( new std::string( projectsipconfig::gethostipsipport() ) ),
                 expires ) );
-  p.addheader( projectsippacket::Allow,
-              "INVITE, ACK, CANCEL, OPTIONS, BYE" );
   p.addheader( projectsippacket::Content_Type,
               "application/sdp" );
   p.addheader( projectsippacket::Content_Length,
@@ -433,8 +429,7 @@ void projectsipregistration::sendoptions( void )
   request.addheader( projectsippacket::Contact,
                       projectsippacket::contact( this->authacceptpacket->getuser().strptr(),
                       stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
-  request.addheader( projectsippacket::Allow,
-                      "INVITE, ACK, CANCEL, OPTIONS, BYE" );
+  request.addcommonheaders();
   request.addheader( projectsippacket::Content_Length,
                       "0" );
 

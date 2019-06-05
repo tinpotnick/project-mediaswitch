@@ -476,8 +476,8 @@ class projectcontrol
     this.rtp.host = "127.0.0.1";
     this.rtp.port = 9002;
 
-    this.codecs = [ "pcmu" ];
-    this.sessionidcounter = 0;
+    this.codecs = [ "pcma", "2833" ]//, "pcmu", "2833" ];
+    this.sessionidcounter = 1;
 
     this.handlers.PUT.dialog = ( pathparts, req, res, body ) =>
     {
@@ -810,7 +810,6 @@ Negotiates a channel with an RTP server then creates the corrosponding SDP objec
                 media: "audio",
                 port: response.json.port,
                 proto: "RTP/AVP",
-                ptime: 20,
                 direction: "sendrecv",
                 payloads: [],
                 rtpmap: {},
@@ -849,6 +848,21 @@ Add a CODEC to the SDP object.
       {
         sdp.m[ 0 ].payloads.push( 0 );
         sdp.m[ 0 ].rtpmap[ "0" ] = { encoding: "PCMU", clock: "8000" };
+        break;
+      }
+      case "pcma":
+      {
+        sdp.m[ 0 ].payloads.push( 8 );
+        sdp.m[ 0 ].rtpmap[ "8" ] = { encoding: "PCMA", clock: "8000" };
+        break;
+      }
+      /* rfc 2833 - DTMF*/
+      case "2833":
+      {
+        sdp.m[ 0 ].payloads.push( 101 );
+        sdp.m[ 0 ].rtpmap[ "101" ] = { encoding: "telephone-event", clock: "8000" };
+        sdp.m[ 0 ].fmtp = {};
+        sdp.m[ 0 ].fmtp[ "101" ] = "0-16";
         break;
       }
     }

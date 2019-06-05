@@ -12,6 +12,8 @@
 #include "projectwebdocument.h"
 
 #define MASSIPPACKETLENGTH 1500
+#define USERAGENT "project-sip"
+#define ALLOWSTRING "INVITE, ACK, CANCEL, OPTIONS, BYE"
 
 /*!md
 # sipuri
@@ -88,6 +90,7 @@ public:
   int getcseq( void );
 
   /* specific headers */
+  void addcommonheaders( void );
   bool addviaheader( const char *host, projectsippacket::pointer ref = nullptr );
   bool addwwwauthenticateheader( projectsippacket::pointer ref );
   void addauthorizationheader( projectsippacket::pointer ref, std::string &user, std::string &password );
