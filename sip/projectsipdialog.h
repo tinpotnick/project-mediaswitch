@@ -142,6 +142,7 @@ private:
   int maxforwards;
   std::string callerid, calleridname;
   bool hidecid;
+  std::string control;
 };
 
 

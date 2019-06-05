@@ -1105,6 +1105,7 @@ void projectsipdialog::waitforinviteprogress( projectsippacket::pointer pk )
   {
     this->callanswered = true;
     this->answerat = std::time( nullptr );
+    this->authenticated = true;
 
     if( pk->getheader( projectsippacket::Content_Length ).toint() > 0 &&
         0 != pk->getheader( projectsippacket::Content_Type ).find( "sdp" ).end() )
@@ -1160,8 +1161,11 @@ void projectsipdialog::waitforinviteprogressafterauth( projectsippacket::pointer
   }
   else if( statuscode >= 400 && statuscode < 500 )
   {
+    this->sendack();
+
     this->errorcode = statuscode;
     this->errorreason = pk->getreasonphrase().str();
+
     this->callhungup = true;
     this->endat = std::time( nullptr );
     this->updatecontrol();
@@ -1194,14 +1198,23 @@ Pass information to our control server.
 */
 bool projectsipdialog::updatecontrol( void )
 {
-  projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->domain );
-
-  if( !ptr )
+  if( "" == this->control )
   {
-    return false;
+    projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->domain );
+
+    if( !ptr )
+    {
+      if( this->callhungup )
+      {
+        this->untrack();
+      }
+      return false;
+    }
+
+    this->control = *ptr->controlhost;
   }
 
-  std::string controluri = *ptr->controlhost;
+  std::string controluri = this->control;
   controluri += "/dialog/" + this->callid;
 
   projectwebdocumentptr d = projectwebdocumentptr( new projectwebdocument() );
@@ -1356,6 +1369,11 @@ void projectsipdialog::httppost( stringvector &path, JSON::Value &body, projectw
       if ( cid.has_key( "private" ) )
       {
         ptr->hidecid = ( bool )JSON::as_boolean( cid[ "private" ] );
+      }
+
+      if( request.has_key( "control" ) )
+      {
+        ptr->control = JSON::as_string( request[ "control" ] );
       }
 
       ptr->oursdp = request[ "sdp" ];

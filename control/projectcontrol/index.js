@@ -728,6 +728,11 @@ request object
       }
 
       c.metadata.channel = channel;
+      request.control = "http://" + this.us.host;
+      if( 80 != this.us.port )
+      {
+        request.control += ":" + this.us.port;
+      }
 
       this.sipserver( request, "/dialog/invite", "POST", ( response ) =>
       {
