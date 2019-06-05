@@ -237,8 +237,8 @@ bool projectsippacket::addremotepartyid( const char *realm,
       ptr++;
       memcpy( ptr, calleridname, calleridnamelen );
       ptr += calleridnamelen;
-      memcpy( ptr, "\"", 1 );
-      ptr++;
+      memcpy( ptr, "\" ", 2 );
+      ptr += 2;
     }
   }
 
@@ -279,7 +279,7 @@ bool projectsippacket::addremotepartyid( const char *realm,
 
   *ptr = 0;
 
-  this->addheader( projectsippacket::Remote_Party_ID, ptr );
+  this->addheader( projectsippacket::Remote_Party_ID, paramvalue );
   return true;
 }
 
@@ -289,7 +289,7 @@ Add a via header:
 setheaderparam( "server10.biloxi.com" "z9hG4bK4b43c2ff8.1" );
 Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
 */
-bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
+bool projectsippacket::addviaheader( const char *host, projectsippacket::pointer ref )
 {
   size_t lh = strlen( host );
   char paramvalue[ DEFAULTHEADERLINELENGTH ];
@@ -337,7 +337,7 @@ bool projectsippacket::addviaheader( const char *host, projectsippacket *ref )
 Generate a nonce parameter used for auth and add the authenticate
 header. Ref RFC 2617 section 3.2.1.
 */
-bool projectsippacket::addwwwauthenticateheader( projectsippacket *ref )
+bool projectsippacket::addwwwauthenticateheader( projectsippacket::pointer ref )
 {
 
   boost::uuids::basic_random_generator<boost::mt19937> gen;
@@ -495,11 +495,9 @@ static inline char *kd( const char *ha1,
 
 /*!md
 # checkauth
-Check the auth of this packet. The reference contans the nonce to check
-we set the nonce and it is not a replay.
-
+Check the auth of this packet. The reference contans the nonce to check we set the nonce and it is not a replay.
 */
-bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
+bool projectsippacket::checkauth( projectsippacket::pointer ref, stringptr password )
 {
   char h1[ 33 ];
   char h2[ 33 ];
@@ -558,9 +556,151 @@ bool projectsippacket::checkauth( projectsippacket *ref, stringptr password )
 }
 
 /*!md
+# addauthorizationheader
+Add the auth header using the credentials.
+
+See RFC 2617 section 3.2.1
+
+We receive either
+401 message
+WWW-Authenticate: Digest realm="blah.net", nonce="5cf6929e0000d71c330c35e96f9c166f2405c2834423ca9c"
+OR
+407 message
+Proxy-Authenticate: Digest realm="blah.net", nonce="5cf6929e0000d71c330c35e96f9c166f2405c2834423ca9c"
+
+We add either a Authorization or Proxy-Authorization is added depending on either 401 or 407 in the response.
+
+From RFC 3261 section 20.6.
+Authorization: Digest username="Alice", realm="atlanta.com",
+       nonce="84a4cc6f3082121f32b42a2187831a9e",
+       response="7587245234b3434cc3412213e5f113a5432"
+*/
+void projectsippacket::addauthorizationheader( projectsippacket::pointer ref, std::string &user, std::string &password )
+{
+  char h1[ 33 ];
+  char h2[ 33 ];
+  char response[ 33 ];
+  char headerstr[ 500 ];
+
+  int sourceheader = projectsippacket::Proxy_Authenticate;
+  int responseheader = projectsippacket::Proxy_Authorization;
+
+  if( 401 == ref->getstatuscode() )
+  {
+    sourceheader = projectsippacket::WWW_Authenticate;
+    responseheader = projectsippacket::Authorization;
+  }
+
+  substring nonce = ref->getheaderparam( sourceheader, "nonce" );
+  substring realm = ref->getheaderparam( sourceheader, "realm" );
+  substring opaque = ref->getheaderparam( sourceheader, "opaque" );
+  substring algorithm = ref->getheaderparam( sourceheader, "algorithm" );
+  substring qop = ref->getheaderparam( sourceheader, "qop" );
+  std::string cnonce;
+  std::string noncecount;
+  if( qop.length() > 0 )
+  {
+    boost::random::random_device rng;
+    boost::random::uniform_int_distribution<> index_dist( 0, randomcharbase.size() - 1 );
+    for( int i = 0; i < 8; ++i )
+    {
+      cnonce += randomcharbase[ index_dist( rng ) ];
+    }
+
+    noncecount = "00000001";
+  }
+
+  substring uri = this->getheaderparam( sourceheader, "uri" );
+  if( 0 == uri.end() )
+  {
+    uri = this->uri;
+  }
+
+  /* check for anything which could make our header str go oversized */
+  if( (
+      user.length() +
+      nonce.length() +
+      realm.length() +
+      uri.length() +
+      opaque.length()
+    ) > 300 ) return;
+
+  kd(
+    ha1( user.c_str(), user.length(),
+         realm.c_str(), realm.length(),
+         password.c_str(), password.length(),
+         nonce.c_str(), nonce.length(),
+         cnonce.c_str(), cnonce.length(),
+         "MD5",
+         h1 ),
+    nonce.c_str(), nonce.length(),
+    noncecount.c_str(), noncecount.length(),
+    cnonce.c_str(), cnonce.length(),
+    qop.c_str(), qop.length(),
+    ha2( this->methodstr.c_str(), this->methodstr.length(),
+         uri.c_str(), uri.length(),
+         h2 ),
+    response );
+
+  /* now add all of the required params then header */
+  int it = 17;
+  memcpy( headerstr, "Digest username=\"", it );
+
+  memcpy( headerstr + it, user.c_str(), user.size() );
+  it += user.size();
+  memcpy( headerstr + it, "\",realm=\"", 9 );
+  it += 9;
+  memcpy( headerstr + it, realm.c_str(), realm.length() );
+  it += realm.length();
+  memcpy( headerstr + it, "\",nonce=\"", 9 );
+  it += 9;
+  memcpy( headerstr + it, nonce.c_str(), nonce.length() );
+  it += nonce.length();
+  memcpy( headerstr + it, "\",uri=\"", 7 );
+  it += 7;
+  memcpy( headerstr + it, uri.c_str(), uri.length() );
+  it += uri.length();
+  memcpy( headerstr + it, "\",response=\"", 12 );
+  it += 12;
+  memcpy( headerstr + it, response, 32 );
+  it += 32;
+  memcpy( headerstr + it, "\"", 1 );
+  it += 1;
+
+  if( 0 != opaque.end() )
+  {
+    memcpy( headerstr + it, ",opaque=\"", 9 );
+    it += 9;
+    memcpy( headerstr + it, opaque.c_str(), opaque.length() );
+    it += opaque.length();
+    memcpy( headerstr + it, "\" ", 2 );
+    it += 2;
+  }
+
+  if( qop.length() > 0 )
+  {
+    memcpy( headerstr + it, ",qop=\"auth\",algorithm=MD5,nc=", 29 );
+    it += 29;
+
+    memcpy( headerstr + it, noncecount.c_str(), noncecount.size() );
+    it += noncecount.size();
+
+    memcpy( headerstr + it, ",cnonce=\"", 9 );
+    it += 9;
+
+    memcpy( headerstr + it, cnonce.c_str(), cnonce.size() );
+    it += cnonce.size();
+
+    memcpy( headerstr + it, "\"", 1 );
+    it += 1;
+  }
+
+  this->addheader( responseheader, headerstr );
+}
+
+/*!md
 # gettouser
 Get the user addressed in the To header.
-
 */
 substring projectsippacket::getuser( int tofrom )
 {

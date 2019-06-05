@@ -21,6 +21,7 @@ Constructor
 Updated: 23.01.2019
 */
 projectsipdialog::projectsipdialog() :
+  cseq( rand() ),
   nextstate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
   controlrequest( projecthttpclient::create( io_service ) ),
   timer( io_service ),
@@ -100,9 +101,9 @@ bool projectsipdialog::invitesippacket( projectsippacket::pointer pk )
         projectsippacket::pointer response = projectsippacket::create();
 
         response->setstatusline( 481, "Call Leg/Transaction Does Not Exist" );
-        response->addviaheader( projectsipconfig::gethostipsipport(), pk.get() );
+        response->addviaheader( projectsipconfig::gethostipsipport(), pk );
 
-        response->addwwwauthenticateheader( pk.get() );
+        response->addwwwauthenticateheader( pk );
 
         response->addheader( projectsippacket::To,
                             pk->getheader( projectsippacket::To ) );
@@ -235,7 +236,10 @@ void projectsipdialog::invitestart( projectsippacket::pointer pk )
     this->retries = 3;
     this->send401();
 
-    this->nextstate = std::bind( &projectsipdialog::waitforacktheninviteauth, this, std::placeholders::_1 );
+    this->nextstate = std::bind(
+        &projectsipdialog::waitforacktheninviteauth,
+        this,
+        std::placeholders::_1 );
 
     this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
         std::bind( &projectsipdialog::resend401, this, std::placeholders::_1 ) );
@@ -252,7 +256,11 @@ void projectsipdialog::invitestart( projectsippacket::pointer pk )
 
   this->invitepk = pk;
   this->updatecontrol();
-  this->nextstate = std::bind( &projectsipdialog::waitfornextinstruction, this, std::placeholders::_1 );
+  this->nextstate = std::bind(
+        &projectsipdialog::waitfornextinstruction,
+        this,
+        std::placeholders::_1 );
+
   this->trying();
 }
 
@@ -281,9 +289,9 @@ void projectsipdialog::send401( void )
   this->authrequest = projectsippacket::create();
 
   this->authrequest->setstatusline( 401, "Unauthorized" );
-  this->authrequest->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk.get() );
+  this->authrequest->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
-  this->authrequest->addwwwauthenticateheader( this->lastreceivedpk.get() );
+  this->authrequest->addwwwauthenticateheader( this->lastreceivedpk );
 
   this->authrequest->addheader( projectsippacket::To,
                       this->lastreceivedpk->getheader( projectsippacket::To ) );
@@ -346,12 +354,12 @@ void projectsipdialog::inviteauth( projectsippacket::pointer pk )
                 user );
 
   if( !password ||
-        !pk->checkauth( this->authrequest.get(), password ) )
+        !pk->checkauth( this->authrequest, password ) )
   {
     projectsippacket::pointer failedauth = projectsippacket::create();
 
     failedauth->setstatusline( 403, "Failed auth" );
-    failedauth->addviaheader( projectsipconfig::gethostipsipport(), pk.get() );
+    failedauth->addviaheader( projectsipconfig::gethostipsipport(), pk );
 
     failedauth->addheader( projectsippacket::To,
                 pk->getheader( projectsippacket::To ) );
@@ -436,7 +444,7 @@ void projectsipdialog::temporaryunavailable( void )
   projectsippacket::pointer unavail = projectsippacket::create();
 
   unavail->setstatusline( 480, "Temporarily Unavailable" );
-  unavail->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk.get() );
+  unavail->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   unavail->addheader( projectsippacket::To,
               this->lastreceivedpk->getheader( projectsippacket::To ) );
@@ -618,7 +626,7 @@ void projectsipdialog::send200( std::string body, bool final )
   projectsippacket::pointer ok = projectsippacket::create();
 
   ok->setstatusline( 200, "Ok" );
-  ok->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk.get() );
+  ok->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   sipuri tu( this->lastreceivedpk->getheader( projectsippacket::To ) );
   substring stu = tu.uri;
@@ -728,7 +736,7 @@ void projectsipdialog::senderror( void )
   projectsippacket::pointer ok = projectsippacket::create();
 
   ok->setstatusline( this->errorcode, this->errorreason );
-  ok->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk.get() );
+  ok->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   ok->addheader( projectsippacket::To,
               this->lastreceivedpk->getheader( projectsippacket::To ) );
@@ -802,6 +810,8 @@ void projectsipdialog::sendbye( void )
     }
   }
 
+  this->cseq = this->lastreceivedpk->getcseq() + 1;
+
   projectsippacket::pointer bye = projectsippacket::create();
 
   if( this->originator )
@@ -823,7 +833,7 @@ void projectsipdialog::sendbye( void )
                 this->lastreceivedpk->getheader( projectsippacket::To ) );
   }
 
-  bye->addviaheader( projectsipconfig::gethostipsipport() );
+  bye->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   bye->addheader( projectsippacket::Contact,
               projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
@@ -832,7 +842,7 @@ void projectsipdialog::sendbye( void )
   bye->addheader( projectsippacket::Call_ID, this->callid );
 
   bye->addheader( projectsippacket::CSeq,
-              std::to_string( this->lastreceivedpk->getcseq() + 1 ) + " BYE" );
+              std::to_string( this->cseq ) + " BYE" );
 
   bye->addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
@@ -887,7 +897,6 @@ invite object:=
   to = {
     user: "01442299280",
     domain: "gw.magrathea.net",
-    port: 5080,
     authuser: "authuser"
     authsecret: "secret"
   }
@@ -967,83 +976,52 @@ a=rtcp:16512 IN IP4 109.169.12.139
 a=ptime:20
 
 */
-void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &response )
+bool projectsipdialog::sendinvite( void )
 {
-  std::string touser, todomain, fromuser, callerid, calleridname, sdp;
-  int maxforwards;
-  bool hide = false;
-
-  try
-  {
-    JSON::Object &from = JSON::as_object( request[ "from" ] );
-    this->domain = JSON::as_string( from[ "domain" ] );
-    fromuser = JSON::as_string( from[ "user" ] );
-
-    JSON::Object &to = JSON::as_object( request[ "to" ] );
-    if( to.has_key( "domain" ) )
-    {
-      todomain = JSON::as_string( to[ "domain" ] );
-    }
-    else
-    {
-      todomain = this->domain;
-    }
-
-    touser = JSON::as_string( to[ "user" ] );
-
-    maxforwards = JSON::as_int64( request[ "maxforwards" ] );
-
-    JSON::Object &cid =  JSON::as_object( request[ "cid" ] );
-    callerid = JSON::as_string( cid[ "number" ] );
-    calleridname = JSON::as_string( cid[ "name" ] );
-
-    if ( cid.has_key( "private" ) )
-    {
-      hide = ( bool )JSON::as_boolean( cid[ "private" ] );
-    }
-
-    this->oursdp = request[ "sdp" ];
-    sdp = *( jsontosdp( JSON::as_object( request[ "sdp" ] ) ) );
-  }
-  catch( const boost::bad_get &e )
-  {
-    // We have not got enough params.
-    this->untrack();
-    response.setstatusline( 500, "Missing param or params in invite" );
-    response.addheader( projectwebdocument::Content_Length, 0 );
-    return;
-  }
+  std::string touri;
+  touri.reserve( 200 );
+  touri = "sip:";
+  touri += this->touser;
+  touri += "@";
+  touri += this->todomain;
 
   projectsippacket::pointer invite = projectsippacket::create();
   // Generate SIP URI i.e. sip:realm
-  invite->setrequestline( projectsippacket::INVITE, std::string( "sip:" ) + todomain );
-  invite->addviaheader( projectsipconfig::gethostipsipport() );
+  invite->setrequestline( projectsippacket::INVITE, touri );
+  invite->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   invite->addheader( projectsippacket::Contact,
               projectsippacket::contact( stringptr( new std::string( fromuser ) ),
               stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
 
   invite->addheader( projectsippacket::Call_ID, this->callid );
-#warning TODO
-  /* TODO - need to correct the nuber - i.e. re-invite may be different. */
-  invite->addheader( projectsippacket::CSeq, "1 INVITE" );
+
+  invite->addheader( projectsippacket::CSeq, std::to_string( this->cseq ) + " INVITE" );
   invite->addheader( projectsippacket::Max_Forwards, maxforwards );
   invite->addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
 
-  invite->addheader( projectsippacket::Content_Type,
-                      "application/sdp" );
-  invite->addheader( projectsippacket::Content_Length,
-                      sdp.length() );
+  std::string sdp = *( jsontosdp( JSON::as_object( this->oursdp ) ) );
+  invite->addheader( projectsippacket::Content_Type, "application/sdp" );
+  invite->addheader( projectsippacket::Content_Length, sdp.length() );
 
-  invite->addremotepartyid( this->domain.c_str(), calleridname.c_str(), callerid.c_str(), hide );
+  invite->addremotepartyid( this->domain.c_str(), this->calleridname.c_str(), this->callerid.c_str(), this->hidecid );
 
-  std::string touri;
-  touri.reserve( 200 );
+  bool authenticate = false;
+  if( this->lastreceivedpk )
+  {
+    int status = this->lastreceivedpk->getstatuscode();
+    if( 401 == status || 407 == status )
+    {
+      authenticate = true;
+      invite->addauthorizationheader( this->lastreceivedpk, this->fromuser, this->authsecret );
+    }
+  }
+
   touri = "<sip:";
-  touri += touser;
+  touri += this->touser;
   touri += "@";
-  touri += todomain;
+  touri += this->todomain;
   touri += ">";
 
   invite->addheader( projectsippacket::To, touri ); /* only gets a tag on a re-invite */
@@ -1051,7 +1029,7 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
   std::string fromuri;
   fromuri.reserve( 200 );
   fromuri = "<sip:";
-  fromuri += fromuser;
+  fromuri += this->fromuser;
   fromuri += "@";
   fromuri += this->domain;
   fromuri += ">;tag=";
@@ -1059,31 +1037,28 @@ void projectsipdialog::sendinvite( JSON::Object &request, projectwebdocument &re
 
   invite->addheader( projectsippacket::From, fromuri ); /* always needs a tag */
 
+
   /* after all headers have been added */
   invite->setbody( sdp.c_str() );
 
   if( !this->sendpk( invite ) )
   {
     this->untrack();
-    response.setstatusline( this->errorcode, this->errorreason );
-    response.addheader( projectwebdocument::Content_Length, 0 );
-    return;
+    return false;
   }
-
-  // Respond to the web request.
-  JSON::Object v;
-  v[ "callid" ] = this->callid;
-  std::string t = JSON::to_string( v );
-
-  response.setstatusline( 200, "Ok" );
-  response.addheader( projectwebdocument::Content_Length, t.size() );
-  response.addheader( projectwebdocument::Content_Type, "text/json" );
-  response.setbody( t.c_str() );
 
   this->invitepk = invite;
 
-  this->nextstate = std::bind( &projectsipdialog::waitforinviteprogress, this, std::placeholders::_1 );
+  if( true == authenticate )
+  {
+    this->nextstate = std::bind( &projectsipdialog::waitforinviteprogressafterauth, this, std::placeholders::_1 );
+  }
+  else
+  {
+    this->nextstate = std::bind( &projectsipdialog::waitforinviteprogress, this, std::placeholders::_1 );
+  }
 
+  return true;
 }
 
 /*!md
@@ -1095,7 +1070,7 @@ void projectsipdialog::sendack( void )
   projectsippacket::pointer ack = projectsippacket::create();
   // Generate SIP URI i.e. sip:realm
   ack->setrequestline( projectsippacket::ACK, std::string( "sip:" ) + this->domain );
-  ack->addviaheader( projectsipconfig::gethostipsipport() );
+  ack->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
   ack->addheader( projectsippacket::To,
                 this->lastreceivedpk->getheader( projectsippacket::To ) );
@@ -1110,11 +1085,13 @@ void projectsipdialog::sendack( void )
   ack->addheader( projectsippacket::Call_ID, this->callid );
 #warning TODO
   /* TODO - need to correct the number - i.e. re-invite may be different. */
-  ack->addheader( projectsippacket::CSeq, "1 ACK" );
+  ack->addheader( projectsippacket::CSeq, std::to_string( this->cseq ) + " ACK" );
   ack->addheader( projectsippacket::Allow,
               "INVITE, ACK, CANCEL, OPTIONS, BYE" );
 
   ack->addheader( projectsippacket::Content_Length, "0" );
+
+  this->cseq++;
 
   this->sendpk( ack );
 }
@@ -1124,6 +1101,49 @@ void projectsipdialog::sendack( void )
 We have sent an invite - wait for something to come back.
 */
 void projectsipdialog::waitforinviteprogress( projectsippacket::pointer pk )
+{
+  int statuscode = pk->getstatuscode();
+  if( 180 == statuscode )
+  {
+    this->callringing = true;
+    this->ringingat = std::time( nullptr );
+    this->updatecontrol();
+  }
+  else if( 200 == statuscode )
+  {
+    this->callanswered = true;
+    this->answerat = std::time( nullptr );
+
+    if( pk->getheader( projectsippacket::Content_Length ).toint() > 0 &&
+        0 != pk->getheader( projectsippacket::Content_Type ).find( "sdp" ).end() )
+    {
+      sdptojson( pk->getbody(), this->remotesdp );
+    }
+
+    this->sendack();
+    this->updatecontrol();
+  }
+  else if( statuscode == 401 || statuscode == 407 )
+  {
+    /* Resend with auth OR if we don't have credentials then hangup and inform control. */
+    this->sendack();
+    this->sendinvite();
+  }
+  else if( statuscode >= 400 && statuscode < 500 )
+  {
+    this->errorcode = statuscode;
+    this->errorreason = pk->getreasonphrase().str();
+    this->callhungup = true;
+    this->endat = std::time( nullptr );
+    this->updatecontrol();
+  }
+}
+
+/*!md
+# waitforinviteprogress
+We have sent an invite - wait for something to come back.
+*/
+void projectsipdialog::waitforinviteprogressafterauth( projectsippacket::pointer pk )
 {
   int statuscode = pk->getstatuscode();
   if( 180 == statuscode )
@@ -1312,8 +1332,69 @@ void projectsipdialog::httppost( stringvector &path, JSON::Value &body, projectw
     ptr = projectsipdialog::create();
     ptr->callid = *projectsippacket::callid();
     ptr->originator = true;
+
+    try
+    {
+      JSON::Object &request = JSON::as_object( body );
+      JSON::Object &from = JSON::as_object( request[ "from" ] );
+      ptr->domain = JSON::as_string( from[ "domain" ] );
+      ptr->fromuser = JSON::as_string( from[ "user" ] );
+      if( from.has_key( "authsecret" ) )
+      {
+        ptr->authsecret = JSON::as_string( from[ "authsecret" ] );
+      }
+
+      JSON::Object &to = JSON::as_object( request[ "to" ] );
+      if( to.has_key( "domain" ) )
+      {
+        ptr->todomain = JSON::as_string( to[ "domain" ] );
+      }
+      else
+      {
+        ptr->todomain = ptr->domain;
+      }
+
+      ptr->touser = JSON::as_string( to[ "user" ] );
+      ptr->maxforwards = JSON::as_int64( request[ "maxforwards" ] );
+
+      JSON::Object &cid =  JSON::as_object( request[ "cid" ] );
+      ptr->callerid = JSON::as_string( cid[ "number" ] );
+      ptr->calleridname = JSON::as_string( cid[ "name" ] );
+
+      if ( cid.has_key( "private" ) )
+      {
+        ptr->hidecid = ( bool )JSON::as_boolean( cid[ "private" ] );
+      }
+
+      ptr->oursdp = request[ "sdp" ];
+    }
+    catch( const boost::bad_get &e )
+    {
+      // We have not got enough params.
+      response.setstatusline( 500, "Missing param or params in invite" );
+      response.addheader( projectwebdocument::Content_Length, 0 );
+      return;
+    }
+
     dialogs.insert( ptr );
-    ptr->sendinvite( JSON::as_object( body ), response );
+
+    if( !ptr->sendinvite() )
+    {
+      response.setstatusline( ptr->errorcode, ptr->errorreason );
+      response.addheader( projectwebdocument::Content_Length, 0 );
+      return;
+    }
+
+    // Respond to the web request.
+    JSON::Object v;
+    v[ "callid" ] = ptr->callid;
+    std::string t = JSON::to_string( v );
+
+    response.setstatusline( 200, "Ok" );
+    response.addheader( projectwebdocument::Content_Length, t.size() );
+    response.addheader( projectwebdocument::Content_Type, "text/json" );
+    response.setbody( t.c_str() );
+
     return;
   }
 }

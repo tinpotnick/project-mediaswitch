@@ -88,13 +88,14 @@ public:
   int getcseq( void );
 
   /* specific headers */
-  bool addviaheader( const char *host, projectsippacket *ref = NULL );
-  bool addwwwauthenticateheader( projectsippacket *ref );
+  bool addviaheader( const char *host, projectsippacket::pointer ref = nullptr );
+  bool addwwwauthenticateheader( projectsippacket::pointer ref );
+  void addauthorizationheader( projectsippacket::pointer ref, std::string &user, std::string &password );
   bool addremotepartyid( const char * realm,
                           const char *calleridname,
                           const char * callerid,
                           bool hide );
-  bool checkauth( projectsippacket *ref, stringptr password );
+  bool checkauth( projectsippacket::pointer ref, stringptr password );
 
   /*
     Request-Line  =  Method SP Request-URI SP SIP-Version CRLF

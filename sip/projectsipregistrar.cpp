@@ -66,7 +66,7 @@ void projectsipregistration::regstart( projectsippacket::pointer pk )
                     std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
 
-    toobrief.addviaheader( via.c_str(), pk.get() );
+    toobrief.addviaheader( via.c_str(), pk );
 
     toobrief.addheader( projectsippacket::Min_Expires,
                 DEFAULTSIPEXPIRES );
@@ -102,9 +102,9 @@ void projectsipregistration::regstart( projectsippacket::pointer pk )
                     std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
 
-  this->authrequest->addviaheader( via.c_str(), pk.get() );
+  this->authrequest->addviaheader( via.c_str(), pk );
 
-  this->authrequest->addwwwauthenticateheader( pk.get() );
+  this->authrequest->addwwwauthenticateheader( pk );
 
   this->authrequest->addheader( projectsippacket::To,
                       pk->getheader( projectsippacket::To ) );
@@ -149,7 +149,7 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
   }
 
   if( !password ||
-        !this->currentpacket->checkauth( this->authrequest.get(), password ) )
+        !this->currentpacket->checkauth( this->authrequest, password ) )
   {
     projectsippacket failedauth;
 
@@ -159,7 +159,7 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
                     std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
 
-    failedauth.addviaheader( via.c_str(), this->currentpacket.get() );
+    failedauth.addviaheader( via.c_str(), this->currentpacket );
 
     failedauth.addheader( projectsippacket::To,
                 this->currentpacket->getheader( projectsippacket::To ) );
@@ -229,7 +229,7 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
                     std::string( ":" ) +
                     std::to_string( projectsipconfig::getsipport() );
 
-  p.addviaheader( via.c_str(), this->currentpacket.get() );
+  p.addviaheader( via.c_str(), this->currentpacket );
   p.addheader( projectsippacket::To,
               this->currentpacket->getheader( projectsippacket::To ) );
   p.addheader( projectsippacket::From,

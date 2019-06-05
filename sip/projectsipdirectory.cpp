@@ -8,50 +8,50 @@
 //static projectsipdirdomain dir;
 static projectsipdirdomain::pointer dir = projectsipdirdomain::create();
 
-/*******************************************************************************
-Function: projectsipdiruser
-Purpose: Constructor
-Updated: 22.01.2019
-*******************************************************************************/
+/*!md
+## projectsipdiruser
+Constructor
+
+*/
 projectsipdiruser::projectsipdiruser( void )
 {
 }
 
-/*******************************************************************************
-Function: projectsipdirdomain::create
-Purpose: Create auto pointer.
-Updated: 22.01.2019
-*******************************************************************************/
+/*!md
+## projectsipdirdomain::create
+Create auto pointer.
+
+*/
 projectsipdiruser::pointer projectsipdiruser::create( void )
 {
   return pointer( new projectsipdiruser() );
 }
 
-/*******************************************************************************
-Function: projectsipdirdomain
-Purpose: Constructor
-Updated: 22.01.2019
-*******************************************************************************/
+/*!md
+## projectsipdirdomain
+Constructor
+
+*/
 projectsipdirdomain::projectsipdirdomain( void )
 {
 
 }
 
-/*******************************************************************************
-Function: projectsipdirdomain::create
-Purpose: Create auto pointer.
-Updated: 22.01.2019
-*******************************************************************************/
+/*!md
+## projectsipdirdomain::create
+Create auto pointer.
+
+*/
 projectsipdirdomain::pointer projectsipdirdomain::create( void )
 {
   return pointer( new projectsipdirdomain() );
 }
 
-/*******************************************************************************
-Function: adduser
-Purpose: Add a user to this domain. If the user exists then replace.
-Updated: 20.02.2019
-*******************************************************************************/
+/*!md
+## adduser
+Add a user to this domain. If the user exists then replace.
+
+*/
 void projectsipdirdomain::adduser( std::string &user, std::string &secret )
 {
   projectsipdirusers::iterator it;
@@ -70,11 +70,11 @@ void projectsipdirdomain::adduser( std::string &user, std::string &secret )
 }
 
 
-/*******************************************************************************
-Function: removeuser
-Purpose: Remove a user from a domain.
-Updated: 11.03.2019
-*******************************************************************************/
+/*!md
+## removeuser
+Remove a user from a domain.
+
+*/
 void projectsipdirdomain::removeuser( std::string &user )
 {
   projectsipdirusers::iterator it;
@@ -85,15 +85,15 @@ void projectsipdirdomain::removeuser( std::string &user )
   }
 }
 
-/*******************************************************************************
-Function: lookuppassword
-Purpose: Looks up the users password from our directory. Our data must be
+/*!md
+## lookuppassword
+Looks up the users password from our directory. Our data must be
 populated via the http server. This also then limits the look up on rogue
 clients trying to randomly lookup username/password combos. This may create a
 slower load on startup and greater memory requirement. But seems to be the best
 option.
-Updated: 22.01.2019
-*******************************************************************************/
+
+*/
 stringptr projectsipdirdomain::lookuppassword( substring domain, substring user )
 {
   projectsipdirdomain::pointer ref = projectsipdirdomain::lookupdomain( domain );
@@ -116,11 +116,11 @@ stringptr projectsipdirdomain::lookuppassword( substring domain, substring user 
   return stringptr();
 }
 
-/*******************************************************************************
-Function: lookuppassword
-Purpose: As above but can pass in string references.
-Updated: 20.02.2019
-*******************************************************************************/
+/*!md
+## lookuppassword
+As above but can pass in string references.
+
+*/
 stringptr projectsipdirdomain::lookuppassword( std::string &domain, std::string &user )
 {
   projectsipdirdomain::pointer ref = projectsipdirdomain::lookupdomain( domain );
@@ -142,11 +142,11 @@ stringptr projectsipdirdomain::lookuppassword( std::string &domain, std::string 
   return stringptr();
 }
 
-/*******************************************************************************
-Function: userexist
-Purpose: Looks up a user in a domain to see if they exist.
-Updated: 20.02.2019
-*******************************************************************************/
+/*!md
+## userexist
+Looks up a user in a domain to see if they exist.
+
+*/
 bool projectsipdirdomain::userexist( std::string &domain, std::string &user )
 {
   projectsipdirdomain::pointer ref = projectsipdirdomain::lookupdomain( domain );
@@ -188,11 +188,11 @@ bool projectsipdirdomain::userexist( std::string &user )
 }
 
 
-/*******************************************************************************
-Function: lookupdomain
-Purpose: Returns a domain object from our directory (assuming we have one).
-Updated: 22.01.2019
-*******************************************************************************/
+/*!md
+## lookupdomain
+Returns a domain object from our directory (assuming we have one).
+
+*/
 projectsipdirdomain::pointer projectsipdirdomain::lookupdomain( substring domain )
 {
   projectsipdirdomain::pointer ref;
@@ -211,7 +211,7 @@ projectsipdirdomain::pointer projectsipdirdomain::lookupdomain( substring domain
     it = dirref->find( l[ i - 1 ] );
     if( dirref->end() == it )
     {
-      return ref;
+      return projectsipdirdomain::pointer();
     }
     ref = it->second;
     dirref = &it->second->subdomains;
@@ -220,11 +220,11 @@ projectsipdirdomain::pointer projectsipdirdomain::lookupdomain( substring domain
   return ref;
 }
 
-/*******************************************************************************
-Function: lookupdomain
-Purpose: Returns a domain object from our directory (assuming we have one).
-Updated: 22.01.2019
-*******************************************************************************/
+/*!md
+## lookupdomain
+Returns a domain object from our directory (assuming we have one).
+
+*/
 projectsipdirdomain::pointer projectsipdirdomain::lookupdomain( std::string &dstr )
 {
   projectsipdirdomain::pointer ref;
@@ -241,8 +241,7 @@ projectsipdirdomain::pointer projectsipdirdomain::lookupdomain( std::string &dst
     it = dirref->find( l[ i - 1 ] );
     if( dirref->end() == it )
     {
-      projectsipdirdomain::pointer n;
-      return n;
+      return projectsipdirdomain::pointer();
     }
     ref = it->second;
     dirref = &it->second->subdomains;
@@ -251,11 +250,11 @@ projectsipdirdomain::pointer projectsipdirdomain::lookupdomain( std::string &dst
   return ref;
 }
 
-/*******************************************************************************
-Function: adddomain
-Purpose: Returns a domain object from our directory (assuming we have one).
-Updated: 20.02.2019
-*******************************************************************************/
+/*!md
+## adddomain
+Returns a domain object from our directory (assuming we have one).
+
+*/
 projectsipdirdomain::pointer projectsipdirdomain::adddomain( std::string &domain )
 {
   projectsipdirdomain::pointer retval;
@@ -286,9 +285,9 @@ projectsipdirdomain::pointer projectsipdirdomain::adddomain( std::string &domain
 
 }
 
-/*******************************************************************************
-Function: removedomain
-Purpose: Removes a domain. Will tidy up the tree of domains if they are unused.
+/*!md
+## removedomain
+Removes a domain. Will tidy up the tree of domains if they are unused.
 com ---> babblevoice ---> bling
                      ---> blong
 removedomain( bling.babblevoice.com ) will remove only bling
@@ -303,8 +302,8 @@ com ---> yadaya      ---> bling
 It ill remove the specified domain regardless of it having children, however
 parent domains will be tidied up (removed) if they are empty of other domains
 and users.
-Updated: 11.03.2019
-*******************************************************************************/
+
+*/
 bool projectsipdirdomain::removedomain( std::string &domain, bool force )
 {
   std::string::size_type i = domain.find( '.' );
@@ -352,11 +351,11 @@ bool projectsipdirdomain::removedomain( std::string &domain, bool force )
 }
 
 
-/*******************************************************************************
-Function: httpget
-Purpose: Report on directory information
-Updated: 20.02.2019
-*******************************************************************************/
+/*!md
+## httpget
+Report on directory information
+
+*/
 void projectsipdirdomain::httpget( stringvector &path, projectwebdocument &response )
 {
   projectsipdirdomain::pointer ptr;
@@ -416,9 +415,9 @@ void projectsipdirdomain::httpget( stringvector &path, projectwebdocument &respo
   response.setstatusline( 404, "Not found" );
 }
 
-/*******************************************************************************
-Function: httpput
-Purpose: Respods to put requests form our control server.
+/*!md
+## httpput
+Respods to put requests form our control server.
 It needs to handle the following array:
 HTTP PUT /dir/bling.babblevoice.com
 {
@@ -432,8 +431,8 @@ OR
 HTTP PUT /dir/bling.babblevoice.com/1003
 { "secret": "mysecret"}
 
-Updated: 20.02.2019
-*******************************************************************************/
+
+*/
 void projectsipdirdomain::httpput( stringvector &path, JSON::Value &body, projectwebdocument &response )
 {
   if( path.size() <= 1 )
@@ -484,9 +483,9 @@ void projectsipdirdomain::httpput( stringvector &path, JSON::Value &body, projec
   response.addheader( projectwebdocument::Content_Length, 0 );
 }
 
-/*******************************************************************************
-Function: httppatch
-Purpose: Responds to patch requests form our control server. The domain must
+/*!md
+## httppatch
+Responds to patch requests form our control server. The domain must
 already exist.
 It needs to handle the following array:
 HTTP PUT /dir/bling.babblevoice.com
@@ -505,8 +504,8 @@ HTTP PUT /dir/bling.babblevoice.com/1003
 
 The document can be the same as put, but we will update the entry without removing
 some items.
-Updated: 20.02.2019
-*******************************************************************************/
+
+*/
 void projectsipdirdomain::httppatch( stringvector &path, JSON::Value &body, projectwebdocument &response )
 {
 
@@ -579,11 +578,11 @@ void projectsipdirdomain::httppatch( stringvector &path, JSON::Value &body, proj
   }
 }
 
-/*******************************************************************************
-Function: httpdelete
-Purpose: Report on directory information
-Updated: 20.02.2019
-*******************************************************************************/
+/*!md
+## httpdelete
+Report on directory information
+
+*/
 void projectsipdirdomain::httpdelete( stringvector &path, projectwebdocument &response )
 {
   if( 3 == path.size() )

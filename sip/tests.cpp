@@ -168,13 +168,13 @@ void testsippacket( void )
 
   // Test sip packet creation
   {
-    projectsippacket testpacket;
+    projectsippacket::pointer testpacket = projectsippacket::create();
 
-    testpacket.setstatusline( 180, "Ringing" );
-    testpacket.addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
-    testpacket.addheader( projectsippacket::CSeq, "314159 INVITE" );
+    testpacket->setstatusline( 180, "Ringing" );
+    testpacket->addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
+    testpacket->addheader( projectsippacket::CSeq, "314159 INVITE" );
 
-    projecttest( *testpacket.strptr(),
+    projecttest( *testpacket->strptr(),
                   "SIP/2.0 180 Ringing\r\n"
                   "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
                   "CSeq: 314159 INVITE\r\n"
@@ -183,10 +183,10 @@ void testsippacket( void )
                   );
 
 
-    testpacket.setbody( "Some SDP?" );
-    testpacket.addheader( projectsippacket::Via, "SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1" );
+    testpacket->setbody( "Some SDP?" );
+    testpacket->addheader( projectsippacket::Via, "SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1" );
 
-    projecttest( *testpacket.strptr(),
+    projecttest( *testpacket->strptr(),
                   "SIP/2.0 180 Ringing\r\n"
                   "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
                   "CSeq: 314159 INVITE\r\n"
@@ -197,19 +197,19 @@ void testsippacket( void )
                   );
 
 
-    projectsippacket testpacket2;
-    testpacket2.setrequestline( projectsippacket::REGISTER, "sip:registrar.biloxi.com" );
+    projectsippacket::pointer testpacket2 = projectsippacket::create();
+    testpacket2->setrequestline( projectsippacket::REGISTER, "sip:registrar.biloxi.com" );
 
-    testpacket2.addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
-    testpacket2.addheader( projectsippacket::CSeq, "314159 INVITE" );
+    testpacket2->addheader( projectsippacket::From, "Alice <sip:alice@atlanta.com>;tag=1928301774" );
+    testpacket2->addheader( projectsippacket::CSeq, "314159 INVITE" );
 
-    testpacket2.getmethod();
-    projecttest( testpacket2.getheader( projectsippacket::From ), "Alice <sip:alice@atlanta.com>;tag=1928301774", "Header does not match." );
+    testpacket2->getmethod();
+    projecttest( testpacket2->getheader( projectsippacket::From ), "Alice <sip:alice@atlanta.com>;tag=1928301774", "Header does not match." );
 
-    testpacket2.addviaheader( "myhost", &testpacket );
-    testpacket2.setbody( "Some SDP" );
+    testpacket2->addviaheader( "myhost", testpacket );
+    testpacket2->setbody( "Some SDP" );
 
-    projecttest( *testpacket2.strptr(),
+    projecttest( *testpacket2->strptr(),
                   "REGISTER sip:registrar.biloxi.com SIP/2.0\r\n"
                   "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
                   "CSeq: 314159 INVITE\r\n"
@@ -584,7 +584,7 @@ void authtest( void )
             "Wrong nonce." );
 
 
-  if( !authrequest->checkauth( request.get(), projectsipdirdomain::lookuppassword( dom, u ) ) )
+  if( !authrequest->checkauth( request, projectsipdirdomain::lookuppassword( dom, u ) ) )
   {
     std::cout << "Failed authentication - that should not have happened" << std::endl;
   }

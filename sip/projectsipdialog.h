@@ -47,6 +47,7 @@ public:
 
   std::string callid;
   std::string alertinfo;
+  uint32_t cseq;
 
   /* our state functions */
 
@@ -61,6 +62,7 @@ public:
 
   /* outbound invite */
   void waitforinviteprogress( projectsippacket::pointer pk );
+  void waitforinviteprogressafterauth( projectsippacket::pointer pk );
 
   /* Our state */
   std::function<void ( projectsippacket::pointer pk ) > nextstate;
@@ -96,7 +98,7 @@ private:
   void senderror( void );
 
   /* Verbs */
-  void sendinvite( JSON::Object &request, projectwebdocument &response );
+  bool sendinvite( void );
   void sendbye( void );
 
   /* clean up */
@@ -117,6 +119,7 @@ private:
   bool originator;
 
   std::string domain;
+
   JSON::Value remotesdp;
   JSON::Value oursdp;
 
@@ -130,6 +133,15 @@ private:
   std::time_t endat;
 
   stringptr ourtag;
+
+  /* outbound values */
+  std::string authsecret;
+  std::string fromuser;
+  std::string todomain;
+  std::string touser;
+  int maxforwards;
+  std::string callerid, calleridname;
+  bool hidecid;
 };
 
 

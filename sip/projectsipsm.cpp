@@ -80,7 +80,7 @@ void projectsipsm::handleoptions( projectsippacket::pointer pk )
   projectsippacket response;
 
   response.setstatusline( 200, "OK" );
-  response.addviaheader( projectsipconfig::gethostip(), pk.get() );
+  response.addviaheader( projectsipconfig::gethostip(), pk );
 
   response.addheader( projectsippacket::To,
                       pk->getheader( projectsippacket::To ) );

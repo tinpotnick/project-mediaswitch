@@ -64,7 +64,7 @@ Function: getversion
 Purpose: As it says.
 Updated: 02.01.2019
 *******************************************************************************/
-const char* projectwebdocument::getversion( void ) 
+const char* projectwebdocument::getversion( void )
 {
   return "HTTP/1.1";
 }
@@ -159,7 +159,7 @@ const char *projectwebdocument::getheaderstr( int header )
       return "Expires";
     case Last_Modified:
       return "Last-Modified";
-    
+
     default:
       return "";
   }
@@ -418,7 +418,7 @@ int projectwebdocument::getheaderfromcrc( int crc )
 
 /*******************************************************************************
 Function: iscomplete
-Purpose: Is the document complete, i.e. we may have received a partial xfer 
+Purpose: Is the document complete, i.e. we may have received a partial xfer
 to us so we need to wait for more.
 Updated: 22.02.2019
 *******************************************************************************/
@@ -453,7 +453,7 @@ bool projectwebdocument::iscomplete( void )
 
 /*******************************************************************************
 Function: append
-Purpose: Add more data to the document. We NULL terminate the input array so 
+Purpose: Add more data to the document. We NULL terminate the input array so
 there must be space to do this.
 Updated: 22.02.2019
 *******************************************************************************/
@@ -916,7 +916,7 @@ void projectwebdocument::setrequestline( int method, std::string uri )
   newline.reserve( DEFAULTHEADERLINELENGTH );
 
   newline = this->getmethodstr( method );
-  this->methodstr.start( newline.size() );
+  this->methodstr.end( newline.size() );
   newline += ' ';
   this->uri.start( newline.size() );
   newline += uri;
@@ -1028,8 +1028,8 @@ void projectwebdocument::addheader( int header, std::string value )
 
     this->storeheader( header, substring( this->document, this->body.start(), this->body.start() + completeheader.size() - 4 ) );
 
-    this->body = substring( this->document, 
-                            this->body.start() + completeheader.size(), 
+    this->body = substring( this->document,
+                            this->body.start() + completeheader.size(),
                             this->body.end() + completeheader.size() );
   }
   this->headercount++;
@@ -1083,7 +1083,7 @@ httpuri::httpuri( substring s )
   {
     this->host--;
   }
-  
+
 
   substring subhost = this->host.find( ':' );
   if( 0 != subhost.end() )
@@ -1106,4 +1106,3 @@ httpuri::httpuri( substring s )
     this->query.end( this->s.end() );
   }
 }
-

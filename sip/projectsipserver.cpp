@@ -88,7 +88,6 @@ void projectsipserverpacket::respond( stringptr doc )
   sipserver->getsocket()->async_send_to( boost::asio::buffer( *doc ), this->sender_endpoint,
           boost::bind( &projectsipserverpacket::handlesend,
             shared_from_this(),
-            doc,
             boost::asio::placeholders::error,
             boost::asio::placeholders::bytes_transferred) );
 }
@@ -98,7 +97,7 @@ void projectsipserverpacket::respond( stringptr doc )
 Just placeholder for now - we should perhaps track errors.
 
 */
-void projectsipserverpacket::handlesend( boost::shared_ptr<std::string> message,
+void projectsipserverpacket::handlesend(
       const boost::system::error_code& error,
       std::size_t bytes_transferred)
 {
