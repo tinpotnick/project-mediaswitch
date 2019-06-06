@@ -38,79 +38,86 @@ static void killserver( int signum )
 
 static void handlewebrequest( projectwebdocument &request, projectwebdocument &response )
 {
-  std::string path = request.getrequesturi().str();
-
-  if( path.length() < 1 )
+  try
   {
-    response.setstatusline( 404, "Not found" );
-    return;
-  }
+    std::string path = request.getrequesturi().str();
 
-  path.erase( 0, 1 ); /* remove the leading / */
-  stringvector pathparts = splitstring( path, '/' );
-
-
-  if( "reg" == pathparts[ 0 ] )
-  {
-    projectsipregistration::httpget( pathparts, response );
-  }
-  else if( "dir" == pathparts[ 0 ] )
-  {
-    switch( request.getmethod() )
+    if( path.length() < 1 )
     {
-      case projectwebdocument::GET:
-      {
+      response.setstatusline( 404, "Not found" );
+      return;
+    }
 
-        projectsipdirdomain::httpget( pathparts, response );
-        break;
-      }
-      case projectwebdocument::PUT:
+    path.erase( 0, 1 ); /* remove the leading / */
+    stringvector pathparts = splitstring( path, '/' );
+
+
+    if( "reg" == pathparts[ 0 ] )
+    {
+      projectsipregistration::httpget( pathparts, response );
+    }
+    else if( "dir" == pathparts[ 0 ] )
+    {
+      switch( request.getmethod() )
       {
-        JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
-        projectsipdirdomain::httpput( pathparts, body, response );
-        break;
-      }
-      case projectwebdocument::PATCH:
-      {
-        JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
-        projectsipdirdomain::httppatch( pathparts, body, response );
-        break;
-      }
-      case projectwebdocument::DELETE:
-      {
-        projectsipdirdomain::httpdelete( pathparts, response );
-        break;
+        case projectwebdocument::GET:
+        {
+
+          projectsipdirdomain::httpget( pathparts, response );
+          break;
+        }
+        case projectwebdocument::PUT:
+        {
+          JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
+          projectsipdirdomain::httpput( pathparts, body, response );
+          break;
+        }
+        case projectwebdocument::PATCH:
+        {
+          JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
+          projectsipdirdomain::httppatch( pathparts, body, response );
+          break;
+        }
+        case projectwebdocument::DELETE:
+        {
+          projectsipdirdomain::httpdelete( pathparts, response );
+          break;
+        }
       }
     }
-  }
-  else if( "dialog" == pathparts[ 0 ] )
-  {
-    switch( request.getmethod() )
+    else if( "dialog" == pathparts[ 0 ] )
     {
-      case projectwebdocument::GET:
+      switch( request.getmethod() )
       {
-        projectsipdialog::httpget( pathparts, response );
-        break;
-      }
-      case projectwebdocument::PUT:
-      {
-        JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
+        case projectwebdocument::GET:
+        {
+          projectsipdialog::httpget( pathparts, response );
+          break;
+        }
+        case projectwebdocument::PUT:
+        {
+          JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
 
-        projectsipdialog::httpput( pathparts, body, response );
-        break;
-      }
-      case projectwebdocument::POST:
-      {
-        JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
+          projectsipdialog::httpput( pathparts, body, response );
+          break;
+        }
+        case projectwebdocument::POST:
+        {
+          JSON::Value body = JSON::parse( *( request.getbody().strptr() ) );
 
-        projectsipdialog::httppost( pathparts, body, response );
-        break;
+          projectsipdialog::httppost( pathparts, body, response );
+          break;
+        }
       }
     }
+    else
+    {
+      response.setstatusline( 404, "Not found" );
+    }
   }
-  else
+  catch( ... )
   {
-    response.setstatusline( 404, "Not found" );
+    response.setstatusline( 500, "Unknown error in request" );
   }
 }
 
