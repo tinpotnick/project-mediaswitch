@@ -318,6 +318,8 @@ The server will return a JSON document. Including stats regarding the workload o
 * RFC 3550: RTP: A Transport Protocol for Real-Time Applications
 * RFC 3551: RTP Profile for Audio and Video Conferences with Minimal Control
 
+Note, I have included RFC 4028 here for possible future work.
+
 # Testing
 
 The SIP server can be run with the test flag:
