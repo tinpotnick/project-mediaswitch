@@ -14,6 +14,8 @@
 #include <deque>
 #include <unordered_map>
 
+#include <thread>
+
 #include "projecthttpserver.h"
 #include "json.hpp"
 #include "projectdaemon.h"
@@ -21,7 +23,8 @@
 #include "projectrtpchannel.h"
 
 
-boost::asio::io_service io_service;
+boost::asio::io_service ioservice;
+boost::asio::io_service workerservice;
 
 typedef std::deque<projectrtpchannel::pointer> rtpchannels;
 typedef std::unordered_map<std::string, projectrtpchannel::pointer> activertpchannels;
@@ -39,7 +42,8 @@ Actually do the stopping
 */
 static void stopserver( void )
 {
-  io_service.stop();
+  workerservice.stop();
+  ioservice.stop();
 }
 
 /*!md
@@ -58,78 +62,80 @@ As it says...
 */
 static void handlewebrequest( projectwebdocument &request, projectwebdocument &response )
 {
-  std::string path = request.getrequesturi().str();
-
-  if( path.length() < 1 )
+  try
   {
-    response.setstatusline( 404, "Not found" );
-    return;
-  }
+    std::string path = request.getrequesturi().str();
 
-  path.erase( 0, 1 ); /* remove the leading / */
-  stringvector pathparts = splitstring( path, '/' );
-
-  int method = request.getmethod();
-  if( "channel" == pathparts[ 0 ] )
-  {
-    if( 1 == pathparts.size() )
+    if( path.length() < 1 )
     {
-      if( projectwebdocument::POST == method )
+      response.setstatusline( 404, "Not found" );
+      return;
+    }
+
+    path.erase( 0, 1 ); /* remove the leading / */
+    stringvector pathparts = splitstring( path, '/' );
+
+    int method = request.getmethod();
+    if( "channel" == pathparts[ 0 ] )
+    {
+      if( 1 == pathparts.size() )
       {
-        JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
-        if( !body.has_key( "channel" ) )
+        if( projectwebdocument::POST == method )
         {
-          if( dormantchannels.size() == 0 )
+          JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
+          if( !body.has_key( "channel" ) )
           {
-            response.setstatusline( 503, "Currently out of channels" );
-            response.addheader( projectwebdocument::Content_Length, 0 );
-            response.addheader( projectwebdocument::Content_Type, "text/json" );
-            return;
-          }
+            if( dormantchannels.size() == 0 )
+            {
+              response.setstatusline( 503, "Currently out of channels" );
+              response.addheader( projectwebdocument::Content_Length, 0 );
+              response.addheader( projectwebdocument::Content_Type, "text/json" );
+              return;
+            }
 
-          std::string u = uuid();
+            std::string u = uuid();
 
-          projectrtpchannel::pointer p = *dormantchannels.begin();
-          dormantchannels.pop_front();
-          activechannels[ u ] = p;
-          p->open( projectrtpchannel::PCMA );
+            projectrtpchannel::pointer p = *dormantchannels.begin();
+            dormantchannels.pop_front();
+            activechannels[ u ] = p;
+            p->open( projectrtpchannel::PCMA );
 
-          JSON::Object v;
-          v[ "channel" ] = u;
-          v[ "port" ] = ( JSON::Integer ) p->getport();
-          v[ "ip" ] = publicaddress;
-          std::string t = JSON::to_string( v );
-
-          response.setstatusline( 200, "Ok" );
-          response.addheader( projectwebdocument::Content_Length, t.size() );
-          response.addheader( projectwebdocument::Content_Type, "text/json" );
-          response.setbody( t.c_str() );
-          return;
-        }
-      }
-      else if( projectwebdocument::DELETE == method )
-      {
-        JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
-        if ( body.has_key( "channel" ) )
-        {
-          std::string channel = JSON::as_string( body[ "channel" ] );
-          activertpchannels::iterator chan = activechannels.find( channel );
-          if ( activechannels.end() != chan )
-          {
-            chan->second->close();
-            activechannels.erase( chan );
-            dormantchannels.push_back( chan->second );
+            JSON::Object v;
+            v[ "channel" ] = u;
+            v[ "port" ] = ( JSON::Integer ) p->getport();
+            v[ "ip" ] = publicaddress;
+            std::string t = JSON::to_string( v );
 
             response.setstatusline( 200, "Ok" );
-            response.addheader( projectwebdocument::Content_Length, "0" );
+            response.addheader( projectwebdocument::Content_Length, t.size() );
+            response.addheader( projectwebdocument::Content_Type, "text/json" );
+            response.setbody( t.c_str() );
             return;
           }
         }
+        else if( projectwebdocument::DELETE == method )
+        {
+          JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
+          if ( body.has_key( "channel" ) )
+          {
+            std::string channel = JSON::as_string( body[ "channel" ] );
+            activertpchannels::iterator chan = activechannels.find( channel );
+            if ( activechannels.end() != chan )
+            {
+              chan->second->close();
+              activechannels.erase( chan );
+              dormantchannels.push_back( chan->second );
+
+              response.setstatusline( 200, "Ok" );
+              response.addheader( projectwebdocument::Content_Length, "0" );
+              return;
+            }
+          }
+        }
       }
-    }
-    else if( pathparts.size() > 1 && "bridge"  == pathparts[ 1 ] )
-    {
-      if( projectwebdocument::POST == method )
+      else if( 2 == pathparts.size() &&
+                "bridge"  == pathparts[ 1 ] &&
+                projectwebdocument::PUT == method )
       {
         JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
         if ( body.has_key( "channels" ) )
@@ -155,26 +161,102 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
           }
         }
       }
-    }
-  }
+      else if( 3 == pathparts.size() &&
+              "target"  == pathparts[ 1 ] &&
+              projectwebdocument::PUT == method )
+      {
+        JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
 
-  response.setstatusline( 404, "Not found" );
+        /* If we get here - we have /channel/target/<uuid> */
+        activertpchannels::iterator chan = activechannels.find( pathparts[ 2 ] );
+        if ( activechannels.end() != chan )
+        {
+          short port = JSON::as_int64( body[ "port" ] );
+          std::string address = JSON::as_string( body[ "address" ] );
+
+          chan->second->target( address, port );
+
+          response.setstatusline( 200, "Ok" );
+          response.addheader( projectwebdocument::Content_Length, "0" );
+          return;
+        }
+      }
+    }
+
+    response.setstatusline( 404, "Not found" );
+  }
+  catch( ... )
+  {
+    response.setstatusline( 500, "Unknown error" );
+  }
 }
 
 /*!md
 # startserver
-As it says...
+Start our server and kick off all of the worker threads.
+
+We have a main ioservice which handles (as it says) all of the I/O. HTTP and RTP traffic is received in this thread. Further worker threads are created and should be tied to a CPU so we can spread the workload of heavy CPU load items (such as transcoding).
+
+If we have 1 CPU (std::thread::hardware_concurrency) then we create 1 worker thread as we cannot tie up the main I/O ioservice. If we have 2, then we assign our main thread to the I/O and a created thread to workload. If we have enough cores then we assign each thread its own CPU. We may want to assess what happens with ounly 2 cores - we don't want 1 idle with 1 heavily transcoding - so we may wish to balance that somehow in the future.
+
+To create a worker thread item:
+
+workerservice->post( boost::bind( transcodeg722, shared_from_this() ) );
+
 */
 void startserver( short port )
 {
+  unsigned numcpus = std::thread::hardware_concurrency();
+
+  if( numcpus > 1 )
+  {
+    numcpus--;
+  }
+
+  std::cout << "Starting " << numcpus << " worker threads" << std::endl;
+
+  // A mutex ensures orderly access to std::cout from multiple threads.
+  std::mutex iomutex;
+  std::vector< std::thread > threads( numcpus );
+
   try
   {
-    projecthttpserver h( io_service, port, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
-  io_service.run();
+    cpu_set_t cpuset;
+    CPU_ZERO( &cpuset );
+    CPU_SET( 0, &cpuset );
+
+    if ( pthread_setaffinity_np( pthread_self(), sizeof( cpu_set_t ), &cpuset ) )
+    {
+      std::cerr << "Error tyng thread to CPU " << 0 << std::endl;
+    }
+
+    for ( unsigned i = 0; i < numcpus; i++ )
+    {
+      threads[ i ] = std::thread( []()
+      {
+        workerservice.run();
+      } );
+
+      CPU_ZERO( &cpuset );
+      CPU_SET( ( i + 1 ) % numcpus, &cpuset );
+
+      if ( pthread_setaffinity_np( threads[ i ].native_handle() , sizeof( cpu_set_t ), &cpuset ) )
+      {
+        std::cerr << "Error tyng thread to CPU " << 0 << std::endl;
+      }
+    }
+
+    projecthttpserver h( ioservice, port, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
+    ioservice.run();
+
+    for ( auto& t : threads )
+    {
+      t.join();
+    }
   }
   catch( std::exception& e )
   {
-  std::cerr << e.what() << std::endl;
+    std::cerr << e.what() << std::endl;
   }
 
   // Clean up
@@ -187,7 +269,7 @@ void startserver( short port )
 # initchannels
 Create our channel objects and pre allocate any memory.
 */
-void initchannels( short startport, short endport )
+void initchannels( unsigned short startport, unsigned short endport )
 {
   int i;
 
@@ -196,7 +278,7 @@ void initchannels( short startport, short endport )
     // Test we can open them all if needed and warn if necessary.
     for( i = startport; i < endport; i += 2 )
     {
-      projectrtpchannel::pointer p = projectrtpchannel::create( io_service, i );
+      projectrtpchannel::pointer p = projectrtpchannel::create( ioservice, i );
       p->open( projectrtpchannel::PCMA );
       dormantchannels.push_back( p );
     }
@@ -223,8 +305,8 @@ int main( int argc, const char* argv[] )
   port = 9002;
   publicaddress = "127.0.0.1";
 
-  short startrtpport = 10000;
-  short endrtpport = 20000;
+  unsigned short startrtpport = 10000;
+  unsigned short endrtpport = 20000;
 
   srand( time( NULL ) );
 

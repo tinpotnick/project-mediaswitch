@@ -44,19 +44,20 @@ class projectrtpchannel :
 {
 
 public:
-  projectrtpchannel( boost::asio::io_service &io_service, short port );
+  projectrtpchannel( boost::asio::io_service &io_service, unsigned short port );
   ~projectrtpchannel( void );
 
   typedef boost::shared_ptr< projectrtpchannel > pointer;
-  static pointer create( boost::asio::io_service &io_service, short port );
+  static pointer create( boost::asio::io_service &io_service, unsigned short port );
 
   enum{ PCMA, PCMU, ILBC20, ILBC30, G722 };
   void open( int codec );
   void close( void );
 
-  short getport( void );
+  unsigned short getport( void );
 
   void bridgeto( pointer other );
+  void target( std::string &address, unsigned short port );
 
   void writepacket( uint8_t *pk, size_t length );
   void handlesend(
@@ -65,7 +66,10 @@ public:
 
 private:
   projectrtpchannel::pointer bridgedto;
-  short port;
+  unsigned short port;
+
+  boost::asio::ip::udp::resolver resolver;
+
   boost::asio::ip::udp::socket rtpsocket;
   boost::asio::ip::udp::socket rtcpsocket;
 
@@ -74,6 +78,7 @@ private:
   boost::asio::ip::udp::endpoint rtcpsenderendpoint;
 
   bool receivedrtp;
+  bool targetconfirmed;
 
   unsigned char *rtpdata;
   unsigned char *rtcpdata;
@@ -85,6 +90,9 @@ private:
 
   void handlertpdata( std::size_t );
   void handlertcpdata( void );
+  void handletargetresolve (
+              boost::system::error_code e,
+              boost::asio::ip::udp::resolver::iterator it );
 
   uint8_t getpacketversion( uint8_t *pk );
   uint8_t getpacketpadding( uint8_t *pk );
