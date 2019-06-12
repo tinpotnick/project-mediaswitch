@@ -1,5 +1,4 @@
-
-CCOPTS:=-Wall -g -O3 -fstack-protector-all
+CCOPTS:=-Wall -g -O3 -fstack-protector-all -std=c++17
 
 # Find all sources
 CPPSOURCES:=$(shell ls *.cpp)

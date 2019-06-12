@@ -1,4 +1,4 @@
-CCOPTS:=-Wall -g -O3 -fstack-protector-all -I../projectlib/
+CCOPTS:=-Wall -g -O3 -fstack-protector-all -I../projectlib/ -std=c++17
 LL:=-L../Debug/ -lproject -lboost_system -lboost_random -lpthread -lcrypto -lresolv
 
 default: ../Debug/project-sip
