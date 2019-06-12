@@ -22,11 +22,13 @@ Create the socket then wait for data
 
 echo "This is my data" > /dev/udp/127.0.0.1/10000
 */
-projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, short port )
+projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsigned short port )
   : port( port ),
+  resolver( io_service ),
   rtpsocket( io_service ),
   rtcpsocket( io_service ),
   receivedrtp( false ),
+  targetconfirmed( false ),
   rtpdata( NULL ),
   rtcpdata( NULL ),
   rtpindex( 0 )
@@ -54,7 +56,7 @@ projectrtpchannel::~projectrtpchannel( void )
 # create
 
 */
-projectrtpchannel::pointer projectrtpchannel::create( boost::asio::io_service &io_service, short port )
+projectrtpchannel::pointer projectrtpchannel::create( boost::asio::io_service &io_service, unsigned short port )
 {
   return pointer( new projectrtpchannel( io_service, port ) );
 }
@@ -107,7 +109,7 @@ void projectrtpchannel::open( int codec )
   this->readsomertcp();
 }
 
-short projectrtpchannel::getport( void )
+unsigned short projectrtpchannel::getport( void )
 {
   return this->port;
 }
@@ -202,13 +204,13 @@ We have received some RTP data - now do something with it.
 void projectrtpchannel::handlertpdata( std::size_t length )
 {
   /* first check we have received the correct one and move if necessary */
-  uint32_t ts = this->gettimestamp( &this->rtpdata[ this->rtpindex ] );
-  uint8_t cccount = this->getpacketcsrccount( &this->rtpdata[ this->rtpindex ] );
-  std::cout << "rtp:" << static_cast<unsigned>( cccount ) << ":" << ts << std::endl;
+  //uint32_t ts = this->gettimestamp( &this->rtpdata[ this->rtpindex ] );
+  //uint8_t cccount = this->getpacketcsrccount( &this->rtpdata[ this->rtpindex ] );
+  //std::cout << "rtp:" << static_cast<unsigned>( cccount ) << ":" << ts << std::endl;
 
   if( this->bridgedto )
   {
-    std::cout << "yeay" << std::endl;
+    //std::cout << "yeay" << std::endl;
     this->bridgedto->writepacket( &this->rtpdata[ this->rtpindex ], length );
   }
 }
@@ -219,18 +221,60 @@ Send a [RTP] packet to our endpoint.
 */
 void projectrtpchannel::writepacket( uint8_t *pk, size_t length )
 {
-  if( !this->receivedrtp )
+  if( this->receivedrtp || this->targetconfirmed )
+  {
+    this->rtpsocket.async_send_to(
+                      boost::asio::buffer( pk, length ),
+                      this->confirmedrtpsenderendpoint,
+                      boost::bind( &projectrtpchannel::handlesend,
+                                    this,
+                                    boost::asio::placeholders::error,
+                                    boost::asio::placeholders::bytes_transferred ) );
+  }
+}
+
+/*!md
+## target
+Our control can set the target of the RTP stream. This can be important in order to open holes in firewall for our reverse traffic.
+*/
+void projectrtpchannel::target( std::string &address, unsigned short port )
+{
+std::cout << "address: " << address << ", port: " << port << std::endl;
+  boost::asio::ip::udp::resolver::query query( boost::asio::ip::udp::v4(), address, std::to_string( port ) );
+
+  /* Resolve the address */
+  this->resolver.async_resolve( query,
+      boost::bind( &projectrtpchannel::handletargetresolve,
+        shared_from_this(),
+        boost::asio::placeholders::error,
+        boost::asio::placeholders::iterator ) );
+}
+
+/*!md
+## handletargetresolve
+We have resolved the target address and port now use it. Further work could be to inform control there is an issue.
+*/
+void projectrtpchannel::handletargetresolve (
+            boost::system::error_code e,
+            boost::asio::ip::udp::resolver::iterator it )
+{
+  /* Don't override the symetric port we send back to */
+  if( this->receivedrtp )
   {
     return;
   }
 
-  this->rtpsocket.async_send_to(
-                    boost::asio::buffer( pk, length ),
-                    this->confirmedrtpsenderendpoint,
-                    boost::bind( &projectrtpchannel::handlesend,
-                                  this,
-                                  boost::asio::placeholders::error,
-                                  boost::asio::placeholders::bytes_transferred ) );
+  boost::asio::ip::udp::resolver::iterator end;
+
+  if( it == end )
+  {
+    /* Failure - silent (the call will be as well!) */
+    return;
+  }
+
+std::cout << "Confirmed target" << std::endl;
+  this->confirmedrtpsenderendpoint = *it;
+  this->targetconfirmed = true;
 }
 
 /*!md
