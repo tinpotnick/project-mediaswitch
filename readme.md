@@ -308,15 +308,15 @@ The server will return a JSON document. Including stats regarding the workload o
 
 # RFCs used in this project
 
-* RFC 2616: Hypertext Transfer Protocol -- HTTP/1.1
-* RFC 2617: HTTP Authentication: Basic and Digest Access Authentication
-* RFC 3261: SIP: Session Initiation Protocol
-* RFC 3881: An Extension to the Session Initiation Protocol (SIP) for Symmetric Response Routing
-* RFC 4028: Session Timers in the Session Initiation Protocol (SIP)
-* RFC 4566: SDP: Session Description Protocol
-* RFC 4317: Session Description Protocol (SDP) Offer/Answer Examples
-* RFC 3550: RTP: A Transport Protocol for Real-Time Applications
-* RFC 3551: RTP Profile for Audio and Video Conferences with Minimal Control
+* [RFC 2616](https://tools.ietf.org/html/rfc2616): Hypertext Transfer Protocol -- HTTP/1.1
+* [RFC 2617](https://tools.ietf.org/html/rfc2617): HTTP Authentication: Basic and Digest Access Authentication
+* [RFC 3261](https://tools.ietf.org/html/rfc3261): SIP: Session Initiation Protocol
+* [RFC 3881](https://tools.ietf.org/html/rfc3881): An Extension to the Session Initiation Protocol (SIP) for Symmetric Response Routing
+* [RFC 4028](https://tools.ietf.org/html/rfc4028): Session Timers in the Session Initiation Protocol (SIP)
+* [RFC 4566](https://tools.ietf.org/html/rfc4566): SDP: Session Description Protocol
+* [RFC 4317](https://tools.ietf.org/html/rfc4317): Session Description Protocol (SDP) Offer/Answer Examples
+* [RFC 3550](https://tools.ietf.org/html/rfc3550): RTP: A Transport Protocol for Real-Time Applications
+* [RFC 3551](https://tools.ietf.org/html/rfc3551): RTP Profile for Audio and Video Conferences with Minimal Control
 
 Note, I have included RFC 4028 here for possible future work.
 
