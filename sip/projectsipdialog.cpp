@@ -1463,11 +1463,12 @@ void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwe
     response.setstatusline( 200, "Ok" );
 
     // need to add sdp info.
-    (*it)->retries = 3;
+    ( *it )->retries = 3;
 
     std::string sdp = "";
     if ( b.has_key( "sdp" ) )
     {
+      ( *it )->oursdp = b[ "sdp" ];
       sdp = *( jsontosdp( JSON::as_object( b[ "sdp" ] ) ) );
     }
 
