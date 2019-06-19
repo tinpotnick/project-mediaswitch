@@ -13,8 +13,8 @@
 #include <stdint.h>
 #include <arpa/inet.h>
 
-#define RTPMAXLENGTH 1500
-#define RTCPMAXLENGTH 1500
+#include <list>
+#include <vector>
 
 /* The number of bytes in a packet */
 #define G711PAYLOADBYTES 80
@@ -22,14 +22,36 @@
 #define ILBC20PAYLOADBYTES 38
 #define ILBC30PAYLOADBYTES 50
 
+/* Need to double check max RTP length with variable length header - there could be a larger length withour CODECs */
+#define RTPMAXLENGTH 80
+#define RTCPMAXLENGTH 1500
+
 /* The number of packets we will keep in a buffer */
 #define BUFFERPACKETCOUNT 20
 
-/*******************************************************************************
-Class: projectrtpchannel
-Purpose: RTP Channel - which represents RTP and RTCP. This is here we include
-our jitter buffer. We create a cyclic window to write data into and then read
-out of.
+class rtppacket
+{
+public:
+  size_t length;
+  unsigned char pk[ RTPMAXLENGTH ];
+
+  uint8_t getpacketversion();
+  uint8_t getpacketpadding();
+  uint8_t getpacketextension();
+  uint8_t getpacketcsrccount();
+  uint8_t getpacketmarker();
+  uint8_t getpayloadtype();
+  uint16_t getsequencenumber();
+  uint32_t gettimestamp();
+  uint32_t getssrc();
+  uint32_t getcsrc( uint8_t index );
+};
+
+/*!md
+# projectrtpchannel
+Purpose: RTP Channel - which represents RTP and RTCP. This is here we include our jitter buffer. We create a cyclic window to write data into and then read out of.
+
+RTP on SIP channels should be able to switch between CODECS during a session so we have to make sure we have space for that.
 
 RTP Payload size (bytes) for the following CODECs
 G711: 80 (10mS)
@@ -37,8 +59,7 @@ G722: 80 (10mS)
 ilbc (mode 20): 38 (20mS)
 ilbc (mode 30): 50 (30mS)
 Question, What do we write this data to? We need to limit transcoding
-Updated: 01.03.2019
-*******************************************************************************/
+*/
 class projectrtpchannel :
   public boost::enable_shared_from_this< projectrtpchannel >
 {
@@ -50,22 +71,29 @@ public:
   typedef boost::shared_ptr< projectrtpchannel > pointer;
   static pointer create( boost::asio::io_service &io_service, unsigned short port );
 
-  enum{ PCMA, PCMU, ILBC20, ILBC30, G722 };
-  void open( int codec );
+  void open();
   void close( void );
 
   unsigned short getport( void );
 
-  void bridgeto( pointer other );
   void target( std::string &address, unsigned short port );
 
-  void writepacket( uint8_t *pk, size_t length );
+  typedef std::vector< int > codeclist;
+  void audio( codeclist codecs );
+
+  void writepacket( rtppacket * );
   void handlesend(
         const boost::system::error_code& error,
         std::size_t bytes_transferred);
 
+  bool canread( void ) { return this->reader; };
+  bool canwrite( void ) { return this->writer; };
+
+  bool isactive( void );
+  rtppacket *pop( void );
+  rtppacket *popordered( uint32_t ts );
+
 private:
-  projectrtpchannel::pointer bridgedto;
   unsigned short port;
 
   boost::asio::ip::udp::resolver resolver;
@@ -77,34 +105,35 @@ private:
   boost::asio::ip::udp::endpoint confirmedrtpsenderendpoint;
   boost::asio::ip::udp::endpoint rtcpsenderendpoint;
 
+  /* confirmation of where the other end of the RTP stream is */
   bool receivedrtp;
   bool targetconfirmed;
 
-  unsigned char *rtpdata;
-  unsigned char *rtcpdata;
+  bool reader;
+  bool writer;
 
-  int rtpindex;
+  rtppacket rtpdata[ BUFFERPACKETCOUNT ];
+  unsigned char rtcpdata[ RTCPMAXLENGTH ];
+
+  std::atomic_int rtpindexoldest;
+  std::atomic_int rtpindexin;
 
   void readsomertp( void );
   void readsomertcp( void );
 
-  void handlertpdata( std::size_t );
   void handlertcpdata( void );
   void handletargetresolve (
               boost::system::error_code e,
               boost::asio::ip::udp::resolver::iterator it );
 
-  uint8_t getpacketversion( uint8_t *pk );
-  uint8_t getpacketpadding( uint8_t *pk );
-  uint8_t getpacketextension( uint8_t *pk );
-  uint8_t getpacketcsrccount( uint8_t *pk );
-  uint8_t getpacketmarker( uint8_t *pk );
-  uint8_t getpayloadtype( uint8_t *pk );
-  uint16_t getsequencenumber( uint8_t *pk );
-  uint32_t gettimestamp( uint8_t *pk );
-  uint32_t getssrc( uint8_t *pk );
-  uint32_t getcsrc( uint8_t *pk, uint8_t index );
+  std::atomic_bool active;
+  uint32_t timestampdiff;
 
+  codeclist codecs;
+  int selectedcodec;
 };
+
+/*typedef std::list< projectrtpchannel::pointer > channellist;
+typedef boost::shared_ptr< channellist > channellistptr;*/
 
 #endif

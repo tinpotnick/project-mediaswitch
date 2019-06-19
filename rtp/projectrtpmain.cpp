@@ -14,6 +14,7 @@
 #include <deque>
 #include <unordered_map>
 
+#include <atomic>
 #include <thread>
 
 #include "projecthttpserver.h"
@@ -21,15 +22,20 @@
 #include "projectdaemon.h"
 
 #include "projectrtpchannel.h"
+#include "projectrtpmixer.h"
 
 
 boost::asio::io_service ioservice;
 boost::asio::io_service workerservice;
+boost::asio::deadline_timer keepalive( workerservice );
 
 typedef std::deque<projectrtpchannel::pointer> rtpchannels;
 typedef std::unordered_map<std::string, projectrtpchannel::pointer> activertpchannels;
 rtpchannels dormantchannels;
 activertpchannels activechannels;
+
+typedef std::unordered_map<std::string, projectrtpmixer::pointer> channelmixers;
+channelmixers mixers;
 
 #warning TODO
 // We probably need a config class
@@ -62,133 +68,256 @@ As it says...
 */
 static void handlewebrequest( projectwebdocument &request, projectwebdocument &response )
 {
-  try
-  {
-    std::string path = request.getrequesturi().str();
+  std::string path = request.getrequesturi().str();
 
-    if( path.length() < 1 )
+  if( 0 == path.length() )
+  {
+    response.setstatusline( 404, "Not found" );
+    return;
+  }
+
+  path.erase( 0, 1 ); /* remove the leading / */
+  stringvector pathparts = splitstring( path, '/' );
+
+  int method = request.getmethod();
+
+  if( "channel" == pathparts[ 0 ] )
+  {
+    if( 1 == pathparts.size() && projectwebdocument::POST == method )
     {
-      response.setstatusline( 404, "Not found" );
+      if( dormantchannels.size() == 0 )
+      {
+        response.setstatusline( 503, "Currently out of channels" );
+        response.addheader( projectwebdocument::Content_Length, 0 );
+        response.addheader( projectwebdocument::Content_Type, "text/json" );
+        return;
+      }
+
+      std::string u = uuid();
+
+      projectrtpchannel::pointer p = *dormantchannels.begin();
+      dormantchannels.pop_front();
+      activechannels[ u ] = p;
+      p->open();
+
+      JSON::Object v;
+      v[ "uuid" ] = u;
+      v[ "port" ] = ( JSON::Integer ) p->getport();
+      v[ "ip" ] = publicaddress;
+
+      JSON::Object c;
+      c[ "active" ] = ( JSON::Integer ) activechannels.size();
+      c[ "available" ] = ( JSON::Integer ) dormantchannels.size();
+      v[ "channels" ] = c;
+std::cout << u << std::endl;
+      std::string t = JSON::to_string( v );
+
+      response.setstatusline( 200, "Ok" );
+      response.addheader( projectwebdocument::Content_Length, t.size() );
+      response.addheader( projectwebdocument::Content_Type, "text/json" );
+      response.setbody( t.c_str() );
       return;
     }
-
-    path.erase( 0, 1 ); /* remove the leading / */
-    stringvector pathparts = splitstring( path, '/' );
-
-    int method = request.getmethod();
-    if( "channel" == pathparts[ 0 ] )
+    else if( 2 == pathparts.size() && projectwebdocument::DELETE == method )
     {
-      if( 1 == pathparts.size() )
+      std::string channel = JSON::as_string( pathparts[ 1 ] );
+      activertpchannels::iterator chan = activechannels.find( channel );
+      if ( activechannels.end() != chan )
       {
-        if( projectwebdocument::POST == method )
-        {
-          JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
-          if( !body.has_key( "channel" ) )
-          {
-            if( dormantchannels.size() == 0 )
-            {
-              response.setstatusline( 503, "Currently out of channels" );
-              response.addheader( projectwebdocument::Content_Length, 0 );
-              response.addheader( projectwebdocument::Content_Type, "text/json" );
-              return;
-            }
+        chan->second->close();
+        activechannels.erase( chan );
+        dormantchannels.push_back( chan->second );
 
-            std::string u = uuid();
+        JSON::Object v;
+        JSON::Object c;
+        c[ "active" ] = ( JSON::Integer ) activechannels.size();
+        c[ "available" ] = ( JSON::Integer ) dormantchannels.size();
+        v[ "channels" ] = c;
 
-            projectrtpchannel::pointer p = *dormantchannels.begin();
-            dormantchannels.pop_front();
-            activechannels[ u ] = p;
-            p->open( projectrtpchannel::PCMA );
+        std::string t = JSON::to_string( v );
 
-            JSON::Object v;
-            v[ "channel" ] = u;
-            v[ "port" ] = ( JSON::Integer ) p->getport();
-            v[ "ip" ] = publicaddress;
-            std::string t = JSON::to_string( v );
-
-            response.setstatusline( 200, "Ok" );
-            response.addheader( projectwebdocument::Content_Length, t.size() );
-            response.addheader( projectwebdocument::Content_Type, "text/json" );
-            response.setbody( t.c_str() );
-            return;
-          }
-        }
-        else if( projectwebdocument::DELETE == method )
-        {
-          JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
-          if ( body.has_key( "channel" ) )
-          {
-            std::string channel = JSON::as_string( body[ "channel" ] );
-            activertpchannels::iterator chan = activechannels.find( channel );
-            if ( activechannels.end() != chan )
-            {
-              chan->second->close();
-              activechannels.erase( chan );
-              dormantchannels.push_back( chan->second );
-
-              response.setstatusline( 200, "Ok" );
-              response.addheader( projectwebdocument::Content_Length, "0" );
-              return;
-            }
-          }
-        }
+        response.setstatusline( 200, "Ok" );
+        response.addheader( projectwebdocument::Content_Length, t.size() );
+        response.addheader( projectwebdocument::Content_Type, "text/json" );
+        response.setbody( t.c_str() );
+        return;
       }
-      else if( 2 == pathparts.size() &&
-                "bridge"  == pathparts[ 1 ] &&
-                projectwebdocument::PUT == method )
+    }
+    /* The second part to creating a channel is to send it somewhere - that is our target */
+    else if( 2 == pathparts.size() &&
+            projectwebdocument::PUT == method )
+    {
+      JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
+
+      /* If we get here - we have /channel/target/<uuid> */
+      activertpchannels::iterator chan = activechannels.find( pathparts[ 1 ] );
+      if ( activechannels.end() != chan )
+      {
+        short port = JSON::as_int64( body[ "port" ] );
+        std::string address = JSON::as_string( body[ "ip" ] );
+
+        chan->second->target( address, port );
+
+        if( body.has_key( "audio" ) )
+        {
+          JSON::Object audio = JSON::as_object( body[ "audio" ] );
+          if( audio.has_key( "payloads" ) )
+          {
+            JSON::Array payloads = JSON::as_array( audio[ "payloads" ] );
+
+            /* this is the CODECs we have been asked to send to the remote endpoint */
+            projectrtpchannel::codeclist ourcodeclist;
+
+            for( JSON::Array::values_t::iterator it = payloads.values.begin();
+                  it != payloads.values.end();
+                  it++ )
+            {
+              ourcodeclist.push_back( JSON::as_int64( *it ) );
+            }
+
+            chan->second->audio( ourcodeclist );
+          }
+        }
+
+        response.setstatusline( 200, "Ok" );
+        response.addheader( projectwebdocument::Content_Length, "0" );
+        return;
+      }
+    }
+  }
+  /*
+    Mixers
+    With a mixer, we can create a new mixer or we want to add or remove channels from a mixer - or destroy a mixer entirly.
+
+    POST - create = { channels: [ "", "" ] }
+    PUT - update = { channels: [ "", "" ] } - updates the channel list in the mixer
+    DELETE - remove = { mixer: "", channels[ "", "" ] } - removes the channels from the mixer, when the mixer has no channels - we clean up
+  */
+  else if( "mixer" == pathparts[ 0 ] )
+  {
+    /* create a mixer */
+    if( 1 == pathparts.size() && projectwebdocument::POST == method )
+    {
+      JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
+      if ( body.has_key( "channels" ) )
+      {
+        std::string u = uuid();
+
+        projectrtpmixer::pointer mixer = projectrtpmixer::create( workerservice );
+
+        mixers[ u ] = mixer;
+
+        JSON::Array channels = JSON::as_array( body[ "channels" ] );
+
+        JSON::Array::values_t::iterator it;
+        for( it = channels.values.begin(); it != channels.values.end(); it ++ )
+        {
+          std::string uuid = JSON::as_string( *it );
+          activertpchannels::iterator chan = activechannels.find( uuid );
+std::cout << "mixer:" << uuid << std::endl;
+          if ( activechannels.end() != chan )
+          {
+            /* at the moment we won't error if we don't find the channel - buyer beware! */
+            mixer->addchannel( chan->second );
+          }
+        }
+
+        mixer->run();
+
+        JSON::Object v;
+        v[ "uuid" ] = u;
+        std::string t = JSON::to_string( v );
+
+        response.setstatusline( 200, "Ok" );
+        response.addheader( projectwebdocument::Content_Length, t.size() );
+        response.addheader( projectwebdocument::Content_Type, "text/json" );
+        response.setbody( t.c_str() );
+        return;
+      }
+    }
+    /*
+      PUT mix/<mixeruuid>
+      Add channels to mixer and update other information.
+      PATCH mix/<mixeruuid>
+      DELETE mix/<mixeruuid>
+      Remove a mixer.
+    */
+    else if( 2 == pathparts.size() )
+    {
+      /* Actually, put is update/replace. So we should remove channels not in in our array. The new array must be complete */
+      if( projectwebdocument::PUT == method )
       {
         JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
         if ( body.has_key( "channels" ) )
         {
-          JSON::Array channels = JSON::as_array( body[ "channels" ] );
-          if( 2 == channels.values.size() )
+          channelmixers::iterator mixerit = mixers.find( pathparts[ 1 ] );
+          if( mixers.end() != mixerit )
           {
-            std::string uuid1 = JSON::as_string( channels.values[ 0 ] );
-            std::string uuid2 = JSON::as_string( channels.values[ 1 ] );
+            JSON::Array channels = JSON::as_array( body[ "channels" ] );
 
-            activertpchannels::iterator chan1 = activechannels.find( uuid1 );
-            activertpchannels::iterator chan2 = activechannels.find( uuid2 );
-
-            if ( activechannels.end() != chan1  && activechannels.end() != chan2 )
+            JSON::Array::values_t::iterator it;
+            for( it = channels.values.begin(); it != channels.values.end(); it ++ )
             {
-              chan1->second->bridgeto( chan2->second );
-              chan2->second->bridgeto( chan1->second );
-
-              response.setstatusline( 200, "Ok" );
-              response.addheader( projectwebdocument::Content_Length, "0" );
-              return;
+              std::string uuid = JSON::as_string( *it );
+              activertpchannels::iterator chan = activechannels.find( uuid );
+              if ( activechannels.end() != chan )
+              {
+                mixerit->second->addchannel( chan->second );
+              }
             }
           }
         }
+        response.setstatusline( 200, "Ok" );
+        response.addheader( projectwebdocument::Content_Length, "0" );
+        return;
       }
-      else if( 3 == pathparts.size() &&
-              "target"  == pathparts[ 1 ] &&
-              projectwebdocument::PUT == method )
+      else if ( projectwebdocument::PATCH == method )
       {
         JSON::Object body = JSON::as_object( JSON::parse( *( request.getbody().strptr() ) ) );
-
-        /* If we get here - we have /channel/target/<uuid> */
-        activertpchannels::iterator chan = activechannels.find( pathparts[ 2 ] );
-        if ( activechannels.end() != chan )
+        channelmixers::iterator mixerit = mixers.find( pathparts[ 1 ] );
+        if( mixers.end() != mixerit )
         {
-          short port = JSON::as_int64( body[ "port" ] );
-          std::string address = JSON::as_string( body[ "address" ] );
-
-          chan->second->target( address, port );
-
+          if ( body.has_key( "channel" ) )
+          {
+            /* we add a channel to the mixer */
+            std::string uuid = JSON::as_string( body[ "channel" ] );
+            activertpchannels::iterator chan = activechannels.find( uuid );
+            if ( activechannels.end() != chan )
+            {
+              mixerit->second->addchannel( chan->second );
+            }
+          }
+        }
+        response.setstatusline( 200, "Ok" );
+        response.addheader( projectwebdocument::Content_Length, "0" );
+        return;
+      }
+      else if( projectwebdocument::DELETE == method )
+      {
+        channelmixers::iterator mixerit = mixers.find( pathparts[ 1 ] );
+        if( mixers.end() != mixerit )
+        {
+          mixerit->second->stop();
+          mixers.erase( mixerit );
           response.setstatusline( 200, "Ok" );
           response.addheader( projectwebdocument::Content_Length, "0" );
           return;
         }
       }
     }
+  }
 
-    response.setstatusline( 404, "Not found" );
-  }
-  catch( ... )
-  {
-    response.setstatusline( 500, "Unknown error" );
-  }
+  response.setstatusline( 404, "Not found" );
+}
+
+/*!md
+## ontimer
+Dummy timer to keep our worker service running. I can't see any other way to stop run from returning.
+*/
+void ontimer(const boost::system::error_code& /*e*/)
+{
+  keepalive.expires_from_now( boost::posix_time::seconds( 5 ) );
+  keepalive.async_wait( &ontimer );
 }
 
 /*!md
@@ -218,6 +347,9 @@ void startserver( short port )
   // A mutex ensures orderly access to std::cout from multiple threads.
   std::mutex iomutex;
   std::vector< std::thread > threads( numcpus );
+
+  keepalive.expires_from_now( boost::posix_time::seconds( 5 ) );
+  keepalive.async_wait( &ontimer );
 
   try
   {
@@ -279,7 +411,7 @@ void initchannels( unsigned short startport, unsigned short endport )
     for( i = startport; i < endport; i += 2 )
     {
       projectrtpchannel::pointer p = projectrtpchannel::create( ioservice, i );
-      p->open( projectrtpchannel::PCMA );
+      p->open();
       dormantchannels.push_back( p );
     }
   }
@@ -293,6 +425,20 @@ void initchannels( unsigned short startport, unsigned short endport )
   for( it = dormantchannels.begin(); it != dormantchannels.end(); it++ )
   {
     (*it)->close();
+  }
+}
+
+/*!md
+# testatomic
+Test an atomic variable to ensure it is lock free. Issue a warning if it is not as we rely on atomic variables for performance with threads.
+*/
+void testatomic( void )
+{
+  std::atomic_bool test;
+
+  if( !test.is_always_lock_free )
+  {
+    std::cerr << "Warning: atomic variables appear to be not atomic so we will be using locks which will impact performance" << std::endl;
   }
 }
 
@@ -365,6 +511,7 @@ int main( int argc, const char* argv[] )
   std::cout << "RTP published address is " << publicaddress << std::endl;
   std::cout << "RTP ports "  << startrtpport << " => " << endrtpport << ": " << (int) ( ( endrtpport - startrtpport ) / 2 ) << " channels" << std::endl;
 
+  testatomic();
   initchannels( startrtpport, endrtpport );
 
   if ( !fg )

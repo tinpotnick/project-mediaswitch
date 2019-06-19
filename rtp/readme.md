@@ -1,18 +1,69 @@
 # RTP Server
 
-Some of my thoughts regarding the design of our RTP server to help me with the design!
+The RTP server offers functionality to process RTP data streams and mix them. Channels will be able to be mixed with other channels or local functions like recording or file playback.
 
-The design of most aspects of Project Media Switch is single threaded asynchronous. This is to improve both reliability and performance. Telecom's software is well suited to asynchronous design as we receive a packet we process and move onto the next. It seems a bit pointless to give up working on this packet and going to another as we should not spend long on each packet. So having a thread for 'every' connection is a bit redundant.
+## API
 
-For the SIP stack this is very appropriate. REGISTER = store the devices location and inform our upper layers in case they wish to act on it. Simple.
+### Channels
+*POST /channel*
 
-The big shortfall with this design is when we have multi core processor systems. Using our SIP stack as an example, this is not much of an issue as we should be able to handle a large number of clients on one core. If we need to go to another core then we are already potentially handling 1000s of clients on the first core. We can do something like separate by domain and publish SRV records (each core's SIP process could run on its own IP address). We can also spread across multiple SIP cores by having multiple SRV records with equal weight. The SIP stack won't support that for a little while yet as it would be required to somehow share information across each process.
+Channel functions which can create and destroy channels. Channels are pre-allocated at start-up and when a channel is requested by our control server is pulled from the pool and put to use.
 
-It is a bit more tricky with the RTP stack. Although the RTP in terms of state machine in considerably simpler (although it may have more complex tasks such as mixing video) these tasks become more CPU intensive. When we accept a connection we have to ensure that it is somehow farmed out to the relevant resource.
+This call returns a JSON object:
 
-Whichever way we work, the design for RTP is many processes on a one or many machines. Each control server (of which there could be many) would know about one or many RTP servers and farm out calls appropriately. We could use this design by simply running multiple processes of the RTP server on the same machine (one for each core) and use the control server to decide how it farms it out. Or we could add a small amount of complexity into the RTP server which can use multiple cores.
+```json
+{
+  "channel": "<uuid>",
+  "port": 10000,
+  "ip": "8.8.8.8"
+}
+```
 
-The largest workload we will have is transcoding. We have to ensure we farm this out appropriately to the most appropriate server and on each server the most appropriate core.
+*DELETE /channel/<uuid>*
+
+As it says - returns 200 ok on completion.
+
+*PUT /channel/target/<uuid>*
+
+This sets the remote address - where we transmit RTP UDP data to. It is not always needed - as if we receive UDP data from our client we will use that address in preference anyway.
+
+```json
+{
+  "port": 12000,
+  "ip": "8.8.4.4"
+}
+```
+
+### Mixers
+
+*POST /mix*
+
+Creates a mixer. If you provide an object it will populate the mixer with channels created above.
+
+```json
+{
+  "channels": [
+    "<uuid>",
+    "<uuid>"
+  ]
+}
+```
+
+It will return a uuid of a mixer.
+
+```json
+{
+  "mixer": "<uuid>"
+}
+```
+
+*PUT /mix/<uuid>*
+
+Updates the list of channels in the mixer. Works in the same way as POST - but does not return json - only a 200.
+
+*DELETE /mix/<uuid>*
+
+Deletes a mixer. TODO.
 
 ## Control Server
 
@@ -26,70 +77,47 @@ Some of the challenges which is bothering me at the moment:
 
 Each channel needs a control URL so it can send information back to the control server if required. For example, DTMF, or file finished playing and so on.
 
-## RTP Server
 
-Do we follow the same design pattern as the SIP server which is very much a single core solution. Or do we have a multiple worker threads solution for each server?
+### Transcoding
 
-Using pthreads (probably via std::threads) you can call
+For some scenarios we may not need to transcode. However we may need to transcode to more than one or more other CODECs. For example, we receive PCMA, which is part of a conference which there are 2 other clients. One asking for G722 and the other PCMU. This may also be the case in the future if we handle video.
 
-```C++
-int main(int argc, const char** argv)
-{
-  constexpr unsigned num_threads = 4;
-  // A mutex ensures orderly access to std::cout from multiple threads.
-  std::mutex iomutex;
-  std::vector<std::thread> threads(num_threads);
-  for (unsigned i = 0; i < num_threads; ++i)
-  {
-    threads[i] = std::thread([&iomutex, i]
-      {
-      std::this_thread::sleep_for(std::chrono::milliseconds(20));
-      while (1)
-      {
-        {
-          // Use a lexical scope and lock_guard to safely lock the mutex only
-          // for the duration of std::cout usage.
-          std::lock_guard<std::mutex> iolock(iomutex);
-          std::cout << "Thread #" << i << ": on CPU " << sched_getcpu() << "\n";
-        }
+As this is the case, the sender channel should always be responsible for transcoding. This way as the sender will know about it's multiple receivers it can transcode for all receivers. If there are 2 requiring the same CODEC we only need to transcode once. We can also keep the intermediate L16 for the different CODECs.
 
-        // Simulate important work done by the tread by sleeping for a bit...
-        std::this_thread::sleep_for(std::chrono::milliseconds(900));
-      }
-    });
+### Mixers
 
-    // Create a cpu_set_t object representing a set of CPUs. Clear it and mark
-    // only CPU i as set.
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(i, &cpuset);
-    int rc = pthread_setaffinity_np(threads[i].native_handle(),
-                                    sizeof(cpu_set_t), &cpuset);
-    if (rc != 0) {
-      std::cerr << "Error calling pthread_setaffinity_np: " << rc << "\n";
-    }
-  }
+I am not sure what to call these yet. So far we have channels. A channel is an RTP & RTCP stream. A Channel is bridged to another channel.
 
-  for (auto& t : threads) {
-    t.join();
-  }
-  return 0;
-}
-```
+A is a phone at one end, B a phone at the other. Within our RTP server we have 2 channels, channel 1 & 2.
 
-This sets the affinity of a thread to a specific CPU. (Thank you https://eli.thegreenplace.net/2016/c11-threads-affinity-and-hyperthreading/).
+A ---> RTP --->  project channel 1 ---> project channel 2 ---> RTP ---> B
 
-So we can easily tie a thread to a CPU. So what will be our strategy?
+We may need transcoding so we may use another thread to take workload away from our main I/O thread.
 
-#### Idea
+We also have other scenarios, a conference room is one example.
 
-We have our normal I/O worker thread. This allows us to be mutex free on all of our control structures - the HTTP server can trigger events events as required, send and receive RTP UDP data. We can then pass off data which requires heavy loads to other threads which are then passed back.
+A ---> RTP --->  project channel 1 ---> project channel 2 ---> RTP ---> B
+                                   ---> project channel 3 ---> RTP ---> C
 
-Main I/O thread receives RTP G711 packet. Its channel has a mark showing it is also required in G722 format. It passes this packet off to a worker thread for transcoding and is redelivered to the channel as G722 by the worker thread. The I/O thread can now perform it's magic as to where to send it etc.
+In both scenarios reverse paths may or may not exist. For example, we may have applications which can listen in on a channel (without sending). Or our conference may allow only 1 speaker at once.
 
-The question then becomes - do we need to tie each thread to a specific CPU?
+Putting this functionality into a channel seems inappropriate. Mixers all have slightly different functions so we need a base generic mixer with child mixers for different purposes (bridge/conference etc). Generic mixers should also be perhaps where transcoding happens.
 
-#### Measurement
+Call recording should perhaps happen in the base/generic mixer. All function will have the ability to record a call. Different mixer may want to do it differently. Although, we may want to record on the basis of an aleg though. There are a few challenges with call recording.
+
+The reason it should be in a mixer is transcoding may needs to have happened - i.e. if we receive SOMEBIZARECODECYETTOBESUPPORTED and store in a wav this my not be possible. So transcoding has to happen.
+
+#### Mix
+
+This is simple, a calls b: a is recorded.
+
+A problem arises a calls b, a transfers to c and hangs up. The recording should continue. In this scenario, both b and c are b legs. In terms of our RTP server this is simply the ability to re-open a file. Our control server will need to make the link. I need to verify how this works with both blind and attended xfer.
+
+#### Conference
+
+Arguably, the conference call should be recorded - which would suggest that as soon as there is 1 caller in a conference, the recording should start. When it drops back down to zero then it should stop. This presents problems like, when browsing from traditional call records and select the call the conference recording will span an entirely different timespan. It ill also be referenced by an identify for the conference rather than by a call which entered the conference.
+
+### Measurement
 
 How are we going to measure it. It - the workload. Using any strategy it would be impossible to balance workload across all CPUs evenly. In fact - a multi thread application would probably be more successful at this than this strategy. We probably need to report back to our control server a number indicative of if we are at capacity or not.
 
@@ -103,10 +131,12 @@ i.e.
 {
   "macro": [
     { "play": "moh", "duration": 30 },
-    { "play": "file", "filename": "you are.mp3" },
+    { "play": "file", "filename": "youare.mp3" },
     { "play": "tts", "first" },
-    { "play": "file", "filename": "in the queue" }
+    { "play": "file", "filename": "inthequeue.mp3" }
   ],
   "loop": true
 }
 ```
+
+Then there is the question - should we support mp3 - this adds a stupid non-scalable workload to a CPU. If we enforce only working with appropriate files then encoding would only ever be one once.

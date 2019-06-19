@@ -1,4 +1,7 @@
 
+"use strict";
+
+
 const http = require( "http" );
 const url = require( "url" );
 
@@ -144,6 +147,118 @@ class call
           this.metadata.family.parent.hangup();
         }
       }
+
+      if( "channel" in this.metadata )
+      {
+        this.control.server( {}, "/channel/" + this.metadata.channel.uuid, "DELETE", this.metadata.channel.control, ( response ) =>
+        {
+          if( "mixer" in this.metadata )
+          {
+            this.metadata.mixer.count--;
+            if( 0 == this.metadata.mixer.count )
+            {
+              this.control.server( {}, "/mixer/" + this.metadata.mixer.uuid, "DELETE", this.metadata.channel.control, ( response ) =>
+              {
+              } );
+            }
+          }
+        } );
+      }
+    }
+
+    this.onanswer = () =>
+    {
+      /*
+        them = their sdp - so information like where we send RTP to.
+        us = our sdp - where rtp should be sent to. this was issued from information from our RTP server so the RTP server does not need updating.
+      */
+      if( !( "sdp" in this.callinfo ) || !( "them" in this.callinfo.sdp ) )
+      {
+        return;
+      }
+
+      var request = {};
+
+      if( "c" in this.callinfo.sdp.them && Array.isArray( this.callinfo.sdp.them.c ) )
+      {
+        request.ip = this.callinfo.sdp.them.c[ 0 ].address;
+      }
+
+      for( let m of this.callinfo.sdp.them.m )
+      {
+        if( "audio" == m.media )
+        {
+          request.port = m.port;
+          request.audio = {};
+          request.audio.payloads = m.payloads;
+          break;
+        }
+      }
+
+      /* Only include payloads we find acceptable ourself */
+      var ourpayloads = [];
+      for( let m of this.callinfo.sdp.us.m )
+      {
+        if( "audio" == m.media )
+        {
+          ourpayloads = m.payloads;
+          break;
+        }
+      }
+
+      request.audio.payloads = request.audio.payloads.filter( payload => ourpayloads.includes( payload ) );
+
+      this.control.server( request, "/channel/" + this.metadata.channel.uuid, "PUT", this.metadata.channel.control, ( response ) =>
+      {
+        /* Now start mixing */
+        /* discover all related channels which should be in the mix */
+        if( "mixer" in this.metadata )
+        {
+          /* we have a mixer already */
+          var request = {};
+          request.channel = this.metadata.channel.uuid;
+          this.metadata.mixer.count++;
+
+          this.control.server( request, "/mixer/", "PATCH", this.metadata.channel.control, ( response ) =>
+          {
+          } );
+        }
+        else
+        {
+          /*
+            create a mixer
+            Once we have a mixer, place a copy into any known family members.
+          */
+          var request = {};
+console.log(this.metadata.channel)
+          request.channels = [ this.metadata.channel.uuid ];
+
+          this.control.server( request, "/mixer/", "POST", this.metadata.channel.control, ( response ) =>
+          {
+            this.metadata.mixer = response.json;
+            this.metadata.mixer.count = 1;
+
+            for( let child of this.metadata.family.children )
+            {
+              child.metadata.mixer = response;
+            }
+
+            if( "parent" in this.metadata.family )
+            {
+              this.metadata.family.parent.metadata.mixer = response;
+              this.metadata.family.parent.answer();
+            }
+          } );
+        }
+      } );
+    }
+
+    this.onringing = () =>
+    {
+      if( "parent" in this.metadata.family )
+      {
+        this.metadata.family.parent.ring();
+      }
     }
   }
 
@@ -242,6 +357,8 @@ request = { codecs: [ 'pcmu' ] }
 */
   answer( request )
   {
+    if( this.answered ) return;
+
     if( undefined == request ) request = {};
 
     this.control.createchannel( request, ( channel ) =>
@@ -254,13 +371,6 @@ request = { codecs: [ 'pcmu' ] }
 
       this.metadata.channel = channel;
 
-      this.onhangup = () =>
-      {
-        this.control.server( { "channel": channel.uuid }, "/channel/", "DELETE", this.metadata.channel.control, ( response ) =>
-        {
-
-        } );
-      }
       this.postrequest( "answer", { "sdp": request.sdp } );
     } );
   }
@@ -312,40 +422,18 @@ request = { codecs: [ 'pcmu' ] }
 
 Similar to the newcall method on the control object except this method calls 'from' an exsisting call. The caller only needs to set the desitnation. This method sets up the call, then if sucsessful will bridge RTP.
 
-request can be:
+forward = false means it will pass this call off to our SIP server (local), forward = true we will still use SIP but use one of our Gateways.
 
-* A simple string ie. "1000" where user 1000 in the same domain as the caller domain
-* A SIP URL i.e. "sip://1000@bling.babblevoice.com"
-* A request object as defined in projectsipcontrol.newcall.
+request is a request object as defined in projectsipcontrol.newcall.
 
 TODO
 - [] Improve CID
 */
   newcall( request )
   {
-    if( "string" == typeof request )
+    if( !( "to" in request ) || !( "user" in request.to ) )
     {
-      var tourl = url.parse( request );
-
-      var newrequest = {};
-      newrequest.to = {};
-      if( tourl.href == request )
-      {
-        newrequest.to.user = request;
-      }
-      else
-      {
-        var authparts = tourl.auth.split( ':' );
-        this.username = authparts[0];
-        newrequest.to.user = decodeURIComponent( authparts[ 0 ] );
-        newrequest.to.domain = tourl.host;
-        if( 2 == authparts.length )
-        {
-          newrequest.to.secret = decodeURIComponent( authparts[ 1 ] );
-        }
-      }
-
-      request = newrequest;
+      return;
     }
 
     if( !( "maxforwards" in request ) )
@@ -360,9 +448,12 @@ TODO
       }
     }
 
-    request.from = {};
-    request.from.domain = this.callinfo.domain;
-    request.from.user = this.callinfo.from;
+    if( !( "from" in request ) )
+    {
+      request.from = {};
+      request.from.domain = this.callinfo.domain;
+      request.from.user = this.callinfo.from;
+    }
 
     if( !( "cid" in request ) ) request.cid = {};
     if( !( "number" in request.cid ) ) request.cid.number = request.from.user;
@@ -371,20 +462,6 @@ TODO
     var call = this.control.newcall( request );
     call.metadata.family.parent = this;
     this.metadata.family.children.push( call );
-
-    call.onringing = () =>
-    {
-      this.ring();
-    }
-
-    call.onanswer = () =>
-    {
-      this.onanswer = () =>
-      {
-        this.bridge( call );
-      }
-      this.answer();
-    }
 
     call.onhangup = () =>
     {
@@ -402,39 +479,13 @@ TODO
 
     this.onhangup = () =>
     {
-      for( var i = 0; i < this.metadata.family.children.length; i++ )
+      for ( let child of this.metadata.family.children )
       {
-        this.metadata.family.children[ i ].hangup();
+        child.hangup();
       }
     }
 
     return call;
-  }
-
-/*!md
-### Media functions.
-*/
-
-/*!md
-### bridge
-We have 2 calls, us (this) and othercall. Both have channels. We ask our RTP server to bridge the 2.
-
-There is currently a limit on the fact that both channels have to exist on the same server.
-*/
-  bridge( othercall, onbridge )
-  {
-    this.metadata.bridged = othercall;
-    othercall.metadata.bridged = this;
-
-    var request = {};
-    request.channels = [];
-    request.channels.push( this.metadata.channel.uuid );
-    request.channels.push( othercall.metadata.channel.uuid );
-
-    this.control.server( request, "/channel/bridge", "POST", this.metadata.channel.control, ( response ) =>
-    {
-      if( undefined != onbridge ) onbridge( response );
-    } );
   }
 
 /*!md
@@ -476,8 +527,10 @@ class projectcontrol
     this.rtp.host = "127.0.0.1";
     this.rtp.port = 9002;
 
-    this.codecs = [ "pcma", "2833" ]//, "pcmu", "2833" ];
+    this.codecs = [ "pcma", "pcmu", "2833" ];
     this.sessionidcounter = 1;
+
+    this.gateways = [];
 
     this.handlers.PUT.dialog = ( pathparts, req, res, body ) =>
     {
@@ -705,15 +758,62 @@ request object
     number: "",
     private: false
   },
-  codecs[ 'pcmu' ]
+  codecs[ 'pcmu' ],
+  forward = false
 }
 ```
+
+A gateway object which we will take settings from if the forward param is set looks like
+```json
+{
+  from: {
+    user: "omniis",
+    domain: "omniis.babblevoice.com",
+    authsecret: "thecatsatonthemat"
+  },
+  to: {
+    domain: "omniis.babblevoice.com",
+  }
+}
+```
+
+The follow list is what we will be taken from a gateway (if it exsists)
+
+* cid
+* codecs
+* from ( user, domain and authsecret )
+* to ( domain )
 */
   newcall( request )
   {
     var c = new call( this, { originator: true } );
 
     if( !( "maxforwards" in request ) ) request.maxforwards = 70;
+
+    if( "forward" in request && request.forward )
+    {
+      var gw = this.gw;
+      if( "from" in gw )
+      {
+        if( !( "from" in request ) ) request.from = {};
+        if( "user" in gw.from ) request.from.user = gw.from.user;
+        if( "domain" in gw.from ) request.from.domain = gw.from.domain;
+        if( "authsecret" in gw.from ) request.from.authsecret = gw.from.authsecret;
+      }
+      if( "to" in gw )
+      {
+        if( !( "to" in request ) ) request.to = {};
+        if( "domain" in gw.to ) request.to.domain = gw.to.domain;
+      }
+      if( "cid" in gw )
+      {
+        if( !( "cid" in request ) ) request.cid = {};
+        if( "name" in gw.cid ) request.cid.name = gw.cid.name;
+        if( "number" in gw.cid ) request.cid.name = gw.cid.number;
+        if( "private" in gw.cid ) request.cid.name = gw.cid.private;
+      }
+      if( "codecs" in gw ) request.codecs = gw.codecs;
+    }
 
     this.createchannel( request, ( channel ) =>
     {
@@ -790,7 +890,7 @@ Negotiates a channel with an RTP server then creates the corrosponding SDP objec
         ch.ip = response.json.ip;
         ch.port = response.json.port;
         ch.control = this.rtp;
-        ch.uuid = response.json.channel;
+        ch.uuid = response.json.uuid;
 
         request.sdp = {
           v: 0,
@@ -861,6 +961,12 @@ Add a CODEC to the SDP object.
         sdp.m[ 0 ].rtpmap[ "8" ] = { encoding: "PCMA", clock: "8000" };
         break;
       }
+      case "722":
+      {
+        sdp.m[ 0 ].payloads.push( 7 );
+        sdp.m[ 0 ].rtpmap[ "8" ] = { encoding: "722", clock: "8000" };
+        break;
+      }
       /* rfc 2833 - DTMF*/
       case "2833":
       {
@@ -881,6 +987,19 @@ Add a CODEC to the SDP object.
 
     this.sipserver( request, "/dir/" + domain );
   }
+
+  /* We have a list of gateways. This is for when we indicate we wish to forward a call.  */
+  set gw( gw )
+  {
+    this.gateways.push( gw );
+  }
+
+  get gw()
+  {
+    return this.gateways[ 0 ];
+  }
+
+
 
 /*!md
 # run
