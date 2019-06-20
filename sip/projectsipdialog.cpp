@@ -496,12 +496,30 @@ void projectsipdialog::waitforackanddie( projectsippacket::pointer pk )
   }
 }
 
+/*!md
+# waitfor200anddie
+The next ack we recieve will end this dialog.
+*/
 void projectsipdialog::waitfor200anddie( projectsippacket::pointer pk )
 {
   int code = pk->getstatuscode();
   if( 200 == code || 481 == code )
   {
     this->updatecontrol();
+    this->untrack();
+  }
+}
+
+/*!md
+# waitfor200thenackanddie
+The next 200 we recieve will end this dialog.
+*/
+void projectsipdialog::waitfor200thenackanddie( projectsippacket::pointer pk )
+{
+  int code = pk->getstatuscode();
+  if( 200 == code || 481 == code )
+  {
+    this->sendack();
     this->untrack();
   }
 }
@@ -696,11 +714,11 @@ void projectsipdialog::resend200( const boost::system::error_code& error )
 
 /*!md
 # hangup
-Hangup if ansered (BYE) or send reason for error code.
+Hangup if answered (BYE) or send reason for error code.
 */
 void projectsipdialog::hangup( void )
 {
-  /* tehcnically we should only consider us hung up when we receive an ack or we have timed out waiting */
+  /* technically we should only consider us hung up when we receive an ack or we have timed out waiting */
   this->callhungup = true;
   this->endat = std::time( nullptr );
 
@@ -710,14 +728,21 @@ void projectsipdialog::hangup( void )
   }
   else
   {
-    this->retries = 3;
+    if( this->originator )
+    {
+      this->sendcancel();
+    }
+    else
+    {
+      this->retries = 3;
 
-    this->senderror();
-    this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
+      this->senderror();
+      this->nextstate = std::bind( &projectsipdialog::waitforackanddie, this, std::placeholders::_1 );
 
-      /* Wait up to DIALOGACKTIMEOUT seconds before we close this dialog */
-    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
+        /* Wait up to DIALOGACKTIMEOUT seconds before we close this dialog */
+      this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
       std::bind( &projectsipdialog::ontimeoutenddialog, this, std::placeholders::_1 ) );
+    }
   }
 }
 
@@ -809,7 +834,7 @@ void projectsipdialog::sendbye( void )
 
   if( this->originator )
   {
-    bye->setrequestline( projectsippacket::BYE, this->invitepk->getrequesturi().str() );
+    bye->setrequestline( projectsippacket::BYE, this->ackpk->getrequesturi().str() );
     bye->addheader( projectsippacket::To,
                   this->lastreceivedpk->getheader( projectsippacket::To ) );
 
@@ -826,7 +851,8 @@ void projectsipdialog::sendbye( void )
                 this->lastreceivedpk->getheader( projectsippacket::To ) );
   }
 
-  bye->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
+  // New transaction, new branch.
+  bye->addviaheader( projectsipconfig::gethostipsipport() );
 
   bye->addheader( projectsippacket::Contact,
               projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
@@ -866,6 +892,87 @@ void projectsipdialog::resendbye( const boost::system::error_code& error )
     }
 
     this->sendbye();
+    this->retries--;
+
+    this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
+        std::bind( &projectsipdialog::resendbye, this, std::placeholders::_1 ) );
+  }
+}
+
+/*!md
+# sendcancel
+Dialog is not confirmed to cancel is the way to bomb out. We must(?) be the originator to cancel.
+*/
+void projectsipdialog::sendcancel( void )
+{
+  if( !this->lastreceivedpk )
+  {
+    return;
+  }
+
+  this->cseq = this->lastreceivedpk->getcseq() + 1;
+
+  projectsippacket::pointer cancel = projectsippacket::create();
+
+  projectsippacket::pointer ref = this->invitepk;
+  if( !ref )
+  {
+    ref = this->lastreceivedpk;
+  }
+
+  if( !ref )
+  {
+    /* nothing more we can do */
+    return;
+  }
+
+  cancel->setrequestline( projectsippacket::CANCEL, ref->getrequesturi().str() );
+  cancel->addheader( projectsippacket::To,
+                ref->getheader( projectsippacket::To ) );
+
+  cancel->addheader( projectsippacket::From,
+              ref->getheader( projectsippacket::From ) );
+
+  cancel->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
+
+  cancel->addheader( projectsippacket::Contact,
+              projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
+              stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
+
+  cancel->addheader( projectsippacket::Call_ID, this->callid );
+
+  cancel->addheader( projectsippacket::CSeq,
+              std::to_string( this->cseq ) + " CANCEL" );
+
+  cancel->addcommonheaders();
+
+  cancel->addheader( projectsippacket::Content_Length, "0" );
+
+  this->sendpk( cancel );
+
+  /* we should receive other packets - but this will be the final */
+  this->nextstate = std::bind( &projectsipdialog::waitfor200thenackanddie, this, std::placeholders::_1 );
+
+  this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
+      std::bind( &projectsipdialog::resendcancel, this, std::placeholders::_1 ) );
+}
+
+/*!md
+# resendcancel
+Resend the last cancel
+*/
+void projectsipdialog::resendcancel( const boost::system::error_code& error )
+{
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    if( 0 == this->retries )
+    {
+      this->updatecontrol();
+      this->untrack();
+      return;
+    }
+
+    this->sendcancel();
     this->retries--;
 
     this->waitfortimer( std::chrono::milliseconds( DIALOGACKTIMEOUT ),
@@ -1062,7 +1169,9 @@ void projectsipdialog::sendack( void )
 {
   projectsippacket::pointer ack = projectsippacket::create();
   // Generate SIP URI i.e. sip:realm
-  ack->setrequestline( projectsippacket::ACK, std::string( "sip:" ) + this->domain );
+  //ack->setrequestline( projectsippacket::ACK, std::string( "sip:" ) + this->domain );
+  ack->setrequestline( projectsippacket::ACK, this->invitepk->getrequesturi().str()  );
+  
   ack->addcommonheaders();
   ack->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
 
@@ -1085,6 +1194,7 @@ void projectsipdialog::sendack( void )
 
   this->cseq++;
 
+  this->ackpk = ack;
   this->sendpk( ack );
 }
 
@@ -1476,8 +1586,6 @@ void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwe
   }
   else if( action == "hangup" )
   {
-    response.setstatusline( 200, "Ok" );
-
     (*it)->retries = 3;
 
     if ( b.has_key( "reason" ) )
@@ -1500,6 +1608,8 @@ void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwe
     }
 
     (*it)->hangup();
+
+    response.setstatusline( 200, "Ok" );
   }
   else
   {

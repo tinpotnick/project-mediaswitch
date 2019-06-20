@@ -58,6 +58,7 @@ public:
   void waitforack( projectsippacket::pointer pk );
   void waitforackanddie( projectsippacket::pointer pk );
   void waitfor200anddie( projectsippacket::pointer pk );
+  void waitfor200thenackanddie( projectsippacket::pointer pk );
   void waitforacktheninviteauth( projectsippacket::pointer pk );
 
   /* outbound invite */
@@ -83,6 +84,7 @@ public:
   void resend401( const boost::system::error_code& error );
   void resenderror( const boost::system::error_code& error );
   void resendbye( const boost::system::error_code& error );
+  void resendcancel( const boost::system::error_code& error );
 
 private:
 
@@ -95,6 +97,7 @@ private:
   void send200( std::string body = "", bool final = false );
   void send401( void );
   void sendack( void );
+  void sendcancel( void );
   void senderror( void );
 
   /* Verbs */
