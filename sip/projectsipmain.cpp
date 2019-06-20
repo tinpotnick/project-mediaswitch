@@ -25,8 +25,11 @@
 boost::asio::io_service io_service;
 projectsipserver::pointer sipserver;
 
+bool running;
+
 static void stopserver( void )
 {
+  running = false;
   io_service.stop();
 }
 
@@ -118,20 +121,31 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
   catch( ... )
   {
     response.setstatusline( 500, "Unknown error in request" );
+    response.addheader( projectwebdocument::Content_Length, 0 );
   }
 }
 
 void startserver( short controlport, short sipport )
 {
-  try
+  running = true;
+
+  sipserver = projectsipserver::create( io_service, sipport );
+  projecthttpserver h( io_service, controlport, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
+
+  while( running )
   {
-    sipserver = projectsipserver::create( io_service, sipport );
-    projecthttpserver h( io_service, controlport, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
-    io_service.run();
-  }
-  catch( std::exception& e )
-  {
-    std::cerr << e.what() << std::endl;
+    try
+    {
+      io_service.run();
+    }
+    catch( std::exception& e )
+    {
+      std::cerr << e.what() << std::endl;
+    }
+    catch( ... )
+    {
+      std::cerr << "Unhandled exception - re-entering ioservice" << std::endl;
+    }
   }
 
   // Clean up
