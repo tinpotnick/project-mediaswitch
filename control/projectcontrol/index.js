@@ -136,32 +136,32 @@ class call
     this.onhangupcallback = [];
 
 
+    /* Some default handlers */
     this.onhangup = () =>
     {
       console.log("hanging up from call onhangup")
-      for( var i = 0; i < this.metadata.family.children.length; i++ )
+      for ( let child of this.metadata.family.children )
       {
-        this.metadata.family.children[ i ].hangup();
-        if( "parent" in this.metadata.family )
+        child.hangup();
+      }
+
+      if( "parent" in this.metadata.family )
+      {
+        /* we only hangup the parent, if the parent only has us as a child */
+        var filtered = this.metadata.family.parent.metadata.family.children.filter( ( value ) =>
         {
-          this.metadata.family.parent.hangup();
-        }
+          return value != this;
+        } );
+        this.metadata.family.parent.metadata.family.children = filtered;
+
+        /* We may want to alter this. There may be occasions where we wish further processing of the originating call after any child may hang up. The reason could be passed back into hanup of the parent who then makes the decision. */
+        if( 0 == filtered.length ) this.metadata.family.parent.hangup();
       }
 
       if( "channel" in this.metadata )
       {
         this.control.server( {}, "/channel/" + this.metadata.channel.uuid, "DELETE", this.metadata.channel.control, ( response ) =>
         {
-          if( "mixer" in this.metadata )
-          {
-            this.metadata.mixer.count--;
-            if( 0 == this.metadata.mixer.count )
-            {
-              this.control.server( {}, "/mixer/" + this.metadata.mixer.uuid, "DELETE", this.metadata.channel.control, ( response ) =>
-              {
-              } );
-            }
-          }
         } );
       }
     }
@@ -210,46 +210,27 @@ class call
 
       this.control.server( request, "/channel/" + this.metadata.channel.uuid, "PUT", this.metadata.channel.control, ( response ) =>
       {
-        /* Now start mixing */
-        /* discover all related channels which should be in the mix */
-        if( "mixer" in this.metadata )
+        if( "parent" in this.metadata.family )
         {
-          /* we have a mixer already */
-          var request = {};
-          request.channel = this.metadata.channel.uuid;
-          this.metadata.mixer.count++;
-
-          this.control.server( request, "/mixer/", "PATCH", this.metadata.channel.control, ( response ) =>
+          this.metadata.family.parent.onanswer = () => 
           {
-          } );
-        }
-        else
-        {
-          /*
-            create a mixer
-            Once we have a mixer, place a copy into any known family members.
-          */
-          var request = {};
-console.log(this.metadata.channel)
-          request.channels = [ this.metadata.channel.uuid ];
-
-          this.control.server( request, "/mixer/", "POST", this.metadata.channel.control, ( response ) =>
-          {
-            this.metadata.mixer = response.json;
-            this.metadata.mixer.count = 1;
-
-            for( let child of this.metadata.family.children )
+            if( "channel" in this.metadata.family.parent.metadata )
             {
-              child.metadata.mixer = response;
+              var url = "/channel/";
+              url += this.metadata.channel.uuid;
+              url += "/mix/";
+              url += this.metadata.family.parent.metadata.channel.uuid;
+    
+              this.control.server( {}, url , "PUT", this.metadata.channel.control, ( response ) =>
+              {
+                
+              } );
             }
-
-            if( "parent" in this.metadata.family )
-            {
-              this.metadata.family.parent.metadata.mixer = response;
-              this.metadata.family.parent.answer();
-            }
-          } );
+          }
+          console.log( "Answering parent" )
+          this.metadata.family.parent.answer();
         }
+
       } );
     }
 
@@ -357,7 +338,16 @@ request = { codecs: [ 'pcmu' ] }
 */
   answer( request )
   {
-    if( this.answered ) return;
+    if( this.answered ) 
+    {
+      /* If a call has already been answered, we schedule running these callbacks as they will have been recently added. */
+      for( let cb of this.onanswercallback )
+      {
+        setTimeout( () => { cb.call( this, this ) }, 0 );
+      }
+      this.onanswercallback = [];
+      return;
+    }
 
     if( undefined == request ) request = {};
 
@@ -377,7 +367,21 @@ request = { codecs: [ 'pcmu' ] }
 
   ring( alertinfo )
   {
-    if( this.ringing || this.answered ) return;
+    if( this.ringing || this.answered ) 
+    {
+      for( let cb of this.onringingcallback )
+      {
+        setTimeout( () => { cb.call( this, this ) }, 0 );
+      }
+      this.onringingcallback = [];
+
+      for( let cb of this.onanswercallback )
+      {
+        setTimeout( () => { cb.call( this, this ) }, 0 );
+      }
+      this.onanswercallback = [];
+      return;
+    }
 
     var postdata = {};
 
@@ -463,28 +467,6 @@ TODO
     call.metadata.family.parent = this;
     this.metadata.family.children.push( call );
 
-    call.onhangup = () =>
-    {
-      /* we only hangup the parent, if the parent only has us as a child */
-      var filtered = call.metadata.family.parent.metadata.family.children.filter( ( value ) =>
-      {
-        return value != call;
-      } );
-      call.metadata.family.parent.metadata.family.children = filtered;
-
-      /* We may want to alter this. There may be occasions where we wish further processing of the originating call after any child may hang up. The reason could be passed back into hanup of the parent who then makes the decision. */
-      if( 0 == filtered.length ) call.metadata.family.parent.hangup();
-
-    }
-
-    this.onhangup = () =>
-    {
-      for ( let child of this.metadata.family.children )
-      {
-        child.hangup();
-      }
-    }
-
     return call;
   }
 
@@ -548,9 +530,9 @@ class projectcontrol
           c = new call( this, callinfo );
           this.calls[ callinfo.callid ] = c;
 
-          for( var i = 0; i < this.onnewcallcallbacks.length; i ++ )
+          for( let cb of this.onnewcallcallbacks )
           {
-            this.onnewcallcallbacks[ i ].call( c, c );
+            cb.call( c, c );
           }
         }
         else
@@ -561,18 +543,18 @@ class projectcontrol
 
         if( c.ringing && c.onringingcallback.length > 0 )
         {
-          for( var i = 0; i < c.onringingcallback.length; i ++ )
+          for( let cb of c.onringingcallback )
           {
-            c.onringingcallback[ i ].call( c, c );
+            cb.call( c, c );
           }
           c.onringingcallback = [];
         }
 
         if( c.answered && c.onanswercallback.length > 0 )
         {
-          for( var i = 0; i < c.onanswercallback.length; i ++ )
+          for( let cb of c.onanswercallback )
           {
-            c.onanswercallback[ i ].call( c, c );
+            cb.call( c, c );
           }
           c.onanswercallback = [];
         }
@@ -622,14 +604,14 @@ class projectcontrol
 
   runhangups( call )
   {
-    for( var i = 0; i < this.onhangupcallbacks.length; i ++ )
+    for( let cb of this.onhangupcallbacks )
     {
-      this.onhangupcallbacks[ i ].call( call, call );
+      cb.call( call, call );
     }
 
-    for( var i = 0; i < call.onhangupcallback.length; i ++ )
+    for( let cb of call.onhangupcallback )
     {
-      call.onhangupcallback[ i ].call( call, call );
+      cb.call( call, call );
     }
     call.onhangupcallback = [];
 
@@ -637,6 +619,22 @@ class projectcontrol
     {
       delete this.calls[ call.callinfo.callid ];
     }
+  }
+
+  runnewcalls( call )
+  {
+    /* global new call handlers */
+    for( let cb of this.onnewcallcallbacks )
+    {
+      cb.call( call, call );
+    }
+
+    /* call specific handlers */
+    for( let cb of call.onnewcallcallback )
+    {
+      cb.call( call, call );
+    }
+    call.onnewcallcallback = [];
   }
 
   set onreg( callback )
@@ -841,29 +839,11 @@ The follow list is what we will be taken from a gateway (if it exsists)
           c.callinfo.callid = response.json.callid;
 
           this.calls[ c.callinfo.callid ] = c;
-
-          for( var i = 0; i < this.onnewcallcallbacks.length; i ++ )
-          {
-            this.onnewcallcallbacks[ i ].call( c, c );
-          }
-
-          for( var i = 0; i < c.onnewcallcallback.length; i++ )
-          {
-            c.onnewcallcallback[ i ].call( c, c );
-          }
+          this.runnewcalls( c );
         }
         else
         {
-          c.error = { code: response.code, message: response.message };
-          for( var i = 0; i < this.onnewcallcallbacks.length; i ++ )
-          {
-            this.onnewcallcallbacks[ i ].call( c, c );
-          }
-
-          for( var i = 0; i < c.onnewcallcallback.length; i++ )
-          {
-            c.onnewcallcallback[ i ].call( c, c );
-          }
+          this.runhangups( c );
         }
       } );
     } );
