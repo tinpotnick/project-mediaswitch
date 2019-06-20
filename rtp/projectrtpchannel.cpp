@@ -23,18 +23,17 @@ Create the socket then wait for data
 echo "This is my data" > /dev/udp/127.0.0.1/10000
 */
 projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsigned short port )
-  : port( port ),
+  : rtpindexoldest( 0 ),
+  rtpindexin( 0 ),
+  active( false ),
+  port( port ),
   resolver( io_service ),
   rtpsocket( io_service ),
   rtcpsocket( io_service ),
   receivedrtp( false ),
   targetconfirmed( false ),
   reader( true ),
-  writer( true ),
-  rtpindexoldest( 0 ),
-  rtpindexin( 0 ),
-  active( false ),
-  timestampdiff( 0 )
+  writer( true )
 {
 }
 
@@ -74,7 +73,6 @@ void projectrtpchannel::open()
 
   this->receivedrtp = false;
   this->active = true;
-  this->timestampdiff = 0;
 
   this->codecs.clear();
   this->selectedcodec = 0;
@@ -96,6 +94,22 @@ void projectrtpchannel::close( void )
 {
   try
   {
+    /* remove oursevelse from our list of mixers */
+    if( this->others )
+    {
+      projectrtpchannellist::iterator it;
+      for( it = this->others->begin(); it != this->others->end(); it++ )
+      {
+        if( it->get() == this )
+        {
+          this->others->erase( it );
+          break;
+        }
+      }
+      /* release the shred pointer */
+      this->others = nullptr;
+    }
+
     this->active = false;
     this->rtpsocket.close();
     this->rtcpsocket.close();
@@ -133,6 +147,7 @@ void projectrtpchannel::readsomertp( void )
           {
             this->rtpindexoldest = ( this->rtpindexoldest + 1 ) % BUFFERPACKETCOUNT;
           }
+          this->handlertpdata();
         }
 
         if( !ec && bytes_recvd && this->active )
@@ -140,6 +155,45 @@ void projectrtpchannel::readsomertp( void )
            this->readsomertp();
         }
       } );
+}
+
+/*!md
+## handlertpdata
+*/
+void projectrtpchannel::handlertpdata( void )
+{
+  /* review: if nothing to do then just echo back */
+  if( !this->others || 0 == this->others->size() )
+  {
+    this->writepacket( &this->rtpdata[ this->rtpindexoldest ] );
+    this->rtpindexoldest = ( this->rtpindexoldest + 1 ) % BUFFERPACKETCOUNT;
+    return;
+  }
+
+  if( 2 == this->others->size() )
+  {
+    int count = 0;
+    /* one should be us */
+    projectrtpchannellist::iterator it;
+    for( it = this->others->begin(); it != this->others->end(); it++ )
+    {
+
+      if( it->get() != this )
+      {
+        count++;
+        ( *it )->writepacket( &this->rtpdata[ this->rtpindexoldest ] );
+        this->rtpindexoldest = ( this->rtpindexoldest + 1 ) % BUFFERPACKETCOUNT;
+      }
+    }
+
+    if( 2 == count )
+    {
+      std::cout << "WARNING" << std::endl;
+    }
+
+  }
+
+  /* more than 2, we have to check all available packets for a sequence number is available then mix */
 }
 
 /*!md
@@ -174,58 +228,6 @@ bool projectrtpchannel::isactive( void )
 }
 
 /*!md
-## pop
-If data has been received pop it and use it. Remains unordered.
-*/
-rtppacket * projectrtpchannel::pop( void )
-{
-  if( this->rtpindexoldest != this->rtpindexin )
-  {
-    rtppacket *buf;
-    buf = &this->rtpdata[ this->rtpindexoldest ];
-
-    this->rtpindexoldest = ( this->rtpindexoldest + 1 ) % BUFFERPACKETCOUNT;
-    return buf;
-  }
-
-  return NULL;
-}
-
-/*!md
-## popordered
-It will search for the relevent ts if available. It will return NULL if not found. This is our ordering function. It will first look at the base of the buffer.
-*/
-rtppacket * projectrtpchannel::popordered( uint32_t ts )
-{
-  if( 0 == this->timestampdiff )
-  {
-    this->timestampdiff = ts - this->rtpdata[ this->rtpindexoldest ].gettimestamp();
-  }
-
-  /* we try and get the one from the expected position */
-  for( int i = 0; i < ( BUFFERPACKETCOUNT / 2 ); i ++ )
-  {
-    /* fan out in both directions. the closer the more likely */
-    uint32_t expectedts = ts + this->timestampdiff;
-    int index = ( this->rtpindexoldest + i ) % BUFFERPACKETCOUNT;
-    if( this->rtpdata[ index ].gettimestamp() == expectedts )
-    {
-      return &this->rtpdata[ index ];
-    }
-
-    index = ( this->rtpindexoldest - i ) % BUFFERPACKETCOUNT;
-    if( this->rtpdata[ index ].gettimestamp() == expectedts )
-    {
-      return &this->rtpdata[ index ];
-    }
-  }
-
-  return NULL;
-}
-
-
-
-/*!md
 ## writepacket
 Send a [RTP] packet to our endpoint.
 */
@@ -258,6 +260,55 @@ std::cout << "address: " << address << ", port: " << port << std::endl;
         shared_from_this(),
         boost::asio::placeholders::error,
         boost::asio::placeholders::iterator ) );
+}
+
+/*!md
+## mix
+Add the other to our list of others. n way relationship.
+*/
+bool projectrtpchannel::mix( projectrtpchannel::pointer other )
+{
+  /* We only mix us with others who are currently friendless */
+  if( other->others )
+  {
+    return false;
+  }
+
+  if( !this->others )
+  {
+    this->others = projectrtpchannellistptr( new projectrtpchannellist  );
+  }
+
+  /* ensure no duplicates */
+  bool usfound = false;
+  bool themfound = false;
+  projectrtpchannellist::iterator it;
+  for( it = this->others->begin(); it != this->others->end(); it++ )
+  {
+    if( it->get() == this )
+    {
+      usfound = true;
+    }
+
+    if( *it == other )
+    {
+      themfound = true;
+    }
+  }
+
+  if( !usfound )
+  {
+    this->others->push_back( other );
+  }
+  
+  if( !themfound )
+  {
+    this->others->push_back( shared_from_this() );
+  }
+
+  other->others = this->others;
+
+  return true;
 }
 
 /*!md

@@ -16,18 +16,18 @@
 #include <list>
 #include <vector>
 
-/* The number of bytes in a packet */
-#define G711PAYLOADBYTES 80
-#define G722PAYLOADBYTES 80
+/* The number of bytes in a packet ( these figure are less some overhead G711 = 172*/
+#define G711PAYLOADBYTES 160
+#define G722PAYLOADBYTES 160
 #define ILBC20PAYLOADBYTES 38
 #define ILBC30PAYLOADBYTES 50
 
 /* Need to double check max RTP length with variable length header - there could be a larger length withour CODECs */
-#define RTPMAXLENGTH 80
+#define RTPMAXLENGTH 200
 #define RTCPMAXLENGTH 1500
 
 /* The number of packets we will keep in a buffer */
-#define BUFFERPACKETCOUNT 20
+#define BUFFERPACKETCOUNT 40
 
 class rtppacket
 {
@@ -90,10 +90,20 @@ public:
   bool canwrite( void ) { return this->writer; };
 
   bool isactive( void );
-  rtppacket *pop( void );
-  rtppacket *popordered( uint32_t ts );
+
+  bool mix( projectrtpchannel::pointer other );
+
+  codeclist codecs;
+  int selectedcodec;
+
+  rtppacket rtpdata[ BUFFERPACKETCOUNT ];
+  unsigned char rtcpdata[ RTCPMAXLENGTH ];
+
+  int rtpindexoldest;
+  int rtpindexin;
 
 private:
+  bool active;
   unsigned short port;
 
   boost::asio::ip::udp::resolver resolver;
@@ -112,28 +122,21 @@ private:
   bool reader;
   bool writer;
 
-  rtppacket rtpdata[ BUFFERPACKETCOUNT ];
-  unsigned char rtcpdata[ RTCPMAXLENGTH ];
-
-  std::atomic_int rtpindexoldest;
-  std::atomic_int rtpindexin;
-
   void readsomertp( void );
   void readsomertcp( void );
 
+  void handlertpdata( void );
   void handlertcpdata( void );
   void handletargetresolve (
               boost::system::error_code e,
               boost::asio::ip::udp::resolver::iterator it );
 
-  std::atomic_bool active;
+  
   uint32_t timestampdiff;
 
-  codeclist codecs;
-  int selectedcodec;
+  typedef std::list< projectrtpchannel::pointer > projectrtpchannellist;
+  typedef boost::shared_ptr< projectrtpchannellist > projectrtpchannellistptr;
+  projectrtpchannellistptr others;
 };
-
-/*typedef std::list< projectrtpchannel::pointer > channellist;
-typedef boost::shared_ptr< channellist > channellistptr;*/
 
 #endif
