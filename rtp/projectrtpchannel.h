@@ -22,12 +22,16 @@
 #define ILBC20PAYLOADBYTES 38
 #define ILBC30PAYLOADBYTES 50
 
+#define PCMAPAYLOADTYPE 0
+#define PCMUPAYLOADTYPE 8
+
 /* Need to double check max RTP length with variable length header - there could be a larger length withour CODECs */
+/* this maybe breached if a stupid number of csrc count is high */
 #define RTPMAXLENGTH 200
 #define RTCPMAXLENGTH 1500
 
 /* The number of packets we will keep in a buffer */
-#define BUFFERPACKETCOUNT 40
+#define BUFFERPACKETCOUNT 20
 
 class rtppacket
 {
@@ -35,16 +39,18 @@ public:
   size_t length;
   unsigned char pk[ RTPMAXLENGTH ];
 
-  uint8_t getpacketversion();
-  uint8_t getpacketpadding();
-  uint8_t getpacketextension();
-  uint8_t getpacketcsrccount();
-  uint8_t getpacketmarker();
-  uint8_t getpayloadtype();
-  uint16_t getsequencenumber();
-  uint32_t gettimestamp();
-  uint32_t getssrc();
+  uint8_t getpacketversion( void );
+  uint8_t getpacketpadding( void );
+  uint8_t getpacketextension( void );
+  uint8_t getpacketcsrccount( void );
+  uint8_t getpacketmarker( void );
+  uint8_t getpayloadtype( void );
+  uint16_t getsequencenumber( void );
+  uint32_t gettimestamp( void );
+  uint32_t getssrc( void );
   uint32_t getcsrc( uint8_t index );
+
+  uint8_t *getpayload( void );
 };
 
 /*!md
@@ -59,6 +65,24 @@ G722: 80 (10mS)
 ilbc (mode 20): 38 (20mS)
 ilbc (mode 30): 50 (30mS)
 Question, What do we write this data to? We need to limit transcoding
+
+Notes about transcoding.
+
+We receive RTP data into rtpdata round robin buffer. When we transcode (and we will support PCMA PCMU iLBC and G722) we can do things like
+
+PCMA->PCMU in one go (very efficiently)
+PCMU->PCMA (also very efficient)
+
+To do
+PCMA-G722 we actuall have to PCMA-L16-G722 which is also true of iLBC. If we also do things like conference (mixing to multiple channels) and call recording then the complexity also increases - especially if we want to become low cpu.
+
+if pcma to pcmu and no recording and only 2 channels then direct conversion
+
+Buffer?
+
+In our RTP channel, we can have a fixed buffer for inbound L16 (i.e. transcoded).
+
+In our mixed channel would contain the buffer to store the 2nd transcoded leg (i.e. PCMA->L16->G722) channel a has the PCMA in the inbuffer, the L16 in the transcoded buffer and the G722 would be stored in an out buffer of the other channel which requires it.
 */
 class projectrtpchannel :
   public boost::enable_shared_from_this< projectrtpchannel >
@@ -92,15 +116,19 @@ public:
   bool isactive( void );
 
   bool mix( projectrtpchannel::pointer other );
+  rtppacket *gettempoutbuf( void );
 
   codeclist codecs;
   int selectedcodec;
 
   rtppacket rtpdata[ BUFFERPACKETCOUNT ];
   unsigned char rtcpdata[ RTCPMAXLENGTH ];
-
   int rtpindexoldest;
   int rtpindexin;
+
+  /* The out data is intended to be written by other channels (or functions), they can then be sent to other channels as well as our own end point  */
+  rtppacket outrtpdata[ BUFFERPACKETCOUNT ];
+  int rtpoutindex;
 
 private:
   bool active;
@@ -131,8 +159,9 @@ private:
               boost::system::error_code e,
               boost::asio::ip::udp::resolver::iterator it );
 
-  
+
   uint32_t timestampdiff;
+  uint64_t receivedpkcount;
 
   typedef std::list< projectrtpchannel::pointer > projectrtpchannellist;
   typedef boost::shared_ptr< projectrtpchannellist > projectrtpchannellistptr;

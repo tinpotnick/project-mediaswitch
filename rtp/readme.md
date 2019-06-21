@@ -34,36 +34,11 @@ This sets the remote address - where we transmit RTP UDP data to. It is not alwa
 }
 ```
 
-### Mixers
+### Mix
 
-*POST /mix*
+*PUT /channel/<uuid>/mix/<uuid>*
 
-Creates a mixer. If you provide an object it will populate the mixer with channels created above.
-
-```json
-{
-  "channels": [
-    "<uuid>",
-    "<uuid>"
-  ]
-}
-```
-
-It will return a uuid of a mixer.
-
-```json
-{
-  "mixer": "<uuid>"
-}
-```
-
-*PUT /mix/<uuid>*
-
-Updates the list of channels in the mixer. Works in the same way as POST - but does not return json - only a 200.
-
-*DELETE /mix/<uuid>*
-
-Deletes a mixer. TODO.
+Configures both channels to mix together.
 
 ## Control Server
 
@@ -140,3 +115,7 @@ i.e.
 ```
 
 Then there is the question - should we support mp3 - this adds a stupid non-scalable workload to a CPU. If we enforce only working with appropriate files then encoding would only ever be one once.
+
+# TODO
+
+ -[] If you use echo (or any other dumb mixing) the timestamp and the sequence number will need to be managed if the application switches.

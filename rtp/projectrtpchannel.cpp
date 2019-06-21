@@ -6,6 +6,7 @@
 
 
 #include "projectrtpchannel.h"
+#include "g711.h"
 
 /*!md
 # Project RTP Channel
@@ -25,6 +26,7 @@ echo "This is my data" > /dev/udp/127.0.0.1/10000
 projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsigned short port )
   : rtpindexoldest( 0 ),
   rtpindexin( 0 ),
+  rtpoutindex( 0 ),
   active( false ),
   port( port ),
   resolver( io_service ),
@@ -33,7 +35,8 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsig
   receivedrtp( false ),
   targetconfirmed( false ),
   reader( true ),
-  writer( true )
+  writer( true ),
+  receivedpkcount( 0 )
 {
 }
 
@@ -62,6 +65,9 @@ void projectrtpchannel::open()
 {
   this->rtpindexin = 0;
   this->rtpindexoldest = 0;
+  this->receivedpkcount = 0;
+
+  this->rtpoutindex = 0;
 
   this->rtpsocket.open( boost::asio::ip::udp::v4() );
   this->rtpsocket.bind( boost::asio::ip::udp::endpoint(
@@ -133,6 +139,7 @@ void projectrtpchannel::readsomertp( void )
       {
         if ( !ec && bytes_recvd > 0 && bytes_recvd <= RTPMAXLENGTH )
         {
+          this->receivedpkcount++;
           if( !this->receivedrtp )
           {
             this->confirmedrtpsenderendpoint = this->rtpsenderendpoint;
@@ -158,42 +165,86 @@ void projectrtpchannel::readsomertp( void )
 }
 
 /*!md
+## xlaw2xlaw
+If the in packet is u law then converts to alaw and vice versaa.
+
+Takes in buffer and an out buffer RTP packet and converts from one to the other. It assumes there is space in the output buffer to match the input.
+*/
+void xlaw2ylaw( rtppacket *out, rtppacket *in )
+{
+  unsigned char ( *convert )( unsigned char ) = ulaw2alaw;
+
+  if( PCMAPAYLOADTYPE == in->getpayloadtype() )
+  {
+    convert = alaw2ulaw;
+  }
+
+  uint8_t *inbufptr, *outbufptr;
+
+  /* copy the header */
+  int headersize = 12 + ( in->getpacketcsrccount() * 4 );
+  memcpy( out->pk, in->pk, headersize );
+  int datalength = in->length - headersize;
+
+  inbufptr = in->getpayload();
+  outbufptr = out->getpayload();
+
+  for( int i = 0; i < datalength; i++ )
+  {
+    *outbufptr = convert( *inbufptr );
+    outbufptr++;
+    inbufptr++;
+  }
+}
+
+/*!md
 ## handlertpdata
+We are not supporting endless support for different CODECs which reduces flexability but simplifies this work. As this work is simplified it should also be more efficient.
 */
 void projectrtpchannel::handlertpdata( void )
 {
-  /* review: if nothing to do then just echo back */
+  rtppacket *src = &this->rtpdata[ this->rtpindexoldest ];
+  this->rtpindexoldest = ( this->rtpindexoldest + 1 ) % BUFFERPACKETCOUNT;
+
+  /* review: if nothing do nothing */
   if( !this->others || 0 == this->others->size() )
-  {
-    this->writepacket( &this->rtpdata[ this->rtpindexoldest ] );
-    this->rtpindexoldest = ( this->rtpindexoldest + 1 ) % BUFFERPACKETCOUNT;
+  { 
     return;
   }
 
   if( 2 == this->others->size() )
   {
-    int count = 0;
     /* one should be us */
-    projectrtpchannellist::iterator it;
-    for( it = this->others->begin(); it != this->others->end(); it++ )
+    projectrtpchannellist::iterator it = this->others->begin();
+    projectrtpchannel::pointer chan = *it;
+    if( it->get() == this )
     {
+      chan = *( ++it );
+    }
 
-      if( it->get() != this )
+    auto uspayloadtype = src->getpayloadtype();
+
+    /* Conversion from PCMU to PCMA and vice versa can be done here as it is a simple lookup, anything else should be passed off to another thread. */
+    if( uspayloadtype == chan->selectedcodec )
+    {
+      chan->writepacket( src );
+    }
+    else
+    {
+      /* we have to transcode */
+      switch( chan->selectedcodec )
       {
-        count++;
-        ( *it )->writepacket( &this->rtpdata[ this->rtpindexoldest ] );
-        this->rtpindexoldest = ( this->rtpindexoldest + 1 ) % BUFFERPACKETCOUNT;
+        case PCMAPAYLOADTYPE:
+        case PCMUPAYLOADTYPE:
+        {
+          rtppacket *dst = chan->gettempoutbuf();
+          xlaw2ylaw( dst, src );
+          chan->writepacket( dst );
+          return;
+        }
       }
     }
-
-    if( 2 == count )
-    {
-      std::cout << "WARNING" << std::endl;
-    }
-
   }
-
-  /* more than 2, we have to check all available packets for a sequence number is available then mix */
 }
 
 /*!md
@@ -216,6 +267,17 @@ void projectrtpchannel::readsomertcp( void )
         this->readsomertcp();
       }
     } );
+}
+
+/*!md
+## gettempoutbuf
+When we need a buffer to send data out (because we cannot guarantee our own buffer will be available) we can use the circular out buffer on this channel. This will return the next one available.
+*/
+rtppacket *projectrtpchannel::gettempoutbuf( void )
+{
+  rtppacket *buf = &this->outrtpdata[ rtpoutindex ];
+  rtpoutindex = ( rtpoutindex + 1 ) % BUFFERPACKETCOUNT;
+  return buf;
 }
 
 /*!md
@@ -300,7 +362,7 @@ bool projectrtpchannel::mix( projectrtpchannel::pointer other )
   {
     this->others->push_back( other );
   }
-  
+
   if( !themfound )
   {
     this->others->push_back( shared_from_this() );
@@ -463,11 +525,22 @@ uint32_t rtppacket::getssrc( void )
 ## getcsrc
 As it says. Use getpacketcsrccount to return the number of available
 0-15. This function doesn't check bounds.
-
 */
 uint32_t rtppacket::getcsrc( uint8_t index )
 {
   uint32_t *tmp = ( uint32_t * )pk;
   tmp += 3 + index;
   return ntohl( *tmp );
+}
+
+/*!md
+## getpayload
+Returns a pointer to the start of the payload.
+*/
+uint8_t *rtppacket::getpayload( void )
+{
+  uint8_t *ptr = this->pk;
+  ptr += 12;
+  ptr += this->getpacketcsrccount();
+  return ptr;
 }
