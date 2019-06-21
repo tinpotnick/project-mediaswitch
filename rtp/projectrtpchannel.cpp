@@ -165,7 +165,7 @@ void projectrtpchannel::readsomertp( void )
 }
 
 /*!md
-## xlaw2xlaw
+## xlaw2ylaw
 If the in packet is u law then converts to alaw and vice versaa.
 
 Takes in buffer and an out buffer RTP packet and converts from one to the other. It assumes there is space in the output buffer to match the input.
