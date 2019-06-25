@@ -36,6 +36,8 @@
 class rtppacket
 {
 public:
+  rtppacket();
+  rtppacket( rtppacket & );
   size_t length;
   unsigned char pk[ RTPMAXLENGTH ];
 
@@ -49,8 +51,14 @@ public:
   uint32_t gettimestamp( void );
   uint32_t getssrc( void );
   uint32_t getcsrc( uint8_t index );
-
   uint8_t *getpayload( void );
+
+  void setpayloadtype( uint8_t payload );
+  void setsequencenumber( uint16_t sq );
+  void settimestamp( uint32_t tmstp );
+
+  void xlaw2ylaw( rtppacket *in );
+  void copy( rtppacket *p );
 };
 
 /*!md

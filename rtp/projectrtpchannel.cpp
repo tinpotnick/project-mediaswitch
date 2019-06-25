@@ -128,7 +128,7 @@ void projectrtpchannel::close( void )
 
 /*!md
 ## handlereadsomertp
-Wait for RTP data. We have to re-order when required.
+Wait for RTP data. We have to re-order when required. Look after all of the round robin memory here. We should have enough time to deal with the in data before it gets overwritten.
 */
 void projectrtpchannel::readsomertp( void )
 {
@@ -164,38 +164,6 @@ void projectrtpchannel::readsomertp( void )
       } );
 }
 
-/*!md
-## xlaw2ylaw
-If the in packet is u law then converts to alaw and vice versaa.
-
-Takes in buffer and an out buffer RTP packet and converts from one to the other. It assumes there is space in the output buffer to match the input.
-*/
-void xlaw2ylaw( rtppacket *out, rtppacket *in )
-{
-  unsigned char ( *convert )( unsigned char ) = ulaw2alaw;
-
-  if( PCMAPAYLOADTYPE == in->getpayloadtype() )
-  {
-    convert = alaw2ulaw;
-  }
-
-  uint8_t *inbufptr, *outbufptr;
-
-  /* copy the header */
-  int headersize = 12 + ( in->getpacketcsrccount() * 4 );
-  memcpy( out->pk, in->pk, headersize );
-  int datalength = in->length - headersize;
-
-  inbufptr = in->getpayload();
-  outbufptr = out->getpayload();
-
-  for( int i = 0; i < datalength; i++ )
-  {
-    *outbufptr = convert( *inbufptr );
-    outbufptr++;
-    inbufptr++;
-  }
-}
 
 /*!md
 ## handlertpdata
@@ -227,7 +195,9 @@ void projectrtpchannel::handlertpdata( void )
     /* Conversion from PCMU to PCMA and vice versa can be done here as it is a simple lookup, anything else should be passed off to another thread. */
     if( uspayloadtype == chan->selectedcodec )
     {
-      chan->writepacket( src );
+      rtppacket *dst = chan->gettempoutbuf();
+      dst->copy( src );
+      chan->writepacket( dst );
     }
     else
     {
@@ -238,7 +208,7 @@ void projectrtpchannel::handlertpdata( void )
         case PCMUPAYLOADTYPE:
         {
           rtppacket *dst = chan->gettempoutbuf();
-          xlaw2ylaw( dst, src );
+          dst->xlaw2ylaw( src );
           chan->writepacket( dst );
           return;
         }
@@ -435,12 +405,87 @@ void projectrtpchannel::handlertcpdata( void )
 }
 
 /*!md
+## Constructor
+*/
+rtppacket::rtppacket() :
+  length( 0 )
+{
+
+}
+
+/*!md
+## Copy contructor
+
+We only need to copy the required bytes.
+*/
+rtppacket::rtppacket( rtppacket &p )
+{
+  this->length = p.length;
+  memcpy( this->pk, p.pk, p.length );
+}
+
+/*!md
+## Copy
+*/
+void rtppacket::copy( rtppacket *p )
+{
+  if( !p ) return;
+  this->length = p->length;
+  memcpy( this->pk, p->pk, p->length );
+}
+
+/*!md
+## xlaw2ylaw
+
+From whichever PCM encoding (u or a) encode to the other.
+*/
+void rtppacket::xlaw2ylaw( rtppacket *in )
+{
+  if( !in ) return;
+  unsigned char ( *convert )( unsigned char );
+
+  /* copy the header */
+  int headersize = 12 + ( in->getpacketcsrccount() * 4 );
+  memcpy( this->pk, in->pk, headersize );
+
+  this->length = in->length;
+
+
+  if( PCMAPAYLOADTYPE == in->getpayloadtype() )
+  {
+    this->setpayloadtype( PCMUPAYLOADTYPE );
+    convert = alaw2ulaw;
+  }
+  else
+  {
+    this->setpayloadtype( PCMAPAYLOADTYPE );
+    convert = ulaw2alaw;
+  }
+
+  uint8_t *inbufptr, *outbufptr;
+
+  int datalength = in->length - headersize;
+
+  inbufptr = in->pk + headersize;
+  outbufptr = this->pk + headersize;
+
+  for( int i = 0; i < datalength; i++ )
+  {
+    *outbufptr = convert( *inbufptr );
+
+    outbufptr++;
+    inbufptr++;
+  }
+}
+
+
+/*!md
 ## getpacketversion
 As it says.
 */
 uint8_t rtppacket::getpacketversion( void )
 {
-  return ( pk[ 0 ] & 0xb0 ) >> 6;
+  return ( this->pk[ 0 ] & 0xc0 ) >> 6;
 }
 
 /*!md
@@ -449,7 +494,7 @@ As it says.
 */
 uint8_t rtppacket::getpacketpadding( void )
 {
-  return ( pk[ 0 ] & 0x20 ) >> 5;
+  return ( this->pk[ 0 ] & 0x20 ) >> 5;
 }
 
 /*!md
@@ -458,7 +503,7 @@ As it says.
 */
 uint8_t rtppacket::getpacketextension( void )
 {
-  return ( pk[ 0 ] & 0x10 ) >> 4;
+  return ( this->pk[ 0 ] & 0x10 ) >> 4;
 }
 
 /*!md
@@ -467,7 +512,7 @@ As it says.
 */
 uint8_t rtppacket::getpacketcsrccount( void )
 {
-  return ( pk[ 0 ] & 0x0f );
+  return ( this->pk[ 0 ] & 0x0f );
 }
 
 /*!md
@@ -476,7 +521,7 @@ As it says.
 */
 uint8_t rtppacket::getpacketmarker( void )
 {
-  return ( pk[ 1 ] & 0x80 ) >> 7;
+  return ( this->pk[ 1 ] & 0x80 ) >> 7;
 }
 
 /*!md
@@ -485,7 +530,16 @@ As it says.
 */
 uint8_t rtppacket::getpayloadtype( void )
 {
-  return ( pk[ 1 ] & 0x7f );
+  return ( this->pk[ 1 ] & 0x7f );
+}
+
+/*!md
+## setpayloadtype
+As it says.
+*/
+void rtppacket::setpayloadtype( uint8_t pt )
+{
+  this->pk[ 1 ] = ( this->pk[ 1 ] & 0x80 ) | ( pt & 0x7f );
 }
 
 /*!md
@@ -494,9 +548,19 @@ As it says.
 */
 uint16_t rtppacket::getsequencenumber( void )
 {
-  uint16_t *tmp = ( uint16_t * )pk;
+  uint16_t *tmp = ( uint16_t * )this->pk;
   tmp++;
   return ntohs( *tmp );
+}
+
+/*!md
+## getsequencenumber
+As it says.
+*/
+void rtppacket::setsequencenumber( uint16_t sq )
+{
+  uint16_t *tmp = ( uint16_t * )this->pk;
+  *tmp = htons( sq );
 }
 
 /*!md
@@ -505,9 +569,19 @@ As it says.
 */
 uint32_t rtppacket::gettimestamp( void )
 {
-  uint32_t *tmp = ( uint32_t * )pk;
+  uint32_t *tmp = ( uint32_t * )this->pk;
   tmp++;
   return ntohl( *tmp );
+}
+
+/*!md
+## settimestamp
+As it says.
+*/
+void rtppacket::settimestamp( uint32_t tmstp )
+{
+  uint32_t *tmp = ( uint32_t * )this->pk;
+  *tmp = htonl( tmstp );
 }
 
 /*!md
@@ -516,7 +590,7 @@ As it says.
 */
 uint32_t rtppacket::getssrc( void )
 {
-  uint32_t *tmp = ( uint32_t * )pk;
+  uint32_t *tmp = ( uint32_t * )this->pk;
   tmp += 2;
   return ntohl( *tmp );
 }
@@ -528,7 +602,7 @@ As it says. Use getpacketcsrccount to return the number of available
 */
 uint32_t rtppacket::getcsrc( uint8_t index )
 {
-  uint32_t *tmp = ( uint32_t * )pk;
+  uint32_t *tmp = ( uint32_t * )this->pk;
   tmp += 3 + index;
   return ntohl( *tmp );
 }
