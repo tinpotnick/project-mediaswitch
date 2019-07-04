@@ -6,7 +6,6 @@
 
 
 #include "projectrtpchannel.h"
-#include "g711.h"
 
 /*!md
 # Project RTP Channel
@@ -36,7 +35,9 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsig
   targetconfirmed( false ),
   reader( true ),
   writer( true ),
-  receivedpkcount( 0 )
+  receivedpkcount( 0 ),
+  g722encoder( nullptr ),
+  g722decoder( nullptr )
 {
 }
 
@@ -85,6 +86,8 @@ void projectrtpchannel::open()
 
   this->readsomertp();
   this->readsomertcp();
+
+  this->lpfilter.reset();
 }
 
 unsigned short projectrtpchannel::getport( void )
@@ -100,6 +103,17 @@ void projectrtpchannel::close( void )
 {
   try
   {
+    if( nullptr != this->g722decoder )
+    {
+      g722_decode_free( this->g722decoder );
+      this->g722decoder = nullptr;
+    }
+    if( nullptr != this->g722encoder )
+    {
+      g722_encode_free( this->g722encoder );
+      this->g722encoder = nullptr;
+    }
+
     /* remove oursevelse from our list of mixers */
     if( this->others )
     {
@@ -147,6 +161,7 @@ void projectrtpchannel::readsomertp( void )
           }
 
           this->rtpdata[ this->rtpindexin ].length = bytes_recvd;
+          this->rtpdata[ this->rtpindexin ].havel16 = false;
           this->rtpindexin = ( this->rtpindexin + 1 ) % BUFFERPACKETCOUNT;
 
           /* if we catch up */
@@ -164,10 +179,68 @@ void projectrtpchannel::readsomertp( void )
       } );
 }
 
+/*!md
+## isl16required
+Check if we need it converting to L16
+
+If we send it to somewhere, we need to decide if we have to convert to l16 or not
+If we send to PCM (U or A) to other then we do
+If we send from ilbc or 722 then we do
+PCM(a or u) to PCM(a or u) does not
+same to same does not
+
+Further work: recording etc - we probably do need conversion.
+Further work: this is where can re-order (probaby very simple - are we the current latest and work back to any left over)
+*/
+bool projectrtpchannel::isl16required( void )
+{
+  rtppacket *src = &this->rtpdata[ this->rtpindexoldest ];
+
+  auto uspayloadtype = src->getpayloadtype();
+
+  for( auto it = this->others->begin(); it != this->others->end(); it++ )
+  {
+    if( uspayloadtype != (* it )->selectedcodec )
+    {
+      /* Some conversion required */
+      switch( uspayloadtype )
+      {
+        case PCMAPAYLOADTYPE:
+        case PCMUPAYLOADTYPE:
+        {
+          switch( (* it )->selectedcodec )
+          {
+            case PCMAPAYLOADTYPE:
+            case PCMUPAYLOADTYPE:
+            {
+              break;
+            }
+            default:
+            {
+              return true;
+            }
+          }
+          break;
+        }
+        case G722PAYLOADTYPE:
+        {
+          return true;
+        }
+        case ILBCPAYLOADTYPE:
+        {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
 
 /*!md
 ## handlertpdata
 We are not supporting endless support for different CODECs which reduces flexability but simplifies this work. As this work is simplified it should also be more efficient.
+
 */
 void projectrtpchannel::handlertpdata( void )
 {
@@ -180,6 +253,33 @@ void projectrtpchannel::handlertpdata( void )
     return;
   }
 
+  if( this->isl16required() )
+  {
+    switch( src->getpayloadtype() )
+    {
+      case PCMAPAYLOADTYPE:
+      case PCMUPAYLOADTYPE:
+      {
+        src->g711tol16();
+        break;
+      }
+      case ILBCPAYLOADTYPE:
+      {
+        break;
+      }
+      case G722PAYLOADTYPE:
+      {
+        if( nullptr == this->g722decoder )
+        {
+          this->g722decoder = g722_decode_init( NULL, 64000, G722_PACKED );
+        }
+        src->g722tol16( this->g722decoder );
+        break;
+      }
+    }
+  }
+
+  /* The next section is sending to our recipient(s) */
   if( 2 == this->others->size() )
   {
     /* one should be us */
@@ -202,15 +302,48 @@ void projectrtpchannel::handlertpdata( void )
     else
     {
       /* we have to transcode */
-      switch( chan->selectedcodec )
+      switch( chan->selectedcodec ) /* other channel - where we are sending data (encoding) */
       {
         case PCMAPAYLOADTYPE:
         case PCMUPAYLOADTYPE:
         {
-          rtppacket *dst = chan->gettempoutbuf();
-          dst->xlaw2ylaw( src );
-          chan->writepacket( dst );
+          switch( uspayloadtype )
+          {
+            /* special case */
+            case PCMAPAYLOADTYPE:
+            case PCMUPAYLOADTYPE:
+            {
+              rtppacket *dst = chan->gettempoutbuf();
+              dst->copyheader( src );
+              dst->xlaw2ylaw( src );
+              chan->writepacket( dst );
+              return;
+            }
+            default:
+            {
+              rtppacket *dst = chan->gettempoutbuf();
+              dst->copyheader( src );
+              dst->l16tog711( chan->selectedcodec, src, this->lpfilter );
+              chan->writepacket( dst );
+              return;
+            }
+          }
+        }
+        case ILBCPAYLOADTYPE:
+        {
           return;
+        }
+        case G722PAYLOADTYPE:
+        {
+          if( nullptr == this->g722encoder )
+          {
+            this->g722encoder = g722_encode_init( NULL, 64000, G722_PACKED );
+          }
+
+          rtppacket *dst = chan->gettempoutbuf();
+          dst->copyheader( src );
+          dst->l16tog722( this->g722encoder, src );
+          chan->writepacket( dst );
         }
       }
     }
@@ -245,8 +378,8 @@ When we need a buffer to send data out (because we cannot guarantee our own buff
 */
 rtppacket *projectrtpchannel::gettempoutbuf( void )
 {
-  rtppacket *buf = &this->outrtpdata[ rtpoutindex ];
-  rtpoutindex = ( rtpoutindex + 1 ) % BUFFERPACKETCOUNT;
+  rtppacket *buf = &this->outrtpdata[ this->rtpoutindex ];
+  this->rtpoutindex = ( this->rtpoutindex + 1 ) % BUFFERPACKETCOUNT;
   return buf;
 }
 
@@ -283,7 +416,6 @@ Our control can set the target of the RTP stream. This can be important in order
 */
 void projectrtpchannel::target( std::string &address, unsigned short port )
 {
-std::cout << "address: " << address << ", port: " << port << std::endl;
   boost::asio::ip::udp::resolver::query query( boost::asio::ip::udp::v4(), address, std::to_string( port ) );
 
   /* Resolve the address */
@@ -345,15 +477,28 @@ bool projectrtpchannel::mix( projectrtpchannel::pointer other )
 
 /*!md
 ## audio
-The CODECs on the other end which are acceptable. The first one should be the prefered. For now we keep hold of the list of codecs as we may be using them in the future.
+The CODECs on the other end which are acceptable. The first one should be the preferred. For now we keep hold of the list of codecs as we may be using them in the future. Filter out non-RTP streams (such as DTMF).
 */
 void projectrtpchannel::audio( codeclist codecs )
 {
   if( codecs.size() > 0 )
   {
     this->codecs = codecs;
-    this->selectedcodec = codecs[ 0 ];
-std::cout << "selected codec " << this->selectedcodec << std::endl;
+    codeclist::iterator it;
+    for( it = codecs.begin(); it != codecs.end(); it++ )
+    {
+      switch( *it )
+      {
+        case PCMAPAYLOADTYPE:
+        case PCMUPAYLOADTYPE:
+        case G722PAYLOADTYPE:
+        case ILBCPAYLOADTYPE:
+        {
+          this->selectedcodec = *it;
+          return;
+        }
+      }
+    }
   }
 }
 
@@ -365,7 +510,7 @@ void projectrtpchannel::handletargetresolve (
             boost::system::error_code e,
             boost::asio::ip::udp::resolver::iterator it )
 {
-  /* Don't override the symetric port we send back to */
+  /* Don't override the symmetric port we send back to */
   if( this->receivedrtp )
   {
     return;
@@ -379,7 +524,6 @@ void projectrtpchannel::handletargetresolve (
     return;
   }
 
-std::cout << "Confirmed target" << std::endl;
   this->confirmedrtpsenderendpoint = *it;
   this->targetconfirmed = true;
 }
@@ -408,7 +552,8 @@ void projectrtpchannel::handlertcpdata( void )
 ## Constructor
 */
 rtppacket::rtppacket() :
-  length( 0 )
+  length( 0 ),
+  havel16( false )
 {
 
 }
@@ -418,7 +563,8 @@ rtppacket::rtppacket() :
 
 We only need to copy the required bytes.
 */
-rtppacket::rtppacket( rtppacket &p )
+rtppacket::rtppacket( rtppacket &p ) :
+  havel16( false )
 {
   this->length = p.length;
   memcpy( this->pk, p.pk, p.length );
@@ -427,49 +573,48 @@ rtppacket::rtppacket( rtppacket &p )
 /*!md
 ## Copy
 */
-void rtppacket::copy( rtppacket *p )
+void rtppacket::copy( rtppacket *src )
 {
-  if( !p ) return;
-  this->length = p->length;
-  memcpy( this->pk, p->pk, p->length );
+  if( !src ) return;
+  this->length = src->length;
+  memcpy( this->pk, src->pk, src->length );
+}
+/*!md
+## Copy header
+*/
+void rtppacket::copyheader( rtppacket *src )
+{
+  if( !src ) return;
+  this->length = src->length;
+  memcpy( this->pk, src->pk, 12 + src->getpacketcsrccount() );
 }
 
 /*!md
 ## xlaw2ylaw
 
-From whichever PCM encoding (u or a) encode to the other.
+From whichever PCM encoding (u or a) encode to the other without having to do intermediate l16.
 */
 void rtppacket::xlaw2ylaw( rtppacket *in )
 {
   if( !in ) return;
   unsigned char ( *convert )( unsigned char );
 
-  /* copy the header */
-  int headersize = 12 + ( in->getpacketcsrccount() * 4 );
-  memcpy( this->pk, in->pk, headersize );
-
-  this->length = in->length;
-
-
   if( PCMAPAYLOADTYPE == in->getpayloadtype() )
   {
     this->setpayloadtype( PCMUPAYLOADTYPE );
-    convert = alaw2ulaw;
+    convert = alaw_to_ulaw;
   }
   else
   {
     this->setpayloadtype( PCMAPAYLOADTYPE );
-    convert = ulaw2alaw;
+    convert = ulaw_to_alaw;
   }
 
   uint8_t *inbufptr, *outbufptr;
+  inbufptr = in->getpayload();
+  outbufptr = this->getpayload();
 
-  int datalength = in->length - headersize;
-
-  inbufptr = in->pk + headersize;
-  outbufptr = this->pk + headersize;
-
-  for( int i = 0; i < datalength; i++ )
+  for( int i = 0; i < G711PAYLOADBYTES; i++ )
   {
     *outbufptr = convert( *inbufptr );
 
@@ -617,4 +762,149 @@ uint8_t *rtppacket::getpayload( void )
   ptr += 12;
   ptr += this->getpacketcsrccount();
   return ptr;
+}
+
+/*!md
+## g722tol16
+As it says.
+*/
+void rtppacket::g722tol16( g722_decode_state_t *g722decoder )
+{
+  g722_decode( g722decoder, this->l16, this->getpayload(), G722PAYLOADBYTES );
+  this->l16samplerate = 16000;
+  this->havel16 = true;
+}
+
+/*!md
+## l16tog722
+As it says.
+*/
+void rtppacket::l16tog722( g722_encode_state_t *g722encoder, rtppacket *l16src )
+{
+  if( 8000 == l16src->l16samplerate )
+  {
+    /* upsample */
+    int16_t *out = l16src->l16 + ( 2 * G722PAYLOADBYTES );
+    int16_t *in = l16src->l16 + G722PAYLOADBYTES;
+    for( int i = 0; i < G722PAYLOADBYTES; i++ )
+    {
+      *out = *in;
+      out--;
+      *out = *in;
+      out--;
+      in--;
+    }
+    l16src->l16samplerate = 16000;
+  }
+
+  this->setpayloadtype( G722PAYLOADTYPE );
+  this->length = 12 + this->getpacketcsrccount() + G722PAYLOADBYTES;
+  g722_encode( g722encoder, this->getpayload(), l16src->l16, G722PAYLOADBYTES * 2 );
+}
+
+/*!md
+## g711tol16
+As it says.
+*/
+void rtppacket::g711tol16( void )
+{
+  int16_t ( *convert )( uint8_t );
+  if( PCMAPAYLOADTYPE == this->getpayloadtype() )
+  {
+    convert = alaw_to_linear;
+  }
+  else if( PCMUPAYLOADTYPE == this->getpayloadtype() )
+  {
+    convert = ulaw_to_linear;
+  }
+  else
+  {
+    return;
+  }
+
+  uint8_t *in;
+  int16_t *out;
+  in = this->getpayload();
+  out = this->l16;
+
+  for( int i = 0; i < G711PAYLOADBYTES; i++ )
+  {
+    *out = convert( *in );
+    in++;
+    out++;
+  }
+  this->havel16 = true;
+  this->l16samplerate = 8000;
+}
+
+/*!md
+## l16tog711
+payloadtype: PCMAPAYLOADTYPE or PCMUPAYLOADTYPE
+*/
+void rtppacket::l16tog711( uint8_t payloadtype, rtppacket *l16src, lowpass3_4k16k &filter )
+{
+  this->setpayloadtype( payloadtype );
+  this->length = 12 + this->getpacketcsrccount() + G711PAYLOADBYTES;
+  
+  uint8_t ( *convert )( int );
+  switch( payloadtype )
+  {
+    case PCMAPAYLOADTYPE:
+    {
+      convert = linear_to_alaw;
+      break;
+    }
+    case PCMUPAYLOADTYPE:
+    {
+      convert = linear_to_ulaw;
+      break;
+    }
+    default:
+    {
+      return;
+    }
+  }
+
+  uint8_t *out;
+  int16_t *in;
+  out = this->getpayload();
+  in = l16src->l16;
+
+  switch( l16src->l16samplerate )
+  {
+    case 16000:
+    {
+      std::cout << l16src->getsequencenumber() << std::endl;
+      int16_t filteredval;
+      int count = 0;
+      for( int i = 0; i < G711PAYLOADBYTES * 2; i++ )
+      {
+        /*
+          LP filter then divide by 2 for 16K to 8K sampling.
+         */
+        filteredval = filter.execute( *in );
+        in++;
+
+        if( 0x01 == ( i & 0x01 ) )
+        {
+          *out = convert( filteredval );
+          out++;
+          count++;
+        }
+      }
+      std::cout << "c:" << count << std::endl;
+      break;
+    }
+    default:
+    {
+      /* assume 8000 */
+      for( int i = 0; i < G711PAYLOADBYTES; i++ )
+      {
+        *out = convert( *in );
+        in++;
+        out++;
+      }
+      break;
+    }
+  }
 }

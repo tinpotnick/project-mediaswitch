@@ -509,7 +509,7 @@ class projectcontrol
     this.rtp.host = "127.0.0.1";
     this.rtp.port = 9002;
 
-    this.codecs = [ "pcma", "pcmu", "2833" ];
+    this.codecs = [ "pcma", "pcmu", "722", "ilbc",  "2833" ];
     this.sessionidcounter = 1;
 
     this.gateways = [];
@@ -943,8 +943,13 @@ Add a CODEC to the SDP object.
       }
       case "722":
       {
-        sdp.m[ 0 ].payloads.push( 7 );
-        sdp.m[ 0 ].rtpmap[ "8" ] = { encoding: "722", clock: "8000" };
+        sdp.m[ 0 ].payloads.push( 9 );
+        break;
+      }
+      case "ilbc":
+      {
+        sdp.m[ 0 ].payloads.push( 97 );
+        sdp.m[ 0 ].rtpmap[ "97" ] = { encoding: "iLBC", clock: "8000" };
         break;
       }
       /* rfc 2833 - DTMF*/

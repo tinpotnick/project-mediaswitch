@@ -25,6 +25,8 @@
 
 #include <chrono>
 
+#include "firfilter.h"
+
 boost::asio::io_service ioservice;
 boost::asio::io_service workerservice;
 
@@ -454,6 +456,12 @@ int main( int argc, const char* argv[] )
         }
         std::cerr << "I need a maxworker count" << std::endl;
         return -1;
+      }
+      else if( "--testfir" == argvstr )
+      {
+        int frequency = boost::lexical_cast< int >( argv[ i + 1 ] );
+        testlofir( frequency );
+        return 0;
       }
     }
   }

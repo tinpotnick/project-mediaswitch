@@ -2,6 +2,11 @@
 
 The RTP server offers functionality to process RTP data streams and mix them. Channels will be able to be mixed with other channels or local functions like recording or file playback.
 
+## Dependencies
+
+* ilbc-devel
+* spandsp-devel
+
 ## API
 
 ### Channels

@@ -16,6 +16,12 @@
 #include <list>
 #include <vector>
 
+/* CODECs */
+#include <ilbc.h>
+#include <spandsp.h>
+
+#include "firfilter.h"
+
 /* The number of bytes in a packet ( these figure are less some overhead G711 = 172*/
 #define G711PAYLOADBYTES 160
 #define G722PAYLOADBYTES 160
@@ -24,10 +30,13 @@
 
 #define PCMAPAYLOADTYPE 0
 #define PCMUPAYLOADTYPE 8
+#define G722PAYLOADTYPE 9
+#define ILBCPAYLOADTYPE 97
 
 /* Need to double check max RTP length with variable length header - there could be a larger length withour CODECs */
 /* this maybe breached if a stupid number of csrc count is high */
 #define RTPMAXLENGTH 200
+#define L16MAXLENGTH ( RTPMAXLENGTH * 2 )
 #define RTCPMAXLENGTH 1500
 
 /* The number of packets we will keep in a buffer */
@@ -39,7 +48,10 @@ public:
   rtppacket();
   rtppacket( rtppacket & );
   size_t length;
-  unsigned char pk[ RTPMAXLENGTH ];
+  uint8_t pk[ RTPMAXLENGTH ];
+  int16_t l16[ L16MAXLENGTH ];
+  bool havel16;
+  int l16samplerate;
 
   uint8_t getpacketversion( void );
   uint8_t getpacketpadding( void );
@@ -57,8 +69,15 @@ public:
   void setsequencenumber( uint16_t sq );
   void settimestamp( uint32_t tmstp );
 
+  void copy( rtppacket *src );
+  void copyheader( rtppacket *src );
+
+  /* conversion functions */
   void xlaw2ylaw( rtppacket *in );
-  void copy( rtppacket *p );
+  void g722tol16( g722_decode_state_t *g722decoder );
+  void l16tog722( g722_encode_state_t *g722encoder, rtppacket *l16src );
+  void g711tol16( void );
+  void l16tog711( uint8_t payloadtype, rtppacket *l16src, lowpass3_4k16k &filter );
 };
 
 /*!md
@@ -82,9 +101,9 @@ PCMA->PCMU in one go (very efficiently)
 PCMU->PCMA (also very efficient)
 
 To do
-PCMA-G722 we actuall have to PCMA-L16-G722 which is also true of iLBC. If we also do things like conference (mixing to multiple channels) and call recording then the complexity also increases - especially if we want to become low cpu.
+PCMA-G722 we actually have to PCMA-L16-G722 which is also true of iLBC. If we also do things like conference (mixing to multiple channels) and call recording then the complexity also increases - especially if we want to become low cpu.
 
-if pcma to pcmu and no recording and only 2 channels then direct conversion
+if PCMA to PCMU and no recording and only 2 channels then direct conversion
 
 Buffer?
 
@@ -157,7 +176,6 @@ private:
 
   bool reader;
   bool writer;
-
   void readsomertp( void );
   void readsomertcp( void );
 
@@ -167,13 +185,20 @@ private:
               boost::system::error_code e,
               boost::asio::ip::udp::resolver::iterator it );
 
-
+  bool isl16required( void );
   uint32_t timestampdiff;
   uint64_t receivedpkcount;
 
   typedef std::list< projectrtpchannel::pointer > projectrtpchannellist;
   typedef boost::shared_ptr< projectrtpchannellist > projectrtpchannellistptr;
   projectrtpchannellistptr others;
+
+  /* CODECs  */
+  g722_encode_state_t *g722encoder;
+  g722_decode_state_t *g722decoder;
+
+  /* If we require downsampling */
+  lowpass3_4k16k lpfilter;
 };
 
 #endif

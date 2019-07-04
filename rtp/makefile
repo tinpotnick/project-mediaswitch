@@ -1,5 +1,5 @@
 CCOPTS:=-Wall -g -O0 -fstack-protector-all -I../projectlib/ -std=c++17
-LL:=-lboost_system -lpthread -lcrypto -L../Debug/ -lproject
+LL:=-lboost_system -lpthread -lcrypto -L../Debug/ -lproject -lspandsp
 
 COMPILER:=g++
 LINKER:=g++
