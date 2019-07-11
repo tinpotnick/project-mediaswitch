@@ -916,7 +916,7 @@ void rtppacket::l16lowtowideband( int16_t *lastsample )
 ##  l16widetolowband
 Downsample our L16 wideband samples to 8K. Pass through filter then grab every other sample.
 */
-void rtppacket::l16widetolowband( lowpass3_4k16k &filter )
+void rtppacket::l16widetonarrowband( lowpass3_4k16k &filter )
 {
   int16_t *out = this->l168k;
   int16_t *in = this->l1616k;
