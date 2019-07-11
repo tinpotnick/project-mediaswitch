@@ -96,8 +96,6 @@ projectcontrol.onnewcall = ( call ) =>
 }
 ```
 
-In this example, we also create an SDP object with sessionid of 20518, host 127.0.0.1 and port 54400. This is where the caller will send its RTP traffic to. See control/projectcontrol/index.js for more information.
-
 Once projectcontrol has been configured run needs calling which places it all in its event loop.
 
 ```js
