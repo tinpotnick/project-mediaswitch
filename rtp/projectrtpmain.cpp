@@ -479,6 +479,9 @@ int main( int argc, const char* argv[] )
   testatomic();
   initchannels( startrtpport, endrtpport );
 
+  /* init transcoding stuff */
+  gen711convertdata();
+
   if ( !fg )
   {
     daemonize();

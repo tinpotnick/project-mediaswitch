@@ -8,6 +8,37 @@
 
 #include "projectrtpchannel.h"
 
+
+/*!md
+Pre generate all 711 data.
+We can speed up 711 conversion by way of pre calculating values. 128K(ish) of data is not too much to worry about!
+*/
+
+static uint8_t l16topcmu[ 65536 ];
+static uint8_t l16topcma[ 65536 ];
+static int16_t pcmatol16[ 256 ];
+static int16_t pcmutol16[ 256 ];
+
+void gen711convertdata( void )
+{
+  std::cout << "Pre generating G711 tables";
+  for( int32_t i = 0; i != 65535; i++ )
+  {
+    int16_t l16val = i - 32768;
+    l16topcmu[ i ] = linear_to_ulaw( l16val );
+    l16topcma[ i ] = linear_to_alaw( l16val );
+  }
+
+  for( uint8_t i = 0; i != 255; i++ )
+  {
+    pcmatol16[ i ] = alaw_to_linear( i );
+    pcmutol16[ i ] = ulaw_to_linear( i );
+  }
+
+  std::cout << " - completed." << std::endl;
+}
+
+
 /*!md
 # Project RTP Channel
 
@@ -818,14 +849,16 @@ As it says.
 */
 void rtppacket::g711tol16( void )
 {
-  int16_t ( *convert )( uint8_t );
-  if( PCMAPAYLOADTYPE == this->getpayloadtype() )
+  int16_t *convert;
+  uint8_t pt = this->getpayloadtype();
+
+  if( PCMAPAYLOADTYPE == pt )
   {
-    convert = alaw_to_linear;
+    convert = pcmatol16;
   }
-  else if( PCMUPAYLOADTYPE == this->getpayloadtype() )
+  else if( PCMUPAYLOADTYPE == pt )
   {
-    convert = ulaw_to_linear;
+    convert = pcmutol16;
   }
   else
   {
@@ -839,7 +872,7 @@ void rtppacket::g711tol16( void )
 
   for( int i = 0; i < G711PAYLOADBYTES; i++ )
   {
-    *out = convert( *in );
+    *out = convert[ *in ];
     in++;
     out++;
   }
@@ -855,17 +888,17 @@ void rtppacket::l16tog711( uint8_t payloadtype, rtppacket *l16src )
 {
   this->setpayloadtype( payloadtype );
   this->length = 12 + this->getpacketcsrccount() + G711PAYLOADBYTES;
-  uint8_t ( *convert )( int );
+  uint8_t *convert;
   switch( payloadtype )
   {
     case PCMAPAYLOADTYPE:
     {
-      convert = linear_to_alaw;
+      convert = l16topcma;
       break;
     }
     case PCMUPAYLOADTYPE:
     {
-      convert = linear_to_ulaw;
+      convert = l16topcmu;
       break;
     }
     default:
@@ -881,7 +914,7 @@ void rtppacket::l16tog711( uint8_t payloadtype, rtppacket *l16src )
 
   for( int i = 0; i < G711PAYLOADBYTES; i++ )
   {
-    *out = convert( *in );
+    *out = convert[ ( *in ) + 32768 ];
 
     in++;
     out++;

@@ -209,4 +209,8 @@ private:
   int16_t resamplelastsample; /* When we upsample we need to interpolate so need last sample */
 };
 
+
+/* Functions */
+void gen711convertdata( void );
+
 #endif
