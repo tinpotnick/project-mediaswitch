@@ -59,6 +59,11 @@ The SIP server requires user information to be uploaded to it.
 projectcontrol.directory( "bling.babblevoice.com", [ { "username": "1003", "secret": "1123654789" } ] );
 ```
 
+We can control which CODECs we allow. Suported: pcma, pcmu, 722, ilbc, 2833. (note ilbc and 2833 TODO).
+```js
+projectcontrol.codecs = [ "722", "pcma", "2833" ];
+```
+
 We would like to be informed about new calls
 
 ```js
@@ -80,21 +85,14 @@ projectcontrol.onnewcall = ( call ) =>
     console.log( "hung up" );
   }
 
-  /* Indicate ringing to the caller */
+  /* Indicate ringing to the caller - not needed as the second leg ringing signal will be passed back */
   call.ring();
 
-  /* Answer after 3 seconds */
-  setTimeout( () =>
+  /* Make a call */
+  if( "3" == call.destination )
   {
-    var sdp = projectcontrol.sdp( 20518, "127.0.0.1", 54400 );
-    projectcontrol.addmedia( sdp, "pcmu" );
-
-    call.answer( sdp, () =>
-    {
-      console.log( "Answered" );
-    } );
-  }, 3000 );
-
+    call.newcall( { to: { user: "1003" } } );
+  }
 }
 ```
 
