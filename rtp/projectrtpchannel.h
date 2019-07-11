@@ -81,7 +81,7 @@ public:
   void l16tog711( uint8_t payloadtype, rtppacket *l16src );
 
   void l16lowtowideband(  int16_t *lastsample  );
-  void l16widetolowband( lowpass3_4k16k &filter );
+  void l16widetonarrowband( lowpass3_4k16k &filter );
 };
 
 /*!md

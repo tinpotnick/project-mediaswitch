@@ -297,7 +297,7 @@ void projectrtpchannel::handlertpdata( void )
 
         if( this->isl16narrowbandrequired( src ) )
         {
-          src->l16widetolowband( this->lpfilter );
+          src->l16widetonarrowband( this->lpfilter );
         }
         break;
       }
