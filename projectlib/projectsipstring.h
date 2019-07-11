@@ -74,6 +74,7 @@ public:
   substring rfind( const char );
   substring find( const char, size_t offset = 0 );
   substring mvend_first_of( const char *str );
+  substring mvend_first_of( const char ch );
 
   substring findsubstr( const char, const char end = 0 );
   substring findend( const char );

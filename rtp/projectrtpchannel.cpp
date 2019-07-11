@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <boost/bind.hpp>
+#include <iomanip>
 
 
 #include "projectrtpchannel.h"
@@ -37,7 +38,9 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsig
   writer( true ),
   receivedpkcount( 0 ),
   g722encoder( nullptr ),
-  g722decoder( nullptr )
+  g722decoder( nullptr ),
+  lpfilter(),
+  resamplelastsample( 0 )
 {
 }
 
@@ -88,6 +91,7 @@ void projectrtpchannel::open()
   this->readsomertcp();
 
   this->lpfilter.reset();
+  this->resamplelastsample = 0;
 }
 
 unsigned short projectrtpchannel::getport( void )
@@ -161,7 +165,9 @@ void projectrtpchannel::readsomertp( void )
           }
 
           this->rtpdata[ this->rtpindexin ].length = bytes_recvd;
-          this->rtpdata[ this->rtpindexin ].havel16 = false;
+          this->rtpdata[ this->rtpindexin ].havel168k = false;
+          this->rtpdata[ this->rtpindexin ].havel1616k = false;
+
           this->rtpindexin = ( this->rtpindexin + 1 ) % BUFFERPACKETCOUNT;
 
           /* if we catch up */
@@ -192,10 +198,8 @@ same to same does not
 Further work: recording etc - we probably do need conversion.
 Further work: this is where can re-order (probaby very simple - are we the current latest and work back to any left over)
 */
-bool projectrtpchannel::isl16required( void )
+bool projectrtpchannel::isl16required( rtppacket *src )
 {
-  rtppacket *src = &this->rtpdata[ this->rtpindexoldest ];
-
   auto uspayloadtype = src->getpayloadtype();
 
   for( auto it = this->others->begin(); it != this->others->end(); it++ )
@@ -237,6 +241,17 @@ bool projectrtpchannel::isl16required( void )
   return false;
 }
 
+#warning TODO - finish these checks and move them to only when something has changed and replace with simple bools.
+bool projectrtpchannel::isl16widebandrequired( rtppacket *src )
+{
+  return true;
+}
+
+bool projectrtpchannel::isl16narrowbandrequired( rtppacket *src )
+{
+  return true;
+}
+
 /*!md
 ## handlertpdata
 We are not supporting endless support for different CODECs which reduces flexability but simplifies this work. As this work is simplified it should also be more efficient.
@@ -253,7 +268,8 @@ void projectrtpchannel::handlertpdata( void )
     return;
   }
 
-  if( this->isl16required() )
+  /* any decoding required */
+  if( this->isl16required( src ) )
   {
     switch( src->getpayloadtype() )
     {
@@ -261,6 +277,10 @@ void projectrtpchannel::handlertpdata( void )
       case PCMUPAYLOADTYPE:
       {
         src->g711tol16();
+        if( this->isl16widebandrequired( src ) )
+        {
+          src->l16lowtowideband( &this->resamplelastsample );
+        }
         break;
       }
       case ILBCPAYLOADTYPE:
@@ -274,6 +294,11 @@ void projectrtpchannel::handlertpdata( void )
           this->g722decoder = g722_decode_init( NULL, 64000, G722_PACKED );
         }
         src->g722tol16( this->g722decoder );
+
+        if( this->isl16narrowbandrequired( src ) )
+        {
+          src->l16widetolowband( this->lpfilter );
+        }
         break;
       }
     }
@@ -323,7 +348,7 @@ void projectrtpchannel::handlertpdata( void )
             {
               rtppacket *dst = chan->gettempoutbuf();
               dst->copyheader( src );
-              dst->l16tog711( chan->selectedcodec, src, this->lpfilter );
+              dst->l16tog711( chan->selectedcodec, src );
               chan->writepacket( dst );
               return;
             }
@@ -553,7 +578,8 @@ void projectrtpchannel::handlertcpdata( void )
 */
 rtppacket::rtppacket() :
   length( 0 ),
-  havel16( false )
+  havel168k( false ),
+  havel1616k( false )
 {
 
 }
@@ -564,7 +590,8 @@ rtppacket::rtppacket() :
 We only need to copy the required bytes.
 */
 rtppacket::rtppacket( rtppacket &p ) :
-  havel16( false )
+  havel168k( false ),
+  havel1616k( false )
 {
   this->length = p.length;
   memcpy( this->pk, p.pk, p.length );
@@ -770,9 +797,8 @@ As it says.
 */
 void rtppacket::g722tol16( g722_decode_state_t *g722decoder )
 {
-  g722_decode( g722decoder, this->l16, this->getpayload(), G722PAYLOADBYTES );
-  this->l16samplerate = 16000;
-  this->havel16 = true;
+  g722_decode( g722decoder, this->l1616k, this->getpayload(), G722PAYLOADBYTES );
+  this->havel1616k = true;
 }
 
 /*!md
@@ -781,25 +807,9 @@ As it says.
 */
 void rtppacket::l16tog722( g722_encode_state_t *g722encoder, rtppacket *l16src )
 {
-  if( 8000 == l16src->l16samplerate )
-  {
-    /* upsample */
-    int16_t *out = l16src->l16 + ( 2 * G722PAYLOADBYTES );
-    int16_t *in = l16src->l16 + G722PAYLOADBYTES;
-    for( int i = 0; i < G722PAYLOADBYTES; i++ )
-    {
-      *out = *in;
-      out--;
-      *out = *in;
-      out--;
-      in--;
-    }
-    l16src->l16samplerate = 16000;
-  }
-
   this->setpayloadtype( G722PAYLOADTYPE );
   this->length = 12 + this->getpacketcsrccount() + G722PAYLOADBYTES;
-  g722_encode( g722encoder, this->getpayload(), l16src->l16, G722PAYLOADBYTES * 2 );
+  g722_encode( g722encoder, this->getpayload(), l16src->l1616k, G722PAYLOADBYTES * 2 );
 }
 
 /*!md
@@ -825,7 +835,7 @@ void rtppacket::g711tol16( void )
   uint8_t *in;
   int16_t *out;
   in = this->getpayload();
-  out = this->l16;
+  out = this->l168k;
 
   for( int i = 0; i < G711PAYLOADBYTES; i++ )
   {
@@ -833,19 +843,18 @@ void rtppacket::g711tol16( void )
     in++;
     out++;
   }
-  this->havel16 = true;
-  this->l16samplerate = 8000;
+
+  this->havel168k = true;
 }
 
 /*!md
 ## l16tog711
 payloadtype: PCMAPAYLOADTYPE or PCMUPAYLOADTYPE
 */
-void rtppacket::l16tog711( uint8_t payloadtype, rtppacket *l16src, lowpass3_4k16k &filter )
+void rtppacket::l16tog711( uint8_t payloadtype, rtppacket *l16src )
 {
   this->setpayloadtype( payloadtype );
   this->length = 12 + this->getpacketcsrccount() + G711PAYLOADBYTES;
-  
   uint8_t ( *convert )( int );
   switch( payloadtype )
   {
@@ -868,43 +877,62 @@ void rtppacket::l16tog711( uint8_t payloadtype, rtppacket *l16src, lowpass3_4k16
   uint8_t *out;
   int16_t *in;
   out = this->getpayload();
-  in = l16src->l16;
+  in = l16src->l168k;
 
-  switch( l16src->l16samplerate )
+  for( int i = 0; i < G711PAYLOADBYTES; i++ )
   {
-    case 16000:
-    {
-      std::cout << l16src->getsequencenumber() << std::endl;
-      int16_t filteredval;
-      int count = 0;
-      for( int i = 0; i < G711PAYLOADBYTES * 2; i++ )
-      {
-        /*
-          LP filter then divide by 2 for 16K to 8K sampling.
-         */
-        filteredval = filter.execute( *in );
-        in++;
+    *out = convert( *in );
 
-        if( 0x01 == ( i & 0x01 ) )
-        {
-          *out = convert( filteredval );
-          out++;
-          count++;
-        }
-      }
-      std::cout << "c:" << count << std::endl;
-      break;
-    }
-    default:
-    {
-      /* assume 8000 */
-      for( int i = 0; i < G711PAYLOADBYTES; i++ )
-      {
-        *out = convert( *in );
-        in++;
-        out++;
-      }
-      break;
-    }
+    in++;
+    out++;
   }
 }
+
+
+/*!md
+## l16lowtowideband
+Upsample from narrow to wideband. Take each point and interpolate between them. We require the final sample from the last packet to continue the interpolating.
+*/
+void rtppacket::l16lowtowideband( int16_t *lastsample )
+{
+  int16_t *in = this->l168k;
+  int16_t *out = this->l1616k;
+
+  for( int i = 0; i < G711PAYLOADBYTES * 2; i++ )
+  {
+    *out = ( ( *in - *lastsample ) / 2 ) + *lastsample;
+    *lastsample = *in;
+    out++;
+
+    *out = *in;
+
+    out++;
+    in++;
+  }
+  this->havel1616k = true;
+}
+
+/*!md
+##  l16widetolowband
+Downsample our L16 wideband samples to 8K. Pass through filter then grab every other sample.
+*/
+void rtppacket::l16widetolowband( lowpass3_4k16k &filter )
+{
+  int16_t *out = this->l168k;
+  int16_t *in = this->l1616k;
+
+  int16_t filteredval;
+  for( int i = 0; i < G711PAYLOADBYTES * 2; i++ )
+  {
+    filteredval = filter.execute( *in );
+    in++;
+
+    if( 0x01 == ( i & 0x01 ) )
+    {
+      *out = filteredval;
+      out++;
+    }
+  }
+  this->havel168k = true;
+}
+

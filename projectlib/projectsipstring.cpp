@@ -674,6 +674,17 @@ substring substring::mvend_first_of( const char *str )
   return substring( this->s, this->startpos, rfindpos );
 }
 
+substring substring::mvend_first_of( const char ch )
+{
+  size_t rfindpos = this->s->find_first_of( ch, this->startpos );
+    if( std::string::npos == rfindpos ||
+        rfindpos > this->endpos )
+  {
+    return substring( this->s, this->startpos, this->endpos );
+  }
+  return substring( this->s, this->startpos, rfindpos );
+}
+
 
 /*******************************************************************************
 Function: findsubstr

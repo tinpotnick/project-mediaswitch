@@ -266,6 +266,11 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
 
   /* update control */
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( pk->geturihost() );
+  if( !ptr )
+  {
+    /* Nothing we can do */
+    return;
+  }
   std::string controluri = *ptr->controlhost;
   controluri += "/reg/" + pk->geturihost().str() + '/' + this->authacceptpacket->getuser().str();
 

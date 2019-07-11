@@ -197,6 +197,9 @@ projectsipdirdomain::pointer projectsipdirdomain::lookupdomain( substring domain
 {
   projectsipdirdomain::pointer ref;
 
+  /* Who would put a port in a realm param - Fanvil - that's who! (Ok, there may be others...) */
+  domain = domain.mvend_first_of( ':' );
+
   std::string dstr = domain.str();
   stringvector l = splitstring( dstr, '.' );
   if( l.size() > 5 )

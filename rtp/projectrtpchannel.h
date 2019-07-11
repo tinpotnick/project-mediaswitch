@@ -28,8 +28,8 @@
 #define ILBC20PAYLOADBYTES 38
 #define ILBC30PAYLOADBYTES 50
 
-#define PCMAPAYLOADTYPE 0
-#define PCMUPAYLOADTYPE 8
+#define PCMUPAYLOADTYPE 0
+#define PCMAPAYLOADTYPE 8
 #define G722PAYLOADTYPE 9
 #define ILBCPAYLOADTYPE 97
 
@@ -49,9 +49,10 @@ public:
   rtppacket( rtppacket & );
   size_t length;
   uint8_t pk[ RTPMAXLENGTH ];
-  int16_t l16[ L16MAXLENGTH ];
-  bool havel16;
-  int l16samplerate;
+  int16_t l168k[ RTPMAXLENGTH ]; /* narrow band */
+  int16_t l1616k[ L16MAXLENGTH ]; /* wideband */
+  bool havel168k;
+  bool havel1616k;
 
   uint8_t getpacketversion( void );
   uint8_t getpacketpadding( void );
@@ -77,7 +78,10 @@ public:
   void g722tol16( g722_decode_state_t *g722decoder );
   void l16tog722( g722_encode_state_t *g722encoder, rtppacket *l16src );
   void g711tol16( void );
-  void l16tog711( uint8_t payloadtype, rtppacket *l16src, lowpass3_4k16k &filter );
+  void l16tog711( uint8_t payloadtype, rtppacket *l16src );
+
+  void l16lowtowideband(  int16_t *lastsample  );
+  void l16widetolowband( lowpass3_4k16k &filter );
 };
 
 /*!md
@@ -185,7 +189,10 @@ private:
               boost::system::error_code e,
               boost::asio::ip::udp::resolver::iterator it );
 
-  bool isl16required( void );
+  bool isl16required( rtppacket *src );
+  bool isl16widebandrequired( rtppacket *src );
+  bool isl16narrowbandrequired( rtppacket *src );
+
   uint32_t timestampdiff;
   uint64_t receivedpkcount;
 
@@ -199,6 +206,7 @@ private:
 
   /* If we require downsampling */
   lowpass3_4k16k lpfilter;
+  int16_t resamplelastsample; /* When we upsample we need to interpolate so need last sample */
 };
 
 #endif

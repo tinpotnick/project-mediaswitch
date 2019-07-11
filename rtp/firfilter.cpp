@@ -39,96 +39,65 @@ fir1 (12, 0.6) also appears to have an ok responce, plus has the benefit of smal
 [ -0.00407771, 0.00013892, 0.02346967, -0.03425401, -0.07174015, 0.28561976, 0.60168706, 0.28561976, -0.07174015,
   -0.03425401, 0.02346967, 0.00013892, -0.00407771 ];
 
+Normalized frequency xpi rad per sample
+
 http://www.arc.id.au/FilterDesign.html is also a good tool. Kaiser-Bessel filter designer. 0-3.4KHz, target 50dB. 16K sampling.
 
-
-[-0.002102, 
-0.000519, 
-0.014189,
-0.010317,
--0.037919, 
--0.060378, 
-0.063665, 
-0.299972, 
-0.425000, 
-0.299972, 
-0.063665, 
--0.060378, 
--0.037919, 
-0.010317, 
-0.014189, 
-0.000519, 
--0.002102] 
 
 Works nicely in a spreadsheet:
 = (-0.002102 * M17) + ( 0.000519 * M16 ) + ( 0.014189 * M15 ) + ( 0.010317 * M14 ) + ( -0.037919 * M13 ) + ( -0.060378 * M12 ) + (0.063665* M11) + (0.299972* M10) + (0.425000* M9) + (0.299972* M8) + (0.063665* M7) + (-0.060378* M6) + (-0.037919* M5) + (0.010317* M4) + (0.014189* M3) + (0.000519* M2) + (-0.002102* M1)
 
 */
+
+static float lp3_4k16kcoeffs[ lowpass3_4k16kfl ] = {
+                  -0.002102, 
+                  0.000519, 
+                  0.014189,
+                  0.010317,
+                  -0.037919, 
+                  -0.060378, 
+                  0.063665, 
+                  0.299972, 
+                  0.425000, 
+                  0.299972, 
+                  0.063665, 
+                  -0.060378, 
+                  -0.037919, 
+                  0.010317, 
+                  0.014189, 
+                  0.000519, 
+                  -0.002102 };
+
 int16_t lowpass3_4k16k::execute( int16_t val )
 {
   float runtot = 0;
-  u_int8_t sample = this->round;
+  int j = this->round;
 
-  this->history[ sample ] = val;
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
+  this->history[ j ] = val;
 
-  runtot += -0.002102 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
+  int i = 0;
+  for ( j = ( j + 1 ) % lowpass3_4k16kfl;  j < lowpass3_4k16kfl;  j++ )
+  {
+    runtot += lp3_4k16kcoeffs[ i ] * this->history[ j ];
+    i++;
+  }
 
-  runtot += 0.000519 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.014189 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.010317 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += -0.037919 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += -0.060378 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.063665 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.299972 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.425000 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.299972 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.063665 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += -0.060378 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += -0.037919 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.010317 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.014189 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += 0.000519 * this->history[ sample ];
-  sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
-  runtot += -0.002102 * this->history[ sample ];
-  //sample = ( sample + 1 ) % lowpass3_4k16kfl;
-
+  j = 0;
+    
+  for ( ;  i < lowpass3_4k16kfl;  i++ )
+  {
+    runtot += lp3_4k16kcoeffs[ i ] * this->history[ j ];
+    j++;
+  }
+  
   this->round = ( this->round + 1 ) % lowpass3_4k16kfl;
-
-  return (int16_t)runtot;
+  return ( int16_t ) runtot;
 }
 
-
+/*!md
+## testlofir
+Call with frequency to generate a frequency then apply the filter to see the responce.
+*/
 void testlofir( int frequency )
 {
   lowpass3_4k16k filter;
