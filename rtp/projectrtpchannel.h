@@ -51,8 +51,10 @@ public:
   uint8_t pk[ RTPMAXLENGTH ];
   int16_t l168k[ RTPMAXLENGTH ]; /* narrow band */
   int16_t l1616k[ L16MAXLENGTH ]; /* wideband */
-  bool havel168k;
-  bool havel1616k;
+  //bool havel168k;
+  //bool havel1616k;
+  int16_t l168klength;
+  int16_t l1616klength;
 
   uint8_t getpacketversion( void );
   uint8_t getpacketpadding( void );
@@ -65,6 +67,7 @@ public:
   uint32_t getssrc( void );
   uint32_t getcsrc( uint8_t index );
   uint8_t *getpayload( void );
+  uint16_t getpayloadlength( void );
 
   void setpayloadtype( uint8_t payload );
   void setsequencenumber( uint16_t sq );
@@ -77,6 +80,8 @@ public:
   void xlaw2ylaw( rtppacket *in );
   void g722tol16( g722_decode_state_t *g722decoder );
   void l16tog722( g722_encode_state_t *g722encoder, rtppacket *l16src );
+  void ilbctol16( iLBC_decinst_t *iLBC_decinst );
+  void l16toilbc( iLBC_encinst_t *iLBC_encinst, rtppacket *l16src );
   void g711tol16( void );
   void l16tog711( uint8_t payloadtype, rtppacket *l16src );
 
@@ -189,9 +194,9 @@ private:
               boost::system::error_code e,
               boost::asio::ip::udp::resolver::iterator it );
 
-  bool isl16required( rtppacket *src );
-  bool isl16widebandrequired( rtppacket *src );
-  bool isl16narrowbandrequired( rtppacket *src );
+  void tol16( rtppacket *src );
+  void requirenarrowband( rtppacket *src );
+  void requirewideband( rtppacket *src );
 
   uint32_t timestampdiff;
   uint64_t receivedpkcount;
@@ -203,6 +208,9 @@ private:
   /* CODECs  */
   g722_encode_state_t *g722encoder;
   g722_decode_state_t *g722decoder;
+
+  iLBC_encinst_t *ilbcencoder;
+  iLBC_decinst_t *ilbcdecoder;
 
   /* If we require downsampling */
   lowpass3_4k16k lpfilter;

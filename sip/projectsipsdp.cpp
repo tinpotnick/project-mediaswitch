@@ -541,14 +541,20 @@ static inline void appendattributes( std::string &out, JSON::Object &a )
       }
       case 0x6450e27e:   /* fmtp */
       {
-        out += "a=";
-        // fmtp:<format> <format specific parameters>
-        out += "fmtp:";
-        JSON::Object obj = JSON::as_object( it->second );
-        out += JSON::as_string( obj.values[ 0 ].first );
-        out += " ";
-        out += JSON::as_string( obj.values[ 0 ].second );
-        out += "\r\n";
+        JSON::Object::values_t::iterator mapit;
+        for( mapit = JSON::as_object( it->second ).values.begin();
+              mapit != JSON::as_object( it->second ).values.end();
+              mapit++ )
+        {
+          out += "a=";
+          // fmtp:<format> <format specific parameters>
+          out += "fmtp:";
+          out += mapit->first;
+          out += " ";
+          out += JSON::as_string( mapit->second );
+          out += "\r\n";
+        }
+
         break;
       }
       case 0x7cb20b10:   /* quality */

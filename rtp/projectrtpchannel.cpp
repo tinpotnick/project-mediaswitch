@@ -149,6 +149,18 @@ void projectrtpchannel::close( void )
       this->g722encoder = nullptr;
     }
 
+    if( nullptr != this->ilbcdecoder )
+    {
+      WebRtcIlbcfix_DecoderFree( this->ilbcdecoder );
+      this->ilbcdecoder = nullptr;
+    }
+
+    if( nullptr != this->ilbcencoder )
+    {
+      WebRtcIlbcfix_EncoderFree( this->ilbcencoder );
+      this->ilbcencoder = nullptr;
+    }
+
     /* remove oursevelse from our list of mixers */
     if( this->others )
     {
@@ -161,7 +173,7 @@ void projectrtpchannel::close( void )
           break;
         }
       }
-      /* release the shred pointer */
+      /* release the shared pointer */
       this->others = nullptr;
     }
 
@@ -196,8 +208,8 @@ void projectrtpchannel::readsomertp( void )
           }
 
           this->rtpdata[ this->rtpindexin ].length = bytes_recvd;
-          this->rtpdata[ this->rtpindexin ].havel168k = false;
-          this->rtpdata[ this->rtpindexin ].havel1616k = false;
+          this->rtpdata[ this->rtpindexin ].l168klength = 0;
+          this->rtpdata[ this->rtpindexin ].l1616klength = 0;
 
           this->rtpindexin = ( this->rtpindexin + 1 ) % BUFFERPACKETCOUNT;
 
@@ -216,72 +228,6 @@ void projectrtpchannel::readsomertp( void )
       } );
 }
 
-/*!md
-## isl16required
-Check if we need it converting to L16
-
-If we send it to somewhere, we need to decide if we have to convert to l16 or not
-If we send to PCM (U or A) to other then we do
-If we send from ilbc or 722 then we do
-PCM(a or u) to PCM(a or u) does not
-same to same does not
-
-Further work: recording etc - we probably do need conversion.
-Further work: this is where can re-order (probaby very simple - are we the current latest and work back to any left over)
-*/
-bool projectrtpchannel::isl16required( rtppacket *src )
-{
-  auto uspayloadtype = src->getpayloadtype();
-
-  for( auto it = this->others->begin(); it != this->others->end(); it++ )
-  {
-    if( uspayloadtype != (* it )->selectedcodec )
-    {
-      /* Some conversion required */
-      switch( uspayloadtype )
-      {
-        case PCMAPAYLOADTYPE:
-        case PCMUPAYLOADTYPE:
-        {
-          switch( (* it )->selectedcodec )
-          {
-            case PCMAPAYLOADTYPE:
-            case PCMUPAYLOADTYPE:
-            {
-              break;
-            }
-            default:
-            {
-              return true;
-            }
-          }
-          break;
-        }
-        case G722PAYLOADTYPE:
-        {
-          return true;
-        }
-        case ILBCPAYLOADTYPE:
-        {
-          return true;
-        }
-      }
-    }
-  }
-
-  return false;
-}
-
-#warning TODO - finish these checks and move them to only when something has changed and replace with simple bools.
-bool projectrtpchannel::isl16widebandrequired( rtppacket *src )
-{
-  return true;
-}
-
-bool projectrtpchannel::isl16narrowbandrequired( rtppacket *src )
-{
-  return true;
-}
 
 /*!md
 ## handlertpdata
@@ -299,42 +245,6 @@ void projectrtpchannel::handlertpdata( void )
     return;
   }
 
-  /* any decoding required */
-  if( this->isl16required( src ) )
-  {
-    switch( src->getpayloadtype() )
-    {
-      case PCMAPAYLOADTYPE:
-      case PCMUPAYLOADTYPE:
-      {
-        src->g711tol16();
-        if( this->isl16widebandrequired( src ) )
-        {
-          src->l16lowtowideband( &this->resamplelastsample );
-        }
-        break;
-      }
-      case ILBCPAYLOADTYPE:
-      {
-        break;
-      }
-      case G722PAYLOADTYPE:
-      {
-        if( nullptr == this->g722decoder )
-        {
-          this->g722decoder = g722_decode_init( NULL, 64000, G722_PACKED );
-        }
-        src->g722tol16( this->g722decoder );
-
-        if( this->isl16narrowbandrequired( src ) )
-        {
-          src->l16widetonarrowband( this->lpfilter );
-        }
-        break;
-      }
-    }
-  }
-
   /* The next section is sending to our recipient(s) */
   if( 2 == this->others->size() )
   {
@@ -348,7 +258,7 @@ void projectrtpchannel::handlertpdata( void )
 
     auto uspayloadtype = src->getpayloadtype();
 
-    /* Conversion from PCMU to PCMA and vice versa can be done here as it is a simple lookup, anything else should be passed off to another thread. */
+    /* Conversion from PCMU to PCMA and vice versa is a simple lookup. */
     if( uspayloadtype == chan->selectedcodec )
     {
       rtppacket *dst = chan->gettempoutbuf();
@@ -377,6 +287,7 @@ void projectrtpchannel::handlertpdata( void )
             }
             default:
             {
+              this->requirenarrowband( src );
               rtppacket *dst = chan->gettempoutbuf();
               dst->copyheader( src );
               dst->l16tog711( chan->selectedcodec, src );
@@ -387,6 +298,19 @@ void projectrtpchannel::handlertpdata( void )
         }
         case ILBCPAYLOADTYPE:
         {
+          this->requirenarrowband( src );
+
+          if( nullptr == this->ilbcencoder )
+          {
+            /* Only support 20mS ATM to make the mixing simpler */
+            WebRtcIlbcfix_EncoderCreate( &this->ilbcencoder );
+            WebRtcIlbcfix_EncoderInit( this->ilbcencoder, 20 );
+          }
+          
+          rtppacket *dst = chan->gettempoutbuf();
+          dst->copyheader( src );
+          dst->l16toilbc( this->ilbcencoder, src );
+          chan->writepacket( dst );
           return;
         }
         case G722PAYLOADTYPE:
@@ -396,6 +320,7 @@ void projectrtpchannel::handlertpdata( void )
             this->g722encoder = g722_encode_init( NULL, 64000, G722_PACKED );
           }
 
+          this->requirewideband( src );
           rtppacket *dst = chan->gettempoutbuf();
           dst->copyheader( src );
           dst->l16tog722( this->g722encoder, src );
@@ -426,6 +351,92 @@ void projectrtpchannel::readsomertcp( void )
         this->readsomertcp();
       }
     } );
+}
+
+
+/*!md
+## tol16
+Convert using our supported CODECs to linears 16 (either narrow or wide band).
+*/
+void projectrtpchannel::tol16( rtppacket *src )
+{
+  switch( src->getpayloadtype() )
+  {
+    case PCMAPAYLOADTYPE:
+    case PCMUPAYLOADTYPE:
+    {
+      src->g711tol16();
+      break;
+    }
+    case ILBCPAYLOADTYPE:
+    {
+      if( nullptr == this->ilbcdecoder )
+      {
+        WebRtcIlbcfix_DecoderCreate( &this->ilbcdecoder );
+        WebRtcIlbcfix_DecoderInit( this->ilbcdecoder, 20 );
+      }
+
+      src->ilbctol16( this->ilbcdecoder );
+      break;
+    }
+    case G722PAYLOADTYPE:
+    {
+      if( nullptr == this->g722decoder )
+      {
+        this->g722decoder = g722_decode_init( NULL, 64000, G722_PACKED );
+      }
+      src->g722tol16( this->g722decoder );
+      break;
+    }
+  }
+}
+
+/*!md
+## requirenarrowband
+Resample if required. Narrow to wide and vice versa.
+*/
+void projectrtpchannel::requirenarrowband( rtppacket *src )
+{
+  if( 0 != src->l168klength )
+  {
+    return;
+  }
+
+  if( 0 == src->l1616klength )
+  {
+    this->tol16( src );
+    if( 0 != src->l168klength )
+    {
+      return;
+    }
+  }
+
+  /* Convert narrow to wide */
+  src->l16widetonarrowband( this->lpfilter );
+}
+
+/*!md
+## requirewideband
+Resample if required. Narrow to wide and vice versa.
+*/
+void projectrtpchannel::requirewideband( rtppacket *src )
+{
+  if( 0 != src->l1616klength )
+  {
+    return;
+  }
+
+  if( 0 == src->l168klength )
+  {
+    this->tol16( src );
+    if( 0 != src->l1616klength )
+    {
+      return;
+    }
+  }
+
+  /* Convert narrow to wide */
+  src->l16lowtowideband( &this->resamplelastsample );
 }
 
 /*!md
@@ -609,8 +620,8 @@ void projectrtpchannel::handlertcpdata( void )
 */
 rtppacket::rtppacket() :
   length( 0 ),
-  havel168k( false ),
-  havel1616k( false )
+  l168klength( 0 ),
+  l1616klength( 0 )
 {
 
 }
@@ -621,8 +632,8 @@ rtppacket::rtppacket() :
 We only need to copy the required bytes.
 */
 rtppacket::rtppacket( rtppacket &p ) :
-  havel168k( false ),
-  havel1616k( false )
+  l168klength( 0 ),
+  l1616klength( 0 )
 {
   this->length = p.length;
   memcpy( this->pk, p.pk, p.length );
@@ -637,6 +648,7 @@ void rtppacket::copy( rtppacket *src )
   this->length = src->length;
   memcpy( this->pk, src->pk, src->length );
 }
+
 /*!md
 ## Copy header
 */
@@ -644,7 +656,7 @@ void rtppacket::copyheader( rtppacket *src )
 {
   if( !src ) return;
   this->length = src->length;
-  memcpy( this->pk, src->pk, 12 + src->getpacketcsrccount() );
+  memcpy( this->pk, src->pk, 12 + ( src->getpacketcsrccount() * 4 ) );
 }
 
 /*!md
@@ -818,8 +830,65 @@ uint8_t *rtppacket::getpayload( void )
 {
   uint8_t *ptr = this->pk;
   ptr += 12;
-  ptr += this->getpacketcsrccount();
+  ptr += ( this->getpacketcsrccount() * 4 );
   return ptr;
+}
+
+
+/*!md
+## getpayloadlength
+As it says.
+*/
+uint16_t rtppacket::getpayloadlength( void )
+{
+  return this->length - 12 - ( this->getpacketcsrccount() * 4 );
+}
+
+/*!md
+## ilbctol16
+As it says.
+*/
+void rtppacket::ilbctol16( iLBC_decinst_t *iLBC_decinst )
+{
+  WebRtc_Word16 speechType;
+
+  this->l168klength = WebRtcIlbcfix_Decode( iLBC_decinst,
+                        ( WebRtc_Word16* ) this->getpayload(),
+                        this->getpayloadlength(),
+                        this->l168k,
+                        &speechType
+                      );
+
+  if( -1 == this->l168klength )
+  {
+    this->l168klength = 0;
+  }
+}
+
+/*!md
+## l16toilbc
+As it says. 
+I think we can always send as 20mS. 
+According to RFC 3952 you determin how many frames are in the packet by the frame length. This is also true (although not explicit) that we can send as 20mS if our source is that but also 30mS if that is the case.
+
+As we only support G722, G711 and iLBC (20/30) then we should be able simply encode and send as the matched size.
+*/
+void rtppacket::l16toilbc( iLBC_encinst_t *iLBC_encinst, rtppacket *l16src )
+{
+  if( 0 == l16src->l168klength )
+  {
+    return;
+  }
+
+  this->setpayloadtype( ILBCPAYLOADTYPE );
+  
+  WebRtc_Word16 len = WebRtcIlbcfix_Encode( iLBC_encinst,
+                            l16src->l168k,
+                            l16src->l168klength,
+                            ( WebRtc_Word16* ) this->getpayload()
+                          );
+
+  this->length = 12 + ( this->getpacketcsrccount() * 4 ) + len;
 }
 
 /*!md
@@ -828,8 +897,7 @@ As it says.
 */
 void rtppacket::g722tol16( g722_decode_state_t *g722decoder )
 {
-  g722_decode( g722decoder, this->l1616k, this->getpayload(), G722PAYLOADBYTES );
-  this->havel1616k = true;
+  this->l1616klength = g722_decode( g722decoder, this->l1616k, this->getpayload(), G722PAYLOADBYTES );
 }
 
 /*!md
@@ -839,7 +907,7 @@ As it says.
 void rtppacket::l16tog722( g722_encode_state_t *g722encoder, rtppacket *l16src )
 {
   this->setpayloadtype( G722PAYLOADTYPE );
-  this->length = 12 + this->getpacketcsrccount() + G722PAYLOADBYTES;
+  this->length = 12 + ( this->getpacketcsrccount() * 4 ) + G722PAYLOADBYTES;
   g722_encode( g722encoder, this->getpayload(), l16src->l1616k, G722PAYLOADBYTES * 2 );
 }
 
@@ -877,7 +945,7 @@ void rtppacket::g711tol16( void )
     out++;
   }
 
-  this->havel168k = true;
+  this->l168klength = G711PAYLOADBYTES;
 }
 
 /*!md
@@ -887,7 +955,7 @@ payloadtype: PCMAPAYLOADTYPE or PCMUPAYLOADTYPE
 void rtppacket::l16tog711( uint8_t payloadtype, rtppacket *l16src )
 {
   this->setpayloadtype( payloadtype );
-  this->length = 12 + this->getpacketcsrccount() + G711PAYLOADBYTES;
+  this->length = 12 + ( this->getpacketcsrccount() * 4 ) + G711PAYLOADBYTES;
   uint8_t *convert;
   switch( payloadtype )
   {
@@ -931,7 +999,7 @@ void rtppacket::l16lowtowideband( int16_t *lastsample )
   int16_t *in = this->l168k;
   int16_t *out = this->l1616k;
 
-  for( int i = 0; i < G711PAYLOADBYTES * 2; i++ )
+  for( int i = 0; i < this->l168klength; i++ )
   {
     *out = ( ( *in - *lastsample ) / 2 ) + *lastsample;
     *lastsample = *in;
@@ -942,7 +1010,7 @@ void rtppacket::l16lowtowideband( int16_t *lastsample )
     out++;
     in++;
   }
-  this->havel1616k = true;
+  this->l1616klength = this->l168klength * 2;
 }
 
 /*!md
@@ -955,7 +1023,7 @@ void rtppacket::l16widetonarrowband( lowpass3_4k16k &filter )
   int16_t *in = this->l1616k;
 
   int16_t filteredval;
-  for( int i = 0; i < G711PAYLOADBYTES * 2; i++ )
+  for( int i = 0; i < this->l1616klength; i++ )
   {
     filteredval = filter.execute( *in );
     in++;
@@ -966,6 +1034,7 @@ void rtppacket::l16widetonarrowband( lowpass3_4k16k &filter )
       out++;
     }
   }
-  this->havel168k = true;
+
+  this->l168klength = this->l1616klength / 2;
 }
 

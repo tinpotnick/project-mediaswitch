@@ -59,7 +59,7 @@ The SIP server requires user information to be uploaded to it.
 projectcontrol.directory( "bling.babblevoice.com", [ { "username": "1003", "secret": "1123654789" } ] );
 ```
 
-We can control which CODECs we allow. Suported: pcma, pcmu, 722, ilbc, 2833. (note ilbc and 2833 TODO).
+We can control which CODECs we allow. Suported: pcma, pcmu, 722, ilbc@20, 2833. (note ilbc and 2833 TODO).
 ```js
 projectcontrol.codecs = [ "722", "pcma", "2833" ];
 ```
@@ -313,6 +313,7 @@ The server will return a JSON document. Including stats regarding the workload o
 * [RFC 4317](https://tools.ietf.org/html/rfc4317): Session Description Protocol (SDP) Offer/Answer Examples
 * [RFC 3550](https://tools.ietf.org/html/rfc3550): RTP: A Transport Protocol for Real-Time Applications
 * [RFC 3551](https://tools.ietf.org/html/rfc3551): RTP Profile for Audio and Video Conferences with Minimal Control
+* [RFC 3952](https://tools.ietf.org/html/rfc3952): Real-time Transport Protocol (RTP) Payload Format for internet Low Bit Rate Codec (iLBC) Speech
 * [Real-Time Transport Protocol (RTP) Parameters](https://www.iana.org/assignments/rtp-parameters/rtp-parameters.xhtml)
 
 Note, I have included RFC 4028 here for possible future work.
@@ -365,3 +366,4 @@ sipp 127.0.0.1 -sf uaclateoffer.xml -m 1 -l 1
 # TODO
 
 - [ ] Impliment session timers (RFC 4028)
+- [ ] Research https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html in more detail to get the best performance out of a host CPU (i.e. SSE for filter and maybe CODECs)

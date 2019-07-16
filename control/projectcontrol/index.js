@@ -950,6 +950,8 @@ Add a CODEC to the SDP object.
       {
         sdp.m[ 0 ].payloads.push( 97 );
         sdp.m[ 0 ].rtpmap[ "97" ] = { encoding: "iLBC", clock: "8000" };
+        if( !( "fmtp" in sdp.m[ 0 ] ) ) sdp.m[ 0 ].fmtp = {};
+        sdp.m[ 0 ].fmtp[ "97" ] = "mode=20";
         break;
       }
       /* rfc 2833 - DTMF*/
@@ -957,7 +959,7 @@ Add a CODEC to the SDP object.
       {
         sdp.m[ 0 ].payloads.push( 101 );
         sdp.m[ 0 ].rtpmap[ "101" ] = { encoding: "telephone-event", clock: "8000" };
-        sdp.m[ 0 ].fmtp = {};
+        if( !( "fmtp" in sdp.m[ 0 ] ) ) sdp.m[ 0 ].fmtp = {};
         sdp.m[ 0 ].fmtp[ "101" ] = "0-16";
         break;
       }
