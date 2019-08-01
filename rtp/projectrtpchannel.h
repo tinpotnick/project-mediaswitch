@@ -19,75 +19,13 @@
 /* CODECs */
 #include <ilbc.h>
 #include <spandsp.h>
-
-#include "firfilter.h"
-
-/* The number of bytes in a packet ( these figure are less some overhead G711 = 172*/
-#define G711PAYLOADBYTES 160
-#define G722PAYLOADBYTES 160
-#define ILBC20PAYLOADBYTES 38
-#define ILBC30PAYLOADBYTES 50
-
-#define PCMUPAYLOADTYPE 0
-#define PCMAPAYLOADTYPE 8
-#define G722PAYLOADTYPE 9
-#define ILBCPAYLOADTYPE 97
-
-/* Need to double check max RTP length with variable length header - there could be a larger length withour CODECs */
-/* this maybe breached if a stupid number of csrc count is high */
-#define RTPMAXLENGTH 200
-#define L16MAXLENGTH ( RTPMAXLENGTH * 2 )
-#define RTCPMAXLENGTH 1500
+#include "projectrtpcodecx.h"
+#include "projectrtppacket.h"
 
 /* The number of packets we will keep in a buffer */
 #define BUFFERPACKETCOUNT 20
+#define BUFFERDELAYCOUNT 10
 
-class rtppacket
-{
-public:
-  rtppacket();
-  rtppacket( rtppacket & );
-  size_t length;
-  uint8_t pk[ RTPMAXLENGTH ];
-  int16_t l168k[ RTPMAXLENGTH ]; /* narrow band */
-  int16_t l1616k[ L16MAXLENGTH ]; /* wideband */
-  //bool havel168k;
-  //bool havel1616k;
-  int16_t l168klength;
-  int16_t l1616klength;
-
-  uint8_t getpacketversion( void );
-  uint8_t getpacketpadding( void );
-  uint8_t getpacketextension( void );
-  uint8_t getpacketcsrccount( void );
-  uint8_t getpacketmarker( void );
-  uint8_t getpayloadtype( void );
-  uint16_t getsequencenumber( void );
-  uint32_t gettimestamp( void );
-  uint32_t getssrc( void );
-  uint32_t getcsrc( uint8_t index );
-  uint8_t *getpayload( void );
-  uint16_t getpayloadlength( void );
-
-  void setpayloadtype( uint8_t payload );
-  void setsequencenumber( uint16_t sq );
-  void settimestamp( uint32_t tmstp );
-
-  void copy( rtppacket *src );
-  void copyheader( rtppacket *src );
-
-  /* conversion functions */
-  void xlaw2ylaw( rtppacket *in );
-  void g722tol16( g722_decode_state_t *g722decoder );
-  void l16tog722( g722_encode_state_t *g722encoder, rtppacket *l16src );
-  void ilbctol16( iLBC_decinst_t *iLBC_decinst );
-  void l16toilbc( iLBC_encinst_t *iLBC_encinst, rtppacket *l16src );
-  void g711tol16( void );
-  void l16tog711( uint8_t payloadtype, rtppacket *l16src );
-
-  void l16lowtowideband(  int16_t *lastsample  );
-  void l16widetonarrowband( lowpass3_4k16k &filter );
-};
 
 /*!md
 # projectrtpchannel
@@ -95,31 +33,13 @@ Purpose: RTP Channel - which represents RTP and RTCP. This is here we include ou
 
 RTP on SIP channels should be able to switch between CODECS during a session so we have to make sure we have space for that.
 
-RTP Payload size (bytes) for the following CODECs
-G711: 80 (10mS)
-G722: 80 (10mS)
-ilbc (mode 20): 38 (20mS)
-ilbc (mode 30): 50 (30mS)
-Question, What do we write this data to? We need to limit transcoding
-
-Notes about transcoding.
-
-We receive RTP data into rtpdata round robin buffer. When we transcode (and we will support PCMA PCMU iLBC and G722) we can do things like
-
-PCMA->PCMU in one go (very efficiently)
-PCMU->PCMA (also very efficient)
-
-To do
-PCMA-G722 we actually have to PCMA-L16-G722 which is also true of iLBC. If we also do things like conference (mixing to multiple channels) and call recording then the complexity also increases - especially if we want to become low cpu.
-
-if PCMA to PCMU and no recording and only 2 channels then direct conversion
-
-Buffer?
-
-In our RTP channel, we can have a fixed buffer for inbound L16 (i.e. transcoded).
-
-In our mixed channel would contain the buffer to store the 2nd transcoded leg (i.e. PCMA->L16->G722) channel a has the PCMA in the inbuffer, the L16 in the transcoded buffer and the G722 would be stored in an out buffer of the other channel which requires it.
 */
+
+
+typedef std::function<bool( rtppacket *pk )> rtppacketplayback;
+typedef std::list< rtppacketplayback > rtppacketplaybacks;
+
+
 class projectrtpchannel :
   public boost::enable_shared_from_this< projectrtpchannel >
 {
@@ -156,8 +76,18 @@ public:
 
   codeclist codecs;
   int selectedcodec;
+  uint32_t ssrcout;
+  uint32_t ssrcin;
+  uint32_t tsout;
+  uint16_t seqout;
 
   rtppacket rtpdata[ BUFFERPACKETCOUNT ];
+  rtppacket *orderedrtpdata[ BUFFERPACKETCOUNT ];
+  rtppacket *lastprocessed;
+  uint32_t orderedinminsn; /* sn = sequence number, min smallest we hold which is unprocessed - when it is processed we can forget about it */
+  uint32_t orderedinmaxsn;
+  int orderedinbottom; /* points to our min sn packet */
+
   unsigned char rtcpdata[ RTCPMAXLENGTH ];
   int rtpindexoldest;
   int rtpindexin;
@@ -189,14 +119,12 @@ private:
   void readsomertcp( void );
 
   void handlertpdata( void );
+  void processrtpdata( rtppacket *src, bool inorder );
   void handlertcpdata( void );
   void handletargetresolve (
               boost::system::error_code e,
               boost::asio::ip::udp::resolver::iterator it );
 
-  void tol16( rtppacket *src );
-  void requirenarrowband( rtppacket *src );
-  void requirewideband( rtppacket *src );
 
   uint32_t timestampdiff;
   uint64_t receivedpkcount;
@@ -206,19 +134,10 @@ private:
   projectrtpchannellistptr others;
 
   /* CODECs  */
-  g722_encode_state_t *g722encoder;
-  g722_decode_state_t *g722decoder;
+  codecx codecworker;
 
-  iLBC_encinst_t *ilbcencoder;
-  iLBC_decinst_t *ilbcdecoder;
-
-  /* If we require downsampling */
-  lowpass3_4k16k lpfilter;
-  int16_t resamplelastsample; /* When we upsample we need to interpolate so need last sample */
+  rtppacketplaybacks players;
 };
 
-
-/* Functions */
-void gen711convertdata( void );
 
 #endif

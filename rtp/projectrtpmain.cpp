@@ -17,21 +17,25 @@
 #include <atomic>
 #include <thread>
 
+#include <chrono>
+
 #include "projecthttpserver.h"
 #include "json.hpp"
 #include "projectdaemon.h"
-
 #include "projectrtpchannel.h"
-
-#include <chrono>
+#include "projectrtppacket.h"
+#include "projectrtpsoundfile.h"
+#include "projectrtpcodecx.h"
 
 #include "firfilter.h"
 
 boost::asio::io_service ioservice;
 boost::asio::io_service workerservice;
 
+std::string mediachroot;
+
 typedef boost::asio::basic_waitable_timer< std::chrono::high_resolution_clock > ourhighrestimer;
-ourhighrestimer keepalive( workerservice );
+ourhighrestimer periodictimer( workerservice );
 
 typedef std::deque<projectrtpchannel::pointer> rtpchannels;
 typedef std::unordered_map<std::string, projectrtpchannel::pointer> activertpchannels;
@@ -191,12 +195,12 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
 
 /*!md
 ## ontimer
-Dummy timer to keep our worker service running. I can't see any other way to stop run from returning.
+Generally atm a keepalive timer.
 */
 void ontimer(const boost::system::error_code& /*e*/)
 {
-  keepalive.expires_at( keepalive.expiry() + std::chrono::seconds( 100 ) );
-  keepalive.async_wait( &ontimer );
+  periodictimer.expires_at( periodictimer.expiry() + std::chrono::seconds( 20 ) );
+  periodictimer.async_wait( &ontimer );
 }
 
 
@@ -207,8 +211,8 @@ Actually do the stopping
 static void stopserver( void )
 {
   running = false;
-  workerservice.stop();
   ioservice.stop();
+  workerservice.stop();
 }
 
 /*!md
@@ -221,18 +225,39 @@ static void killserver( int signum )
   stopserver();
 }
 
+/*!md
+## workerthread
+Worker threads perform transcoding and generally the workload of mixing etc.
+*/
+void workerthread( void )
+{
+  while( running )
+  {
+    try
+    {
+      workerservice.run();
+    }
+    catch( std::exception& e )
+    {
+      std::cerr << e.what() << std::endl;
+    }
+    catch( ... )
+    {
+      std::cerr << "Unhandled exception in worker bees - rentering workerservice" << std::endl;
+    }
+    std::cout << "Worker bee finished" << std::endl;
+  }
+}
 
 /*!md
 # startserver
 Start our server and kick off all of the worker threads.
 
-We have a main ioservice which handles (as it says) all of the I/O. HTTP and RTP traffic is received in this thread. Further worker threads are created and should be tied to a CPU so we can spread the workload of heavy CPU load items (such as transcoding).
-
-If we have 1 CPU (std::thread::hardware_concurrency) then we create 1 worker thread as we cannot tie up the main I/O ioservice. If we have 2, then we assign our main thread to the I/O and a created thread to workload. If we have enough cores then we assign each thread its own CPU. We may want to assess what happens with ounly 2 cores - we don't want 1 idle with 1 heavily transcoding - so we may wish to balance that somehow in the future.
-
+Try strategy of 1 thread per core. Work should be shared out between them. We have to be careful about data access whilst trying not to use Mutex for performance.
 To create a worker thread item:
 
-workerservice->post( boost::bind( transcodeg722, shared_from_this() ) );
+Note for sometime:
+ioservice->post( boost::bind( somefunction, shared_from_this() ) );
 
 */
 void startserver( short port )
@@ -240,14 +265,15 @@ void startserver( short port )
   running = true;
   unsigned numcpus = std::thread::hardware_concurrency();
 
-  if( numcpus > 1 )
-  {
-    numcpus--;
-  }
-
   if( 0 != maxworker && numcpus > maxworker )
   {
     numcpus = maxworker;
+  }
+
+  numcpus--;
+  if( 0 == numcpus )
+  {
+    numcpus = 1;
   }
 
   std::cout << "Starting " << numcpus << " worker threads" << std::endl;
@@ -256,51 +282,34 @@ void startserver( short port )
   std::mutex iomutex;
   std::vector< std::thread > threads( numcpus );
 
-  keepalive.expires_at( std::chrono::system_clock::now() );
-  keepalive.async_wait( &ontimer );
+  periodictimer.expires_at( std::chrono::system_clock::now() );
+  periodictimer.async_wait( &ontimer );
 
   try
   {
+    projecthttpserver h( ioservice, port, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
+
     cpu_set_t cpuset;
     CPU_ZERO( &cpuset );
     CPU_SET( 0, &cpuset );
 
     if ( pthread_setaffinity_np( pthread_self(), sizeof( cpu_set_t ), &cpuset ) )
     {
-      std::cerr << "Error tyng thread to CPU " << 0 << std::endl;
+      std::cerr << "Error tying thread to CPU " << 0 << std::endl;
     }
 
     for ( unsigned i = 0; i < numcpus; i++ )
     {
-      threads[ i ] = std::thread( []()
-      {
-        while( running )
-        {
-          try
-          {
-            workerservice.run();
-          }
-          catch( std::exception& e )
-          {
-            std::cerr << e.what() << std::endl;
-          }
-          catch( ... )
-          {
-            std::cerr << "Unhandled exception in worker bees - rentering workerservice" << std::endl;
-          }
-        }
-      } );
+      threads[ i ] = std::thread( workerthread );
 
       CPU_ZERO( &cpuset );
       CPU_SET( ( i + 1 ) % numcpus, &cpuset );
 
       if ( pthread_setaffinity_np( threads[ i ].native_handle() , sizeof( cpu_set_t ), &cpuset ) )
       {
-        std::cerr << "Error tyng thread to CPU " << 0 << std::endl;
+        std::cerr << "Error tying thread to CPU " << 0 << std::endl;
       }
     }
-
-    projecthttpserver h( ioservice, port, std::bind( &handlewebrequest, std::placeholders::_1, std::placeholders::_2 ) );
 
     while( running )
     {
@@ -314,7 +323,7 @@ void startserver( short port )
       }
       catch( ... )
       {
-        std::cerr << "Unhandled exception - rentering ioservice" << std::endl;
+        std::cerr << "Unhandled exception in ioservice" << std::endl;
       }
     }
 
@@ -347,7 +356,7 @@ void initchannels( unsigned short startport, unsigned short endport )
     // Test we can open them all if needed and warn if necessary.
     for( i = startport; i < endport; i += 2 )
     {
-      projectrtpchannel::pointer p = projectrtpchannel::create( ioservice, i );
+      projectrtpchannel::pointer p = projectrtpchannel::create( workerservice, i );
       p->open();
       dormantchannels.push_back( p );
     }
@@ -402,7 +411,16 @@ int main( int argc, const char* argv[] )
     {
       std::string argvstr = argv[ i ];
 
-      if ( "--fg" == argvstr)
+      if( "--help" == argvstr )
+      {
+        std::cout << "--fg - do not daemonize tune the program in the foreground." << std::endl;
+        std::cout << "--port - the port to run the control http server on." << std::endl;
+        std::cout << "--pa - the public address we tell the client to send RTP to." << std::endl;
+        std::cout << "--maxworker - we launch a thread per core, if you wish to change this use this." << std::endl;
+        std::cout << "--chroot - setup the root directory for where soundfiles are read and written to." << std::endl;
+        exit( 0 );
+      }
+      else if ( "--fg" == argvstr )
       {
         fg = true;
       }
@@ -437,7 +455,7 @@ int main( int argc, const char* argv[] )
         catch( boost::bad_lexical_cast &e )
         {
         }
-        std::cerr << "What port was that?" << std::endl;
+        std::cerr << "Need more info..." << std::endl;
         return -1;
       }
       else if( "--maxworker" == argvstr )
@@ -461,6 +479,21 @@ int main( int argc, const char* argv[] )
       {
         int frequency = boost::lexical_cast< int >( argv[ i + 1 ] );
         testlofir( frequency );
+        return 0;
+      }
+      else if( "--chroot" == argvstr )
+      {
+        i++;
+        mediachroot = argv[ i ];
+        if( '/' != mediachroot[ mediachroot.size() -1 ] )
+        {
+          mediachroot += "/";
+        }
+      }
+      else if( "--wavinfo" == argvstr )
+      {
+        i++;
+        wavinfo( argv[ i ] );
         return 0;
       }
     }

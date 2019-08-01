@@ -12,7 +12,7 @@ The design is broken down into 3 core components. Each component is primarily a 
 
 Note re green threads - otherwise known as cooperative multi-threading. The one drawback with using this technique is your software has to cooperate with other threads - i.e. give up processing time. The SIP component uses C++ Boost ASIO and call control uses Node JS - both very good frameworks for this style. Both are high performance frameworks. RTP also uses C++ Boost ASIO.
 
-For most users this means when you are writing Node scripts for your own call control scenarios, you must understand the asynchronous nature of Node and how to properly write asynchronous Javascript. **You can lock up the whole control thread by not giving up processor time.** However, when you get it write, you end up with a very efficient server.
+For most users this means when you are writing Node scripts for your own call control scenarios, you must understand the asynchronous nature of Node and how to properly write asynchronous Javascript. **You can lock up the whole control thread by not giving up processor time.** However, when you get it right, you end up with a very efficient server.
 
 The 3 main components:
 
@@ -61,7 +61,7 @@ projectcontrol.directory( "bling.babblevoice.com", [ { "username": "1003", "secr
 
 We can control which CODECs we allow. Suported: pcma, pcmu, 722, ilbc@20, 2833. (note ilbc and 2833 TODO).
 ```js
-projectcontrol.codecs = [ "722", "pcma", "2833" ];
+projectcontrol.codecs = [ "722", "pcma", "pcmu", "ilbc", "2833" ];
 ```
 
 We would like to be informed about new calls
