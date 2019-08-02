@@ -26,6 +26,9 @@
 #define BUFFERPACKETCOUNT 20
 #define BUFFERDELAYCOUNT 10
 
+/* 1 in ... packet loss */
+//#define SIMULATEDPACKETLOSSRATE 10
+
 
 /*!md
 # projectrtpchannel
@@ -72,7 +75,7 @@ public:
   bool isactive( void );
 
   bool mix( projectrtpchannel::pointer other );
-  rtppacket *gettempoutbuf( void );
+  rtppacket *gettempoutbuf( uint32_t skipcount );
 
   codeclist codecs;
   int selectedcodec;
@@ -119,7 +122,7 @@ private:
   void readsomertcp( void );
 
   void handlertpdata( void );
-  void processrtpdata( rtppacket *src, bool inorder );
+  void processrtpdata( rtppacket *src, uint32_t skipcount );
   void handlertcpdata( void );
   void handletargetresolve (
               boost::system::error_code e,

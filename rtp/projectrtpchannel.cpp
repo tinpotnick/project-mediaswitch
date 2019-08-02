@@ -166,6 +166,18 @@ void projectrtpchannel::readsomertp( void )
       {
         if ( !ec && bytes_recvd > 0 && bytes_recvd <= RTPMAXLENGTH )
         {
+#ifdef SIMULATEDPACKETLOSSRATE
+          /* simulate packet loss */
+          if( 0 == rand() % SIMULATEDPACKETLOSSRATE )
+          {
+            if( !ec && bytes_recvd && this->active )
+            {
+              this->readsomertp();
+            }
+            return;
+          }
+#endif
+
           this->receivedpkcount++;
           if( !this->receivedrtp )
           {
@@ -258,10 +270,13 @@ void projectrtpchannel::handlertpdata( void )
         goto whilecontinue;
       }
 
-      lastworkedonsn = src->getsequencenumber() - BUFFERPACKETCOUNT;
       if( nullptr != this->lastprocessed )
       {
         lastworkedonsn = this->lastprocessed->getsequencenumber();
+      }
+      else
+      {
+        lastworkedonsn = src->getsequencenumber() - 1;
       }
 
       workingonsn = src->getsequencenumber();
@@ -274,7 +289,7 @@ void projectrtpchannel::handlertpdata( void )
       }
 
       /* At this point we should be in order - but may have breaks (missing chunks) */
-      this->processrtpdata( src, 1 == workingonaheadby );
+      this->processrtpdata( src, workingonaheadby - 1 );
       this->lastprocessed = src;
 
 whilecontinue:
@@ -290,17 +305,17 @@ whilecontinue:
 
 Mix and send the data somewhere.
 */
-void projectrtpchannel::processrtpdata( rtppacket *src, bool inorder )
+void projectrtpchannel::processrtpdata( rtppacket *src, uint32_t skipcount )
 {
-  if( !inorder )
+  if( 0 != skipcount )
   {
-    this->codecworker.reset();
+    this->codecworker.restart();
   }
 
   /* only us - run our transformations */
   if( !this->others || 0 == this->others->size() )
   {
-    rtppacket *out = this->gettempoutbuf();
+    rtppacket *out = this->gettempoutbuf( skipcount );
     out->copyheader( src );
     memset( out->getpayload(), 0, out->getpayloadlength() );
 
@@ -330,7 +345,7 @@ void projectrtpchannel::processrtpdata( rtppacket *src, bool inorder )
     }
 
     this->codecworker << *src;
-    rtppacket *dst = chan->gettempoutbuf();
+    rtppacket *dst = chan->gettempoutbuf( skipcount );
     *dst << this->codecworker;
     chan->writepacket( dst );
   }
@@ -345,8 +360,7 @@ When we need a buffer to send data out (because we cannot guarantee our own buff
 
 We assume this is called to send packets out in order, and at intervals required for each timestamp to be incremented in lou of it payload type.
 */
-#warning TODO - need to figure out skipping packets. This can be included in the work with reordering etc
-rtppacket *projectrtpchannel::gettempoutbuf( void )
+rtppacket *projectrtpchannel::gettempoutbuf( uint32_t skipcount )
 {
   rtppacket *buf = &this->outrtpdata[ this->rtpoutindex ];
   this->rtpoutindex = ( this->rtpoutindex + 1 ) % BUFFERPACKETCOUNT;
@@ -354,7 +368,14 @@ rtppacket *projectrtpchannel::gettempoutbuf( void )
   buf->init( this->ssrcout );
   buf->setpayloadtype( this->selectedcodec );
 
+  this->seqout += skipcount;
   buf->setsequencenumber( this->seqout );
+
+  if( skipcount > 0 )
+  {
+    this->tsout += ( buf->getticksperpacket() * skipcount );
+  }
+
   buf->settimestamp( this->tsout );
 
   this->seqout++;

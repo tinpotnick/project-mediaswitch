@@ -19,7 +19,8 @@ public:
   codecx();
   ~codecx();
 
-  void reset();
+  void reset( void );
+  void restart( void );
 
   friend codecx& operator << ( codecx&, rtppacket& );
   friend rtppacket& operator << ( rtppacket&, codecx& );

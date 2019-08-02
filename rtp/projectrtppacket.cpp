@@ -188,17 +188,24 @@ Takes the current timesamp and adds the number of samples (depending on the CODE
 */
 uint32_t rtppacket::getnexttimestamp( void )
 {
-  uint32_t last = this->gettimestamp();
+  return this->gettimestamp() + this->getticksperpacket();
+}
 
+/*!md
+## getticksperpacket
+Returns the number of ticks per packet
+*/
+uint32_t rtppacket::getticksperpacket( void )
+{
   switch( this->getpayloadtype() )
   {
     case ILBCPAYLOADTYPE:
     {
-      return last + ILBC20PAYLOADBYTES;
+      return ILBC20PAYLOADBYTES;
     }
   }
 
-  return last + G711PAYLOADBYTES;
+  return G711PAYLOADBYTES;
 }
 
 /*!md

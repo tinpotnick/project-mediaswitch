@@ -103,6 +103,10 @@ codecx::~codecx()
   this->reset();
 }
 
+/*!md
+## reset
+Full reset - clear out all CODECs
+*/
 void codecx::reset()
 {
   if( nullptr != this->g722decoder )
@@ -127,6 +131,16 @@ void codecx::reset()
     this->ilbcencoder = nullptr;
   }
 
+  this->restart();
+
+}
+
+/*!md
+## restart
+Do enough to manage missing packets.
+*/
+void codecx::restart( void )
+{
   this->lpfilter.reset();
   this->resamplelastsample = 0;
 }
