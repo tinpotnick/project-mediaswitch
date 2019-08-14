@@ -6,7 +6,7 @@
 
 
 #include <sys/types.h>
-#include <sys/stat.h> 
+#include <sys/stat.h>
 #include <aio.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -94,7 +94,7 @@ typedef struct
     char riff_header[ 4 ]; /* Contains "RIFF" */
     int32_t wav_size; /* Size of the wav portion of the file, which follows the first 8 bytes. File size - 8 */
     char wave_header[ 4 ]; /* Contains "WAVE" */
-    
+
     /* Format Header */
     char fmt_header[ 4 ]; /* Contains "fmt " (includes trailing space) */
     int32_t fmt_chunk_size; /* Should be 16 for PCM */
@@ -104,10 +104,10 @@ typedef struct
     int32_t byte_rate; /* Number of bytes per second. sample_rate * num_channels * Bytes Per Sample */
     int16_t sample_alignment; /* num_channels * Bytes Per Sample */
     int16_t bit_depth; /* Number of bits per sample */
-    
+
     /* Data */
     char data_header[ 4 ]; /* Contains "data" */
-    int32_t data_bytes; /* Number of bytes in data. Number of samples * num_channels * sample byte size */
+    /* int32_t data_bytes;  Number of bytes in data. Number of samples * num_channels * sample byte size */
     /* Remainder of wave file is bytes */
 } wav_header;
 

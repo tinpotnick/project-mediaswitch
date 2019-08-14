@@ -36,17 +36,17 @@ public:
   uint8_t *getpayload( void );
   uint16_t getpayloadlength( void );
 
+  void setpayloadlength( size_t length );
   void setpayloadtype( uint8_t payload );
   void setsequencenumber( uint16_t sq );
   void settimestamp( uint32_t tmstp );
   void init( uint32_t ssrc );
 
   void copy( rtppacket *src );
+  void copy( uint8_t *src, size_t len );
   void copyheader( rtppacket *src );
 
 };
 
 
 #endif  /* PROJECTRTPPACKTET_H */
-
-

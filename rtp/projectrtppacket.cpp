@@ -47,12 +47,26 @@ void rtppacket::copy( rtppacket *src )
 {
   if( !src ) return;
 
-  this->length = src->length;
-  memcpy( this->pk + 12 + ( this->getpacketcsrccount() * 4 ), 
-          src->pk + 12 + ( src->getpacketcsrccount() * 4 ), 
+  memcpy( this->pk + 12 + ( this->getpacketcsrccount() * 4 ),
+          src->pk + 12 + ( src->getpacketcsrccount() * 4 ),
           src->getpayloadlength() );
 
   this->length = src->getpayloadlength() + 12 + ( this->getpacketcsrccount() * 4 );
+}
+
+/*!md
+## Copy
+Copy the payload from src to us.
+*/
+void rtppacket::copy( uint8_t *src, size_t len )
+{
+  if( !src ) return;
+
+  memcpy( this->pk + 12 + ( this->getpacketcsrccount() * 4 ),
+          src,
+          len );
+
+  this->length = len + 12 + ( this->getpacketcsrccount() * 4 );
 }
 
 /*!md
@@ -193,18 +207,10 @@ uint32_t rtppacket::getnexttimestamp( void )
 
 /*!md
 ## getticksperpacket
-Returns the number of ticks per packet
+Returns the number of ticks per packet. All support packets are the same. A bit strange!
 */
 uint32_t rtppacket::getticksperpacket( void )
 {
-  switch( this->getpayloadtype() )
-  {
-    case ILBCPAYLOADTYPE:
-    {
-      return ILBC20PAYLOADBYTES;
-    }
-  }
-
   return G711PAYLOADBYTES;
 }
 
@@ -264,7 +270,11 @@ uint16_t rtppacket::getpayloadlength( void )
   return this->length - 12 - ( this->getpacketcsrccount() * 4 );
 }
 
-
-
-
-
+/*!md
+## setpayloadlength
+As it says.
+*/
+void rtppacket::setpayloadlength( size_t length )
+{
+  this->length = 12 + ( this->getpacketcsrccount() * 4 ) + length;
+}

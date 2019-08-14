@@ -16,6 +16,8 @@
 #define PCMAPAYLOADTYPE 8
 #define G722PAYLOADTYPE 9
 #define ILBCPAYLOADTYPE 97
+/* RFC says this is 44k sampling, however it also seems a little ambiguous on this - so we generally are going to be using this so lets see where it goes! */
+#define L16PAYLOADTYPE 11
 
 /* Need to double check max RTP length with variable length header - there could be a larger length withour CODECs */
 /* this maybe breached if a stupid number of csrc count is high */
@@ -32,4 +34,3 @@ extern boost::asio::io_service workerservice;
 extern std::string mediachroot;
 
 #endif /* PROJECTRTPGLOBALS_H */
-

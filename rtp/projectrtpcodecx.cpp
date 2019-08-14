@@ -13,10 +13,10 @@ Pre generate all 711 data.
 We can speed up 711 conversion by way of pre calculating values. 128K(ish) of data is not too much to worry about!
 */
 
-static uint8_t l16topcmu[ 65536 ];
-static uint8_t l16topcma[ 65536 ];
-static int16_t pcmatol16[ 256 ];
-static int16_t pcmutol16[ 256 ];
+static uint8_t _l16topcmu[ 65536 ];
+static uint8_t _l16topcma[ 65536 ];
+static int16_t _pcmatol16[ 256 ];
+static int16_t _pcmutol16[ 256 ];
 
 /* Copied from the CCITT G.711 specification  - taken from spandsp*/
 static const uint8_t ulaw_to_alaw_table[256] =
@@ -68,14 +68,14 @@ void gen711convertdata( void )
   for( int32_t i = 0; i != 65535; i++ )
   {
     int16_t l16val = i - 32768;
-    l16topcmu[ i ] = linear_to_ulaw( l16val );
-    l16topcma[ i ] = linear_to_alaw( l16val );
+    _l16topcmu[ i ] = linear_to_ulaw( l16val );
+    _l16topcma[ i ] = linear_to_alaw( l16val );
   }
 
   for( uint8_t i = 0; i != 255; i++ )
   {
-    pcmatol16[ i ] = alaw_to_linear( i );
-    pcmutol16[ i ] = ulaw_to_linear( i );
+    _pcmatol16[ i ] = alaw_to_linear( i );
+    _pcmutol16[ i ] = ulaw_to_linear( i );
   }
 
   std::cout << " - completed." << std::endl;
@@ -87,13 +87,12 @@ codecx::codecx() :
   ilbcencoder( nullptr ),
   ilbcdecoder( nullptr ),
   resamplelastsample( 0 ),
+  l168k( nullptr ),
+  l1616k( nullptr ),
+  l168kallocatedlength( 0 ),
+  l1616kallocatedlength( 0 ),
   l168klength( 0 ),
-  l1616klength( 0 ),
-  in( nullptr ),
-  pcmaref( nullptr ),
-  pcmuref( nullptr ),
-  g722ref( nullptr ),
-  ilbcref( nullptr )
+  l1616klength( 0 )
 {
 
 }
@@ -131,6 +130,20 @@ void codecx::reset()
     this->ilbcencoder = nullptr;
   }
 
+  if( 0 != this->l168kallocatedlength && nullptr != this->l168k )
+  {
+    delete[] this->l168k;
+    this->l168kallocatedlength = 0;
+    this->l168k = nullptr;
+  }
+
+  if( 0 != this->l1616kallocatedlength && nullptr != this->l1616k )
+  {
+    delete[] this->l1616k;
+    this->l1616kallocatedlength = 0;
+    this->l1616k = nullptr;
+  }
+
   this->restart();
 
 }
@@ -152,27 +165,28 @@ From whichever PCM encoding (u or a) encode to the other without having to do in
 
 TODO - check that using a lookup table instead of a funcion call uses SSE functions in the CPU.
 */
-void codecx::xlaw2ylaw( rtppacket &pk )
+void codecx::xlaw2ylaw( void )
 {
-  if( !in ) return;
+  if( 0 == this->in.size() ) return;
   const uint8_t *convert;
+  uint8_t *inbufptr, *outbufptr;
+  size_t insize = this->in.size();
 
-  if( PCMAPAYLOADTYPE == in->getpayloadtype() )
+  if( PCMAPAYLOADTYPE == this->in.getformat() )
   {
-    this->pcmuref = &pk;
+    outbufptr = this->pcmuref.c_str();
+    this->pcmuref.size( insize );
     convert = alaw_to_ulaw_table;
   }
   else
   {
-    this->pcmaref = &pk;
+    outbufptr = this->pcmaref.c_str();
+    this->pcmaref.size( insize );
     convert = ulaw_to_alaw_table;
   }
-
-  uint8_t *inbufptr, *outbufptr;
-  inbufptr = this->in->getpayload();
-  outbufptr = pk.getpayload();
-
-  for( int i = 0; i < G711PAYLOADBYTES; i++ )
+  
+  inbufptr = this->in.c_str();
+  for( size_t i = 0; i < insize; i++ )
   {
     *outbufptr = convert[ *inbufptr ];
 
@@ -182,21 +196,59 @@ void codecx::xlaw2ylaw( rtppacket &pk )
 }
 
 /*!md
+## allocatel168k
+Allocate buffer if needed.
+*/
+void codecx::allocatel168k( std::size_t len )
+{
+  if( len > this->l168kallocatedlength )
+  {
+    if( 0 != this->l168kallocatedlength )
+    {
+      delete[] this->l168k;
+    }
+
+    this->l168k = new int16_t[ len ];
+    this->l168kallocatedlength = len;
+  }
+}
+
+/*!md
+## allocatel1616k
+Allocate buffer if needed.
+*/
+void codecx::allocatel1616k( std::size_t len )
+{
+  if( len > this->l1616kallocatedlength )
+  {
+    if( 0 != this->l1616kallocatedlength )
+    {
+      delete[] this->l1616k;
+    }
+
+    this->l1616k = new int16_t[ len ];
+    this->l1616kallocatedlength = len;
+  }
+}
+
+/*!md
 ## g711tol16
 As it says.
 */
 void codecx::g711tol16( void )
 {
+  this->allocatel168k( this->in.size() );
+
   int16_t *convert;
-  uint8_t pt = this->in->getpayloadtype();
+  uint8_t pt = this->in.getformat();
 
   if( PCMAPAYLOADTYPE == pt )
   {
-    convert = pcmatol16;
+    convert = _pcmatol16;
   }
   else if( PCMUPAYLOADTYPE == pt )
   {
-    convert = pcmutol16;
+    convert = _pcmutol16;
   }
   else
   {
@@ -205,55 +257,53 @@ void codecx::g711tol16( void )
 
   uint8_t *in;
   int16_t *out;
-  in = this->in->getpayload();
+  in = this->in.c_str();
   out = this->l168k;
 
-  for( int i = 0; i < G711PAYLOADBYTES; i++ )
+  size_t insize = this->in.size();
+  for( size_t i = 0; i < insize; i++ )
   {
     *out = convert[ *in ];
     in++;
     out++;
   }
 
-  this->l168klength = G711PAYLOADBYTES;
+  this->l168klength = insize;
 }
 
 
 /*!md
-## l16tog711
+## l16topcma
 */
-void codecx::l16tog711( rtppacket &dst )
+void codecx::l16topcma( void )
 {
-  dst.length = 12 + ( dst.getpacketcsrccount() * 4 ) + G711PAYLOADBYTES;
-  uint8_t *convert;
-  switch( dst.getpayloadtype() )
-  {
-    case PCMAPAYLOADTYPE:
-    {
-      convert = l16topcma;
-      this->pcmaref = &dst;
-      break;
-    }
-    case PCMUPAYLOADTYPE:
-    {
-      this->pcmuref = &dst;
-      convert = l16topcmu;
-      break;
-    }
-    default:
-    {
-      return;
-    }
-  }
+  uint8_t *out = this->pcmaref.c_str();;
 
-  uint8_t *out;
   int16_t *in;
-  out = dst.getpayload();
   in = this->l168k;
 
-  for( int i = 0; i < G711PAYLOADBYTES; i++ )
+  for( int i = 0; i < this->l168klength; i++ )
   {
-    *out = convert[ ( *in ) + 32768 ];
+    *out = _l16topcma[ ( *in ) + 32768 ];
+
+    in++;
+    out++;
+  }
+}
+
+/*!md
+## l16topcmu
+*/
+void codecx::l16topcmu( void )
+{
+  uint8_t *out = this->pcmuref.c_str();;
+
+  int16_t *in;
+  in = this->l168k;
+
+  for( int i = 0; i < this->l168klength; i++ )
+  {
+    *out = _l16topcmu[ ( *in ) + 32768 ];
 
     in++;
     out++;
@@ -266,6 +316,9 @@ As it says.
 */
 void codecx::ilbctol16( void )
 {
+  /* roughly compression size with some leg room. */
+  this->allocatel168k( this->in.size() * 5 );
+
   WebRtc_Word16 speechType;
 
   if( nullptr == this->ilbcdecoder )
@@ -276,8 +329,8 @@ void codecx::ilbctol16( void )
   }
 
   this->l168klength = WebRtcIlbcfix_Decode( this->ilbcdecoder,
-                        ( WebRtc_Word16* ) this->in->getpayload(),
-                        this->in->getpayloadlength(),
+                        ( WebRtc_Word16* ) this->in.c_str(),
+                        this->in.size(),
                         this->l168k,
                         &speechType
                       );
@@ -292,30 +345,41 @@ void codecx::ilbctol16( void )
 ## l16tog722
 As it says.
 */
-void codecx::l16tog722( rtppacket &dst )
+void codecx::l16tog722( void )
 {
+  if( nullptr == this->l1616k )
+  {
+    return;
+  }
+
   if( nullptr == this->g722encoder )
   {
     this->g722encoder = g722_encode_init( NULL, 64000, G722_PACKED );
   }
 
-  dst.length = 12 + ( dst.getpacketcsrccount() * 4 ) + G722PAYLOADBYTES;
-  g722_encode( this->g722encoder, dst.getpayload(), this->l1616k, G722PAYLOADBYTES * 2 );
+  int len = g722_encode( this->g722encoder, this->g722ref.c_str(), this->l1616k, this->g722ref.size() * 2 );
 
-  this->g722ref = &dst;
+  if( len > 0 )
+  {
+    this->g722ref.size( len );
+  }
+  else
+  {
+    this->g722ref.size( 0 );
+  }
 }
 
 /*!md
 ## l16toilbc
-As it says. 
-I think we can always send as 20mS. 
+As it says.
+I think we can always send as 20mS.
 According to RFC 3952 you determin how many frames are in the packet by the frame length. This is also true (although not explicit) that we can send as 20mS if our source is that but also 30mS if that is the case.
 
 As we only support G722, G711 and iLBC (20/30) then we should be able simply encode and send as the matched size.
 */
-void codecx::l16toilbc( rtppacket &dst )
+void codecx::l16toilbc( void )
 {
-  if( 0 == this->l168klength )
+  if( nullptr == this->l168k )
   {
     return;
   }
@@ -326,16 +390,20 @@ void codecx::l16toilbc( rtppacket &dst )
     WebRtcIlbcfix_EncoderCreate( &this->ilbcencoder );
     WebRtcIlbcfix_EncoderInit( this->ilbcencoder, 20 );
   }
-  
+
   WebRtc_Word16 len = WebRtcIlbcfix_Encode( this->ilbcencoder,
                             this->l168k,
                             this->l168klength,
-                            ( WebRtc_Word16* ) this->in->getpayload()
+                            ( WebRtc_Word16* ) this->ilbcref.c_str()
                           );
-
-  dst.length = 12 + ( dst.getpacketcsrccount() * 4 ) + len;
-
-  this->ilbcref = &dst;
+  if ( len > 0 )
+  {
+    this->ilbcref.size( len );
+  }
+  else
+  {
+    this->ilbcref.size( 0 );
+  }
 }
 
 
@@ -345,12 +413,14 @@ As it says.
 */
 void codecx::g722tol16( void )
 {
+  this->allocatel1616k( this->in.size() * 2 );
+
   if( nullptr == this->g722decoder )
   {
     this->g722decoder = g722_decode_init( NULL, 64000, G722_PACKED );
   }
 
-  this->l1616klength = g722_decode( g722decoder, this->l1616k, this->in->getpayload(), G722PAYLOADBYTES );
+  this->l1616klength = g722_decode( g722decoder, this->l1616k, this->in.c_str(), this->in.size() );
 }
 
 /*!md
@@ -359,6 +429,13 @@ Upsample from narrow to wideband. Take each point and interpolate between them. 
 */
 void codecx::l16lowtowideband( void )
 {
+  if( nullptr == this->l168k )
+  {
+    return;
+  }
+
+  this->allocatel1616k( this->l168klength * 2 );
+
   int16_t *in = this->l168k;
   int16_t *out = this->l1616k;
 
@@ -382,6 +459,9 @@ Downsample our L16 wideband samples to 8K. Pass through filter then grab every o
 */
 void codecx::l16widetonarrowband( void )
 {
+  /* if odd need ceil instead of floor (the + 1 bit) */
+  this->allocatel168k( ( this->l1616klength + 1 ) / 2 );
+
   int16_t *out = this->l168k;
   int16_t *in = this->l1616k;
 
@@ -414,12 +494,12 @@ Have a think about if this is where we want to mix audio data.
 */
 codecx& operator << ( codecx& c, rtppacket& pk )
 {
-  c.in = &pk;
+  c.in = rawsound( pk );
 
-  c.pcmaref = nullptr;
-  c.pcmuref = nullptr;
-  c.g722ref = nullptr;
-  c.ilbcref = nullptr;
+  c.pcmaref = rawsound();
+  c.pcmuref = rawsound();
+  c.g722ref = rawsound();
+  c.ilbcref = rawsound();
 
   c.l1616klength = 0;
   c.l168klength = 0;
@@ -434,43 +514,43 @@ Take the data out and transcode if necessary. Keep reference to any packet we ha
 rtppacket& operator << ( rtppacket& pk, codecx& c )
 {
   /* This shouldn't happen. */
-  if( nullptr == c.in )
+  if( 0 == c.in.size() )
   {
     pk.length = 0;
     return pk;
   }
 
-  int inpayloadtype = c.in->getpayloadtype();
+  int inpayloadtype = c.in.getformat();
   int outpayloadtype = pk.getpayloadtype();
 
   if( inpayloadtype == outpayloadtype )
   {
-    pk.copy( c.in );
+    pk.copy( c.in.c_str(), c.in.size() );
     return pk;
   }
 
   /* If we have already converted this packet... */
-  if( PCMAPAYLOADTYPE == outpayloadtype && nullptr != c.pcmaref )
+  if( PCMAPAYLOADTYPE == outpayloadtype &&  0 != c.pcmaref.size() )
   {
-    pk.copy( c.pcmaref );
+    pk.copy( c.pcmaref.c_str(), c.pcmaref.size() );
     return pk;
   }
 
-  if( PCMUPAYLOADTYPE == outpayloadtype && nullptr != c.pcmuref )
+  if( PCMUPAYLOADTYPE == outpayloadtype && 0 != c.pcmuref.size() )
   {
-    pk.copy( c.pcmuref );
+    pk.copy( c.pcmuref.c_str(), c.pcmuref.size() );
     return pk;
   }
 
-  if( ILBCPAYLOADTYPE == outpayloadtype && nullptr != c.ilbcref )
+  if( ILBCPAYLOADTYPE == outpayloadtype && 0 != c.ilbcref.size() )
   {
-    pk.copy( c.ilbcref );
+    pk.copy( c.ilbcref.c_str(), c.ilbcref.size() );
     return pk;
   }
 
-  if( G722PAYLOADTYPE == outpayloadtype && nullptr != c.g722ref )
+  if( G722PAYLOADTYPE == outpayloadtype && 0 != c.g722ref.size() )
   {
-    pk.copy( c.g722ref );
+    pk.copy( c.g722ref.c_str(), c.g722ref.size() );
     return pk;
   }
 
@@ -487,13 +567,14 @@ rtppacket& operator << ( rtppacket& pk, codecx& c )
         /* special case */
         case PCMAPAYLOADTYPE:
         {
-          c.xlaw2ylaw( pk ); 
+          c.xlaw2ylaw();
+          pk.copy( c.pcmaref.c_str(), c.pcmaref.size() );
           return pk;
         }
         case PCMUPAYLOADTYPE:
         {
-          c.xlaw2ylaw( pk );
-
+          c.xlaw2ylaw();
+          pk.copy( c.pcmuref.c_str(), c.pcmuref.size() );
           return pk;
         }
         default:
@@ -523,6 +604,11 @@ rtppacket& operator << ( rtppacket& pk, codecx& c )
       }
       break;
     }
+    default:
+    {
+      /* should not get here */
+      return pk;
+    }
   }
 
   /* If we get here we may have L16 but at the wrong sample rate so check and resample - then convert */
@@ -535,8 +621,9 @@ rtppacket& operator << ( rtppacket& pk, codecx& c )
       {
         c.l16widetonarrowband();
       }
-      c.l16toilbc( pk );
-      c.ilbcref = &pk;
+      c.ilbcref = rawsound( pk );
+      c.l16toilbc();
+      pk.setpayloadlength( c.ilbcref.size() );
       break;
     }
     case G722PAYLOADTYPE:
@@ -545,18 +632,30 @@ rtppacket& operator << ( rtppacket& pk, codecx& c )
       {
         c.l16lowtowideband();
       }
-      c.l16tog722( pk );
-      c.g722ref = &pk;
+      c.g722ref = rawsound( pk );
+      c.l16tog722();
       break;
     }
     case PCMAPAYLOADTYPE:
+    {
+      if( 0 == c.l168klength && 0 != c.l1616klength )
+      {
+        c.l16widetonarrowband();
+      }
+      c.pcmaref = rawsound( pk );
+      c.l16topcma();
+      pk.setpayloadlength( c.pcmaref.size() );
+      break;
+    }
     case PCMUPAYLOADTYPE:
     {
       if( 0 == c.l168klength && 0 != c.l1616klength )
       {
         c.l16widetonarrowband();
       }
-      c.l16tog711( pk );
+      c.pcmuref = rawsound( pk );
+      c.l16topcmu();
+      pk.setpayloadlength( c.pcmuref.size() );
       break;
     }
   }
@@ -564,3 +663,57 @@ rtppacket& operator << ( rtppacket& pk, codecx& c )
   return pk;
 }
 
+
+/*!md
+# rawsound
+An object representing raw data for sound - which can be in any format (supported). We maintain a pointer to the raw data and will not clean it up.
+*/
+rawsound::rawsound() :
+  data( nullptr ),
+  length( 0 ),
+  format( 0 ),
+  samplerate( 0 )
+{
+}
+
+/*!md
+# rawsound
+*/
+rawsound::rawsound( uint8_t *ptr, std::size_t length, int format, uint16_t samplerate ) :
+  data( ptr ),
+  length( length ),
+  format( format ),
+  samplerate( samplerate )
+{
+}
+
+/*!md
+## rawsound
+Construct from an rtp packet
+*/
+rawsound::rawsound( rtppacket& pk )
+{
+  this->data = pk.getpayload();
+  this->length = pk.getpayloadlength();
+  this->format = pk.getpayloadtype();
+
+  switch( pk.getpayloadtype() )
+  {
+    case PCMUPAYLOADTYPE:
+    case PCMAPAYLOADTYPE:
+    {
+      this->samplerate = 8000;
+      break;
+    }
+    case G722PAYLOADTYPE:
+    {
+      this->samplerate = 16000;
+      break;
+    }
+    case ILBCPAYLOADTYPE:
+    {
+      this->samplerate = 8000;
+      break;
+    }
+  }
+}

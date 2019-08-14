@@ -117,7 +117,7 @@ soundfile::soundfile( std::string &filename, compression format, int mode, bandw
     return;
 	}
 
-	
+
 	return;
 
 }
@@ -157,7 +157,7 @@ int soundfile::read( rtppacket *pk )
     return -1;
   }
 
-  /* success? */ 
+  /* success? */
 	int numbytes = aio_return( &this->wavblock );
 
   if( -1 == numbytes )
@@ -168,13 +168,13 @@ int soundfile::read( rtppacket *pk )
   memcpy( pk->pk, (const void *)this->wavblock.aio_buf, this->wavblock.aio_nbytes );
 
   /* read again */
-	if ( aio_read( &this->wavblock ) == -1 )
-	{
+  if ( aio_read( &this->wavblock ) == -1 )
+  {
     /* report error somehow. */
-		close( this->file );
+    close( this->file );
     this->file = 0;
     return -1;
-	}
+  }
 
   return numbytes;
 }
@@ -190,11 +190,55 @@ void wavinfo( const char *file )
   int fd = open( file, O_RDONLY, 0 );
   if( -1 == fd )
   {
-    std::cerr << "Couldn't open file" << std::endl;
+    std::cerr << "Couldn't open file " << file << std::endl;
     return;
   }
 
   read( fd, &hd, sizeof( wav_header ) );
 
+  if( 'R' != hd.riff_header[ 0 ] ||
+      'I' != hd.riff_header[ 1 ] ||
+      'F' != hd.riff_header[ 2 ] ||
+      'F' != hd.riff_header[ 3 ] )
+  {
+    std::cout << "Bad riff" << std::endl;
+    goto done;
+  }
+
+  if( 'W' != hd.wave_header[ 0 ] ||
+      'A' != hd.wave_header[ 1 ] ||
+      'V' != hd.wave_header[ 2 ] ||
+      'E' != hd.wave_header[ 3 ] )
+  {
+    std::cout << "Bad wav" << std::endl;
+    goto done;
+  }
+
+  if( 'f' != hd.fmt_header[ 0 ] ||
+      'm' != hd.fmt_header[ 1 ] ||
+      't' != hd.fmt_header[ 2 ] ||
+      ' ' != hd.fmt_header[ 3 ] )
+  {
+    std::cout << "Bad format" << std::endl;
+    goto done;
+  }
+
+  if( 'd' != hd.data_header[ 0 ] ||
+      'a' != hd.data_header[ 1 ] ||
+      't' != hd.data_header[ 2 ] ||
+      'a' != hd.data_header[ 3 ] )
+  {
+    std::cout << "Bad data header" << std::endl;
+    goto done;
+  }
+
+  std::cout << "Audio format: " << hd.audio_format << std::endl;
+  std::cout << "Channel count: " << hd.num_channels << std::endl;
+  std::cout << "Sample rate: " << hd.sample_rate << std::endl;
+  std::cout << "Byte rate: " << hd.byte_rate << std::endl;
+  std::cout << "BPS: " << hd.bit_depth << std::endl;
+  std::cout << "Wav size: " << hd.wav_size << std::endl;
+
+done:
   close( fd );
 }
