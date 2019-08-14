@@ -634,6 +634,7 @@ rtppacket& operator << ( rtppacket& pk, codecx& c )
       }
       c.g722ref = rawsound( pk );
       c.l16tog722();
+      pk.setpayloadlength( c.g722ref.size() );
       break;
     }
     case PCMAPAYLOADTYPE:
