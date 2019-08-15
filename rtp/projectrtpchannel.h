@@ -19,8 +19,11 @@
 /* CODECs */
 #include <ilbc.h>
 #include <spandsp.h>
+
+#include "globals.h"
 #include "projectrtpcodecx.h"
 #include "projectrtppacket.h"
+#include "projectrtpsoundfile.h"
 
 /* The number of packets we will keep in a buffer */
 #define BUFFERPACKETCOUNT 20
@@ -140,6 +143,7 @@ private:
   codecx codecworker;
 
   rtppacketplaybacks players;
+  soundfile::pointer player;
 };
 
 

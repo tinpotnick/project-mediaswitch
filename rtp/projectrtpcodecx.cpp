@@ -507,6 +507,21 @@ codecx& operator << ( codecx& c, rtppacket& pk )
   return c;
 }
 
+codecx& operator << ( codecx& c, rawsound& raw )
+{
+  c.in = raw;
+
+  c.pcmaref = rawsound();
+  c.pcmuref = rawsound();
+  c.g722ref = rawsound();
+  c.ilbcref = rawsound();
+
+  c.l1616klength = 0;
+  c.l168klength = 0;
+
+  return c;
+}
+
 /*!md
 ## rtppacket << codecx
 Take the data out and transcode if necessary. Keep reference to any packet we have transcoded as we may need to use it again.
@@ -602,6 +617,27 @@ rtppacket& operator << ( rtppacket& pk, codecx& c )
       {
         c.g722tol16();
       }
+      break;
+    }
+    case L16PAYLOADTYPE:
+    {
+      size_t insize = c.in.size();
+      if( 0 != insize )
+      {
+        if( 8000 == c.in.getsamplerate() )
+        {
+          c.allocatel168k( c.in.size() );
+          memcpy( c.l168k, c.in.c_str(), c.in.size() );
+          c.l168klength = c.in.size() / 2;
+        }
+        else if( 16000 == c.in.getsamplerate() )
+        {
+          c.allocatel1616k( c.in.size() );
+          memcpy( c.l1616k, c.in.c_str(), c.in.size() );
+          c.l1616klength = c.in.size() / 2;
+        }
+      }
+
       break;
     }
     default:

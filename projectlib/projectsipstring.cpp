@@ -369,7 +369,7 @@ Function: substring constructor
 Purpose: As it say.
 Updated: 08.01.2019
 *******************************************************************************/
-substring::substring( char * s )
+substring::substring( const char * s )
 {
   this->s = stringptr( new std::string( s ) );
   this->startpos = 0;

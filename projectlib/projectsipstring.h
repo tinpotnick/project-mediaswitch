@@ -53,7 +53,7 @@ class substring
 {
 public:
   substring();
-  substring( char * s );
+  substring( const char * s );
   substring( substring ss, size_t start, size_t end );
   substring( stringptr s );
   substring( stringptr s, size_t start, size_t end );

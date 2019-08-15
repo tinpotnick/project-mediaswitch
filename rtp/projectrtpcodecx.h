@@ -23,11 +23,16 @@ public:
   size_t size( void ){ return this->length; };
   void size( size_t len ){ this->length = len; };
   int getformat( void ){ return this->format; };
+  uint16_t getsamplerate( void ) { return this->samplerate; };
 
 private:
 
+  /* ptr to our buffer */
   uint8_t *data;
+
+  /* length of buffer in bytes */
   size_t length;
+  
   int format;
   uint16_t samplerate;
 };

@@ -8,7 +8,6 @@
 
 
 #include "projectrtpchannel.h"
-#include "globals.h"
 
 
 /*!md
@@ -316,9 +315,10 @@ void projectrtpchannel::processrtpdata( rtppacket *src, uint32_t skipcount )
   if( !this->others || 0 == this->others->size() )
   {
     rtppacket *out = this->gettempoutbuf( skipcount );
-    out->copyheader( src );
+    //out->copyheader( src );
     memset( out->getpayload(), 0, out->getpayloadlength() );
 
+#if 0
     /* More thinking required. We might want to playback something and mix other items but with a smaller volume (or louder) */
     for( auto it = this->players.begin(); it != this->players.end(); it++ )
     {
@@ -327,8 +327,23 @@ void projectrtpchannel::processrtpdata( rtppacket *src, uint32_t skipcount )
         /* Erase this one... */
       }
     }
+#endif
 
-    this->writepacket( out );
+    if( !this->player )
+    {
+      std::string url = "file://test.wav";
+      this->player = soundfile::create( url );
+    }
+
+    rawsound r = player->read();
+    if( 0 != r.size() )
+    {
+      std::cout << "r:" << r.size() << std::endl;
+      this->codecworker << r;
+      *out << this->codecworker;
+
+      this->writepacket( out );
+    }
 
     return;
   }

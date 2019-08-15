@@ -4,119 +4,75 @@
 #include "projectrtpsoundfile.h"
 #include "globals.h"
 
+#include "projectwebdocument.h"
+
 
 /*!md
 ## soundfile
-Ideas:
-This is to be used in an xform in our channel which has a chain of actions. We may have already had MOH placed into our packet in our read function which we simply want to attenuate in this function here. So, how are we going to a) pass that other information in and b) other options like only this xform to save CPU on playing MOH if it is fully attenuated?
+Time to simplify. We will read wav files - all should be in pcm format - either wideband or narrow band. Anything else we will throw out. In the future we may support pre-encoded - but for now...
 
-This begs the question, do we create a format of sound file, which has the same recording but in different formats in it. Similar to wav for different channels but would need to allow different lengths of recordings in it in different formats.
-
-The mix of compression and bandwidth can be used either in the file.wav or file.wav.g722 (still wav but reference in the filename). The bandwidth is defined by the compression (i.e. pcma, pcmu and ilbc are all narrowband, g722 is wideband, pcm can be both) so
-
-pcm, pcmu, pcma, g722, ilbc
-Will be assigned the following file formats
-
-| Format | extension |
-|-|-|
-| pcm - narrowband | .pcm8 |
-| pcm - wideband | .pcm16 |
-| pcmu | .pcmu |
-| pcma | .pcma |
-| g722 | .g722 |
-| ilbc | .ilbc |
-
-We prefer the specific filename and will expect it to be in the correct format.
+We need to support
+* read and write (play and record)
+* whole read and store in memory (maybe)
+* looping a file playback (this is effectively moh)
+* multiple readers (of looped files only - equivalent of moh)
+* virtual files (i.e. think tone://) ( think tone_stream in FS - work on real first)
+* Need to review: https://www.itu.int/dms_pub/itu-t/opb/sp/T-SP-E.180-2010-PDF-E.pdf
+* Also: TGML - https://freeswitch.org/confluence/display/FREESWITCH/TGML I think a simpler version may be possible
 */
-soundfile::soundfile( std::string &filename, compression format, int mode, bandwidth bps ) :
-  file( 0 ),
-  readbuffer( nullptr ),
-  mode( mode ),
-  blocksize( G711PAYLOADBYTES )
+soundfile::soundfile( std::string &url ) :
+  file( -1 ),
+  readbuffercount( 2 ),
+  currentindex( 0 ),
+  blocksize( 320 )
 {
-  std::string filenfullpath = mediachroot + filename;
-  std::string filenameforcompression;
 
-  this->mode = mode;
-
-  /* allocate a buffer */
-  switch( mode )
+  httpuri uriparts( substring( url.c_str() ) );
+  if( uriparts.protocol == "file" ) 
   {
-    case pcm:
-    {
-      if( wideband == bps )
-      {
-        filenameforcompression = filenfullpath + ".pcm16";
-        this->blocksize = L16WIDEBANDBYTES;
-      }
-      else
-      {
-        filenameforcompression = filenfullpath + ".pcm18";
-        this->blocksize = L16NARROWBANDBYTES;
-      }
-      break;
-    }
-    case pcmu:
-    {
-      filenameforcompression = filenfullpath + ".pcmu";
-      this->blocksize = G711PAYLOADBYTES;
-      break;
-    }
-    case pcma:
-    {
-      filenameforcompression = filenfullpath + ".pcma";
-      this->blocksize = G711PAYLOADBYTES;
-      break;
-    }
-    case g722:
-    {
-      filenameforcompression = filenfullpath + ".g722";
-      this->blocksize = G722PAYLOADBYTES;
-      break;
-    }
-    case ilbc:
-    {
-      filenameforcompression = filenfullpath + ".ilbc";
-      this->blocksize = ILBC20PAYLOADBYTES;
-      break;
-    }
-  }
+    int mode = O_RDONLY;
+    std::string filenfullpath = mediachroot + uriparts.host.str();
 
-  this->file = open( filenameforcompression.c_str(), mode | O_NONBLOCK, 0 );
-
-	if ( -1 == this->file )
-	{
     this->file = open( filenfullpath.c_str(), mode | O_NONBLOCK, 0 );
     if ( -1 == this->file )
     {
+      /* Not much more we can do */
       return;
     }
-	}
 
-  this->readbuffer = new uint8_t[ this->blocksize ];
+    // For now we will assume this is the correct format
+    this->readbuffer = new uint8_t[ this->blocksize * this->readbuffercount ];
 
-  /* As it is asynchronous - we read wav header + ahead */
-	memset( &wavheader, 0, sizeof( aiocb ) );
-	wavheader.aio_nbytes = this->blocksize;
-	wavheader.aio_fildes = file;
-	wavheader.aio_offset = 0;
-	wavheader.aio_buf = this->readbuffer;
+    /* As it is asynchronous - we read wav header + ahead */
+    memset( &this->cbwavheader, 0, sizeof( aiocb ) );
+    this->cbwavheader.aio_nbytes = sizeof( wav_header );
+    this->cbwavheader.aio_fildes = file;
+    this->cbwavheader.aio_offset = 0;
+    this->cbwavheader.aio_buf = &this->wavheader;
 
-  memset( &wavblock, 0, sizeof( aiocb ) );
-	wavblock.aio_nbytes = this->blocksize;
-	wavblock.aio_fildes = file;
-	wavblock.aio_offset = 0;
-	wavblock.aio_buf = this->readbuffer;
+    memset( &this->cbwavblock, 0, sizeof( aiocb ) );
+    this->cbwavblock.aio_nbytes = this->blocksize;
+    this->cbwavblock.aio_fildes = file;
+    this->cbwavblock.aio_offset = sizeof( wav_header );
+    this->cbwavblock.aio_buf = this->readbuffer;
 
-	/* read */
-	if ( aio_read( &wavheader ) == -1 )
-	{
-    /* report error somehow. */
-		close( this->file );
-    this->file = 0;
-    return;
-	}
+    /* read */
+    if ( aio_read( &this->cbwavheader ) == -1 )
+    {
+      /* report error somehow. */
+      close( this->file );
+      this->file = -1;
+      return;
+    }
 
+    if ( aio_read( &this->cbwavblock ) == -1 )
+    {
+      /* report error somehow. */
+      close( this->file );
+      this->file = -1;
+      return;
+    }
+  }
 
 	return;
 
@@ -138,9 +94,9 @@ soundfile::~soundfile()
 # create
 Shared pointer version of us.
 */
-soundfile::pointer soundfile::create( std::string &filename, compression format, int mode, bandwidth bps )
+soundfile::pointer soundfile::create( std::string &url )
 {
-  return pointer( new soundfile( filename, format, mode, bps ) );
+  return pointer( new soundfile( url ) );
 }
 
 /*
@@ -150,33 +106,42 @@ Asynchronous read.
 Return the number of bytes read. Will read the appropriate amount of bytes for 1 rtp packet for the defined CODEC.
 If not ready return -1.
 */
-int soundfile::read( rtppacket *pk )
+rawsound soundfile::read( void )
 {
-  if( aio_error( &this->wavblock ) == EINPROGRESS )
+  if( aio_error( &this->cbwavblock ) == EINPROGRESS )
   {
-    return -1;
+    return rawsound();
   }
 
   /* success? */
-	int numbytes = aio_return( &this->wavblock );
+	int numbytes = aio_return( &this->cbwavblock );
 
-  if( -1 == numbytes )
+  if( -1 == numbytes || 0 == numbytes )
   {
-    return -1;
+    return rawsound();
   }
 
-  memcpy( pk->pk, (const void *)this->wavblock.aio_buf, this->wavblock.aio_nbytes );
+  uint8_t *current = ( uint8_t * ) this->cbwavblock.aio_buf;
 
-  /* read again */
-  if ( aio_read( &this->wavblock ) == -1 )
+  this->currentindex = ( this->currentindex + 1 ) % readbuffercount;
+  this->cbwavblock.aio_buf = this->readbuffer + ( this->blocksize * this->currentindex );
+  this->cbwavblock.aio_offset += this->blocksize;
+
+  /* read next block */
+  if ( aio_read( &this->cbwavblock ) == -1 )
   {
     /* report error somehow. */
     close( this->file );
-    this->file = 0;
-    return -1;
+    this->file = -1;
+    return rawsound();
   }
 
-  return numbytes;
+  if ( nullptr == current )
+  {
+    return rawsound();
+  }
+
+  return rawsound( current, this->blocksize, L16PAYLOADTYPE, this->wavheader.sample_rate );
 }
 
 
