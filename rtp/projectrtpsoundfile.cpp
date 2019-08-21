@@ -88,6 +88,11 @@ soundfile::~soundfile()
   {
     delete[] this->readbuffer;
   }
+
+  if ( -1 != this->file )
+  {
+    close( this->file );
+  }
 }
 
 /*!md
@@ -120,12 +125,17 @@ rawsound soundfile::read( void )
   {
     return rawsound();
   }
-
+  
   uint8_t *current = ( uint8_t * ) this->cbwavblock.aio_buf;
 
   this->currentindex = ( this->currentindex + 1 ) % readbuffercount;
   this->cbwavblock.aio_buf = this->readbuffer + ( this->blocksize * this->currentindex );
   this->cbwavblock.aio_offset += this->blocksize;
+
+  if( this->cbwavblock.aio_offset > ( __off_t ) ( this->wavheader.wav_size + sizeof( wav_header ) ) )
+  {
+    this->cbwavblock.aio_offset = sizeof( wav_header );
+  }
 
   /* read next block */
   if ( aio_read( &this->cbwavblock ) == -1 )

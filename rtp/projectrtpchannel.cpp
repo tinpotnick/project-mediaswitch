@@ -338,7 +338,7 @@ void projectrtpchannel::processrtpdata( rtppacket *src, uint32_t skipcount )
     rawsound r = player->read();
     if( 0 != r.size() )
     {
-      std::cout << "r:" << r.size() << std::endl;
+      this->codecworker << codecx::next;
       this->codecworker << r;
       *out << this->codecworker;
 
@@ -359,6 +359,7 @@ void projectrtpchannel::processrtpdata( rtppacket *src, uint32_t skipcount )
       chan = *( ++it );
     }
 
+    this->codecworker << codecx::next;
     this->codecworker << *src;
     rtppacket *dst = chan->gettempoutbuf( skipcount );
     *dst << this->codecworker;

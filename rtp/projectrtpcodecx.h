@@ -18,12 +18,15 @@ public:
   rawsound();
   rawsound( uint8_t *ptr, std::size_t length, int format, uint16_t samplerate = 8000 );
   rawsound( rtppacket& pk );
+  rawsound( rawsound & );
+  ~rawsound();
 
   uint8_t *c_str( void ){ return this->data; };
   size_t size( void ){ return this->length; };
   void size( size_t len ){ this->length = len; };
   int getformat( void ){ return this->format; };
   uint16_t getsamplerate( void ) { return this->samplerate; };
+  void malloc( size_t len );
 
 private:
 
@@ -32,6 +35,7 @@ private:
 
   /* length of buffer in bytes */
   size_t length;
+  size_t allocatedlength;
   
   int format;
   uint16_t samplerate;
@@ -50,21 +54,23 @@ public:
   friend rtppacket& operator << ( rtppacket&, codecx& );
   friend codecx& operator << ( codecx&, rawsound& );
   friend rawsound& operator << ( rawsound&, codecx& );
+  friend codecx& operator << ( codecx&, const char& );
+  static const char next;
 
 private:
   void xlaw2ylaw( void );
-  void g711tol16( void );
-  void ilbctol16( void );
-  void g722tol16( void );
-  void l16lowtowideband( void);
-  void l16widetonarrowband( void );
+  bool g711tol16( void );
+  bool ilbctol16( void );
+  bool g722tol16( void );
   void l16topcma( void );
   void l16topcmu( void );
   void l16tog722( void );
   void l16toilbc( void );
 
-  void allocatel168k( std::size_t len );
-  void allocatel1616k( std::size_t len );
+  void l16lowtowideband( void);
+  void l16widetonarrowband( void );
+  void requirenarrowband( void );
+  void requirewideband( void );
 
   /* CODECs  */
   g722_encode_state_t *g722encoder;
@@ -77,7 +83,7 @@ private:
   lowpass3_4k16k lpfilter;
   /* When we up sample we need to interpolate so need last sample */
   int16_t resamplelastsample;
-
+#if 0
   int16_t *l168k; /* narrow band */
   int16_t *l1616k; /* wideband */
 
@@ -87,6 +93,9 @@ private:
   int16_t l1616klength;
 
   rawsound in;
+#endif
+  rawsound l168kref;
+  rawsound l1616kref;
   rawsound pcmaref;
   rawsound pcmuref;
   rawsound g722ref;
@@ -100,6 +109,8 @@ rtppacket& operator << ( rtppacket&, codecx& );
 
 codecx& operator << ( codecx&, rawsound& );
 rawsound& operator << ( rawsound&, codecx& );
+
+codecx& operator << ( codecx&, const char& );
 
 /* Functions */
 void gen711convertdata( void );
