@@ -162,6 +162,7 @@ class call
       {
         this.control.server( {}, "/channel/" + this.metadata.channel.uuid, "DELETE", this.metadata.channel.control, ( response ) =>
         {
+          delete this.control.channels[ this.metadata.channel.uuid ];
         } );
       }
     }
@@ -351,7 +352,7 @@ request = { codecs: [ 'pcmu' ] }
 
     if( undefined == request ) request = {};
 
-    this.control.createchannel( request, ( channel ) =>
+    this.control.createchannel( this, request, ( channel ) =>
     {
       if ( undefined == channel )
       {
@@ -495,6 +496,9 @@ class projectcontrol
 
     /* Store by call-id */
     this.calls = {}
+
+    /* Reverse channel uuid to call id */
+    this.channels = {}
 
     /* TODO - work out if we need more and how to add. */
     this.sip = {};
@@ -813,7 +817,7 @@ The follow list is what we will be taken from a gateway (if it exsists)
       if( "codecs" in gw ) request.codecs = gw.codecs;
     }
 
-    this.createchannel( request, ( channel ) =>
+    this.createchannel( c, request, ( channel ) =>
     {
       if( !( "sdp" in request ) )
       {
@@ -826,11 +830,6 @@ The follow list is what we will be taken from a gateway (if it exsists)
       }
 
       c.metadata.channel = channel;
-      request.control = "http://" + this.us.host;
-      if( 80 != this.us.port )
-      {
-        request.control += ":" + this.us.port;
-      }
 
       this.sipserver( request, "/dialog/invite", "POST", ( response ) =>
       {
@@ -857,12 +856,17 @@ Negotiates a channel with an RTP server then creates the corrosponding SDP objec
 {
   ip: "",
   port: 10000,
-  channel: "uuid"
 }
 */
-  createchannel( request, callback )
+  createchannel( call, request, callback )
   {
-    this.server( {}, "/channel/", "POST", this.rtp, ( response ) =>
+    request.control = "http://" + this.us.host;
+    if( 80 != this.us.port )
+    {
+      request.control += ":" + this.us.port;
+    }
+
+    this.server( request, "/channel/", "POST", this.rtp, ( response ) =>
     {
       if( 200 == response.code )
       {
@@ -871,6 +875,9 @@ Negotiates a channel with an RTP server then creates the corrosponding SDP objec
         ch.port = response.json.port;
         ch.control = this.rtp;
         ch.uuid = response.json.uuid;
+
+        /* reverse map from channel uuid to call */
+        this.channels[ response.json.uuid ] = call;
 
         request.sdp = {
           v: 0,
