@@ -57,8 +57,6 @@ typedef struct
 class soundfile
 {
 public:
-  enum compression { pcm, pcmu, pcma, g722, ilbc };
-  enum bandwidth{ narrowband, wideband };
   soundfile( std::string &url );
   ~soundfile();
 

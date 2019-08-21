@@ -40,7 +40,11 @@ soundfile::soundfile( std::string &url ) :
       return;
     }
 
-    // For now we will assume this is the correct format
+    /* 
+      Soundfile blindly reads the format and passes to the codec - so it must be in a format we support - or there will be silence.
+
+      Our macro player (to be written) will choose the most appropriate file to play based on the codec of the channel.
+    */
     this->readbuffer = new uint8_t[ this->blocksize * this->readbuffercount ];
 
     /* As it is asynchronous - we read wav header + ahead */
@@ -110,6 +114,8 @@ Asynchronous read.
 
 Return the number of bytes read. Will read the appropriate amount of bytes for 1 rtp packet for the defined CODEC.
 If not ready return -1.
+
+We only support 1 channel. Anything else we need to look at.
 */
 rawsound soundfile::read( void )
 {
@@ -151,7 +157,28 @@ rawsound soundfile::read( void )
     return rawsound();
   }
 
-  return rawsound( current, this->blocksize, L16PAYLOADTYPE, this->wavheader.sample_rate );
+  int ploadtype = L16PAYLOADTYPE;
+  switch( this->wavheader.audio_format )
+  {
+    case WAVE_FORMAT_ALAW:
+    {
+      ploadtype = PCMAPAYLOADTYPE;
+    }
+    case WAVE_FORMAT_MULAW:
+    {
+      ploadtype = PCMUPAYLOADTYPE;
+    }
+    case WAVE_FORMAT_POLYCOM_G722:
+    {
+      ploadtype = G722PAYLOADTYPE;
+    }
+    case WAVE_FORMAT_GLOBAL_IP_ILBC:
+    {
+      ploadtype = ILBCPAYLOADTYPE;
+    }
+  }
+
+  return rawsound( current, this->blocksize, ploadtype, this->wavheader.sample_rate );
 }
 
 
