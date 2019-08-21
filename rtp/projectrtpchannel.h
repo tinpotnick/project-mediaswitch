@@ -3,16 +3,16 @@
 #ifndef PROJECTRTPCHANNEL_H
 #define PROJECTRTPCHANNEL_H
 
-#include <boost/asio.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
-#include <boost/asio/ip/udp.hpp>
+#include <memory>
+#include <atomic>
 
-#include <boost/shared_ptr.hpp>
+#include <boost/asio.hpp>
+#include <boost/asio/ip/udp.hpp>
 
 #include <stdint.h>
 #include <arpa/inet.h>
 
+#include <string>
 #include <list>
 #include <vector>
 
@@ -23,7 +23,8 @@
 #include "globals.h"
 #include "projectrtpcodecx.h"
 #include "projectrtppacket.h"
-#include "projectrtpsoundfile.h"
+#include "projectrtpsoundsoup.h"
+#include "projectsipstring.h"
 
 /* The number of packets we will keep in a buffer */
 #define BUFFERPACKETCOUNT 20
@@ -38,31 +39,28 @@
 Purpose: RTP Channel - which represents RTP and RTCP. This is here we include our jitter buffer. We create a cyclic window to write data into and then read out of.
 
 RTP on SIP channels should be able to switch between CODECS during a session so we have to make sure we have space for that.
-
 */
 
 
-typedef std::function<bool( rtppacket *pk )> rtppacketplayback;
-typedef std::list< rtppacketplayback > rtppacketplaybacks;
-
-
 class projectrtpchannel :
-  public boost::enable_shared_from_this< projectrtpchannel >
+  public std::enable_shared_from_this< projectrtpchannel >
 {
 
 public:
   projectrtpchannel( boost::asio::io_service &io_service, unsigned short port );
   ~projectrtpchannel( void );
 
-  typedef boost::shared_ptr< projectrtpchannel > pointer;
+  typedef std::shared_ptr< projectrtpchannel > pointer;
   static pointer create( boost::asio::io_service &io_service, unsigned short port );
 
-  void open();
+  void open( std::string &control );
   void close( void );
 
   unsigned short getport( void );
 
   void target( std::string &address, unsigned short port );
+  void setcontrol( std::string &address ) { this->control = address; };
+  void setplaydef( stringptr newdef ) { std::atomic_store( &this->newplaydef, newdef ); };
 
   typedef std::vector< int > codeclist;
   void audio( codeclist codecs );
@@ -142,8 +140,10 @@ private:
   /* CODECs  */
   codecx codecworker;
 
-  rtppacketplaybacks players;
-  soundfile::pointer player;
+  soundsoup::pointer player;
+  stringptr newplaydef;
+
+  std::string control;
 };
 
 

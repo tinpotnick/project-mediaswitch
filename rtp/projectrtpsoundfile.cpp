@@ -22,9 +22,9 @@ We need to support
 */
 soundfile::soundfile( std::string &url ) :
   file( -1 ),
+  url( url ),
   readbuffercount( 2 ),
-  currentindex( 0 ),
-  blocksize( 320 )
+  currentindex( 0 )
 {
 
   httpuri uriparts( substring( url.c_str() ) );
@@ -45,7 +45,7 @@ soundfile::soundfile( std::string &url ) :
 
       Our macro player (to be written) will choose the most appropriate file to play based on the codec of the channel.
     */
-    this->readbuffer = new uint8_t[ this->blocksize * this->readbuffercount ];
+    this->readbuffer = new uint8_t[ L16WIDEBANDBYTES * this->readbuffercount ];
 
     /* As it is asynchronous - we read wav header + ahead */
     memset( &this->cbwavheader, 0, sizeof( aiocb ) );
@@ -55,7 +55,7 @@ soundfile::soundfile( std::string &url ) :
     this->cbwavheader.aio_buf = &this->wavheader;
 
     memset( &this->cbwavblock, 0, sizeof( aiocb ) );
-    this->cbwavblock.aio_nbytes = this->blocksize;
+    this->cbwavblock.aio_nbytes = L16WIDEBANDBYTES;
     this->cbwavblock.aio_fildes = file;
     this->cbwavblock.aio_offset = sizeof( wav_header );
     this->cbwavblock.aio_buf = this->readbuffer;
@@ -131,12 +131,51 @@ rawsound soundfile::read( void )
   {
     return rawsound();
   }
+
+  int ploadtype = L16PAYLOADTYPE;
+  int blocksize = L16WIDEBANDBYTES;
+  switch( this->wavheader.audio_format )
+  {
+    case WAVE_FORMAT_PCM:
+    {
+      if( 8000 == this->wavheader.sample_rate )
+      {
+        blocksize = L16NARROWBANDBYTES;
+      }
+      break;
+    }
+    case WAVE_FORMAT_ALAW:
+    {
+      ploadtype = PCMAPAYLOADTYPE;
+      blocksize = G711PAYLOADBYTES;
+      break;
+    }
+    case WAVE_FORMAT_MULAW:
+    {
+      ploadtype = PCMUPAYLOADTYPE;
+      blocksize = G711PAYLOADBYTES;
+      break;
+    }
+    case WAVE_FORMAT_POLYCOM_G722:
+    {
+      ploadtype = G722PAYLOADTYPE;
+      blocksize = G722PAYLOADBYTES;
+      break;
+    }
+    case WAVE_FORMAT_GLOBAL_IP_ILBC:
+    {
+      ploadtype = ILBCPAYLOADTYPE;
+      blocksize = ILBC20PAYLOADBYTES;
+      break;
+    }
+  }
   
   uint8_t *current = ( uint8_t * ) this->cbwavblock.aio_buf;
 
   this->currentindex = ( this->currentindex + 1 ) % readbuffercount;
-  this->cbwavblock.aio_buf = this->readbuffer + ( this->blocksize * this->currentindex );
-  this->cbwavblock.aio_offset += this->blocksize;
+  this->cbwavblock.aio_buf = this->readbuffer + ( blocksize * this->currentindex );
+  this->cbwavblock.aio_offset += blocksize;
+  this->cbwavblock.aio_nbytes = blocksize;
 
   if( this->cbwavblock.aio_offset > ( __off_t ) ( this->wavheader.wav_size + sizeof( wav_header ) ) )
   {
@@ -157,28 +196,38 @@ rawsound soundfile::read( void )
     return rawsound();
   }
 
-  int ploadtype = L16PAYLOADTYPE;
-  switch( this->wavheader.audio_format )
+  return rawsound( current, blocksize, ploadtype, this->wavheader.sample_rate );
+}
+
+/*!md
+# setposition and getposition
+Gets and sets the position in terms of mS.
+*/
+void soundfile::setposition( long mseconds )
+{
+  int newposition = sizeof( wav_header );
+  newposition += ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) * mseconds; /* bytes per sample */
+  this->cbwavblock.aio_offset = newposition;
+}
+
+long soundfile::getposition( void )
+{
+  if( this->cbwavblock.aio_offset <= ( __off_t ) sizeof( wav_header ) )
   {
-    case WAVE_FORMAT_ALAW:
-    {
-      ploadtype = PCMAPAYLOADTYPE;
-    }
-    case WAVE_FORMAT_MULAW:
-    {
-      ploadtype = PCMUPAYLOADTYPE;
-    }
-    case WAVE_FORMAT_POLYCOM_G722:
-    {
-      ploadtype = G722PAYLOADTYPE;
-    }
-    case WAVE_FORMAT_GLOBAL_IP_ILBC:
-    {
-      ploadtype = ILBCPAYLOADTYPE;
-    }
+    return 0;
   }
 
-  return rawsound( current, this->blocksize, ploadtype, this->wavheader.sample_rate );
+  long position = this->cbwavblock.aio_offset -= sizeof( wav_header );
+  return position / ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 );
+}
+
+/*!md
+# complete
+Have we completed reading the file.
+*/
+bool soundfile::complete( void )
+{
+  return this->cbwavblock.aio_offset > this->wavheader.wav_size;
 }
 
 
@@ -238,7 +287,7 @@ void wavinfo( const char *file )
   std::cout << "Channel count: " << hd.num_channels << std::endl;
   std::cout << "Sample rate: " << hd.sample_rate << std::endl;
   std::cout << "Byte rate: " << hd.byte_rate << std::endl;
-  std::cout << "BPS: " << hd.bit_depth << std::endl;
+  std::cout << "Bit depth: " << hd.bit_depth << std::endl;
   std::cout << "Wav size: " << hd.wav_size << std::endl;
 
 done:

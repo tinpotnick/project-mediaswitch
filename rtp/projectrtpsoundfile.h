@@ -5,8 +5,7 @@
 
 #include <string>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <memory>
 
 
 #include <sys/types.h>
@@ -34,7 +33,7 @@ typedef struct
     /* Format Header */
     char fmt_header[ 4 ]; /* Contains "fmt " (includes trailing space) */
     int32_t fmt_chunk_size; /* Should be 16 for PCM */
-    int16_t audio_format; /* Should be 1 for PCM. 3 for IEEE Float */
+    uint16_t audio_format; /* Should be 1 for PCM. 3 for IEEE Float */
     int16_t num_channels;
     int32_t sample_rate;
     int32_t byte_rate; /* Number of bytes per second. sample_rate * num_channels * Bytes Per Sample */
@@ -60,17 +59,22 @@ public:
   soundfile( std::string &url );
   ~soundfile();
 
-  typedef boost::shared_ptr< soundfile > pointer;
+  typedef std::shared_ptr< soundfile > pointer;
   static pointer create( std::string &url );
+  std::string &geturl( void ) { return this->url; };
 
   rawsound read( void );
 
+  void setposition( long seconds );
+  long getposition( void );
+  bool complete( void );
+
 private:
   int file;
+  std::string url;
   uint8_t *readbuffer;
   int readbuffercount;
   int currentindex;
-  int blocksize;
   aiocb cbwavheader;
   wav_header wavheader;
   aiocb cbwavblock;

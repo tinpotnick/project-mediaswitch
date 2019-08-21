@@ -63,7 +63,7 @@ projectrtpchannel::pointer projectrtpchannel::create( boost::asio::io_service &i
 ## open
 Open the channel to read network data. Setup memory and pointers.
 */
-void projectrtpchannel::open()
+void projectrtpchannel::open( std::string &control )
 {
   /* indexes into our circular rtp array */
   this->rtpindexin = 0;
@@ -91,8 +91,6 @@ void projectrtpchannel::open()
   this->readsomertp();
   this->readsomertcp();
 
-  this->players.clear();
-
   this->ssrcout = rand();
 
   /* anchor our out time to when the channel is opened */
@@ -108,6 +106,8 @@ void projectrtpchannel::open()
   this->orderedinmaxsn = 0;
   this->orderedinbottom = 0;
   this->lastprocessed = nullptr;
+
+  this->control = control;
 }
 
 unsigned short projectrtpchannel::getport( void )
@@ -143,8 +143,6 @@ void projectrtpchannel::close( void )
     this->active = false;
     this->rtpsocket.close();
     this->rtcpsocket.close();
-
-    this->players.clear();
   }
   catch(...)
   {
@@ -311,38 +309,41 @@ void projectrtpchannel::processrtpdata( rtppacket *src, uint32_t skipcount )
     this->codecworker.restart();
   }
 
-  /* only us - run our transformations */
+  /* only us */
   if( !this->others || 0 == this->others->size() )
   {
     rtppacket *out = this->gettempoutbuf( skipcount );
-    //out->copyheader( src );
-    memset( out->getpayload(), 0, out->getpayloadlength() );
 
-#if 0
-    /* More thinking required. We might want to playback something and mix other items but with a smaller volume (or louder) */
-    for( auto it = this->players.begin(); it != this->players.end(); it++ )
+    stringptr newplaydef = std::atomic_exchange( &this->newplaydef, stringptr( NULL ) );
+    if( newplaydef )
     {
-      if( false == (*it)( out ) )
+      try
       {
-        /* Erase this one... */
+        if( !this->player )
+        {
+          this->player = soundsoup::create();
+        }
+
+        JSON::Value ob = JSON::parse( *newplaydef );
+        this->player->config( JSON::as_object( ob ), out->getpayloadtype() );
+      }
+      catch(...)
+      {
+        std::cerr << "Bad sound soup: " << *newplaydef << std::endl;
       }
     }
-#endif
 
-    if( !this->player )
+    if( this->player )
     {
-      std::string url = "file://test.wav";
-      this->player = soundfile::create( url );
-    }
+      rawsound r = player->read();
+      if( 0 != r.size() )
+      {
+        this->codecworker << codecx::next;
+        this->codecworker << r;
+        *out << this->codecworker;
 
-    rawsound r = player->read();
-    if( 0 != r.size() )
-    {
-      this->codecworker << codecx::next;
-      this->codecworker << r;
-      *out << this->codecworker;
-
-      this->writepacket( out );
+        this->writepacket( out );
+      }
     }
 
     return;
