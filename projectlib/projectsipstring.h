@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -14,7 +14,7 @@
 #define PROJECTSIPSTRING_H
 
 
-typedef boost::shared_ptr< std::string > stringptr;
+typedef std::shared_ptr< std::string > stringptr;
 typedef std::vector<std::string> stringvector;
 
 #define CHARARRAYLENGTH 8096
