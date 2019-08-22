@@ -44,24 +44,24 @@ projectcontrol.onnewcall = ( call ) =>
   {
     call.ring();
     setTimeout( () => { call.answer(); }, 2000 );
+
+    call.onanswer = () =>
+    {
+      console.log( "Answered" );
+  
+      var soup = {}
+      soup.loop = true
+      soup.files = []
+      soup.files.push( { wav: "file://test.wav" } )
+  
+      call.play( soup )
+      setTimeout( () => { call.hangup(); }, 60000 );
+    }
   }
 
   call.onhangup = () =>
   {
     console.log( "hung up" );
-  }
-
-  call.onanswer = () =>
-  {
-    console.log( "Answered" );
-
-    var soup = {}
-    soup.loop = true
-    soup.files = []
-    soup.files.push( { wav: "file://test.wav" } )
-
-    call.play( soup )
-    setTimeout( () => { call.hangup(); }, 60000 );
   }
 }
 
