@@ -48,6 +48,8 @@ Clean up
 */
 projectrtpchannel::~projectrtpchannel( void )
 {
+  this->player = nullptr;
+  this->others = nullptr;
 }
 
 /*!md
@@ -123,6 +125,7 @@ void projectrtpchannel::close( void )
 {
   try
   {
+    this->player = nullptr;
 
     /* remove oursevelse from our list of mixers */
     if( this->others )

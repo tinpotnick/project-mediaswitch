@@ -60,7 +60,7 @@ public:
 
   void target( std::string &address, unsigned short port );
   void setcontrol( std::string &address ) { this->control = address; };
-  void setplaydef( stringptr newdef ) { std::atomic_store( &this->newplaydef, newdef ); };
+  void play( stringptr newdef ) { std::atomic_store( &this->newplaydef, newdef ); };
 
   typedef std::vector< int > codeclist;
   void audio( codeclist codecs );

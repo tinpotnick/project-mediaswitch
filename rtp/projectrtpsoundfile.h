@@ -78,6 +78,9 @@ private:
   aiocb cbwavheader;
   wav_header wavheader;
   aiocb cbwavblock;
+
+  bool opened;
+  bool badheader;
 };
 
 

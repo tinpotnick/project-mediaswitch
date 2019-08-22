@@ -92,8 +92,6 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
         activechannels[ u ] = p;
         p->open( JSON::as_string( body[ "control" ] ) );
 
-        p->setplaydef( stringptr( new std::string("{\"files\":[{\"wav\":\"file://test.wav\"}],\"loop\":false}") ) );
-
         JSON::Object v;
         v[ "uuid" ] = u;
         v[ "port" ] = ( JSON::Integer ) p->getport();
@@ -172,6 +170,20 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
             }
           }
 
+          response.setstatusline( 200, "Ok" );
+          response.addheader( projectwebdocument::Content_Length, "0" );
+          return;
+        }
+      }
+      /* /PUT /channel/<uuid>/play */
+      else if( 3 == pathparts.size() && 
+          projectwebdocument::PUT == method &&
+          "play" == pathparts[ 2 ] )
+      {
+        activertpchannels::iterator chan = activechannels.find( pathparts[ 1 ] );
+        if ( activechannels.end() != chan )
+        {
+          chan->second->play( request.getbody().strptr() );
           response.setstatusline( 200, "Ok" );
           response.addheader( projectwebdocument::Content_Length, "0" );
           return;

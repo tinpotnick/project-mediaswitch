@@ -225,13 +225,30 @@ void soundsoup::config( JSON::Object &json, int format )
       }
 
       /* Defaults */
-      ref.loopcount = -1;
-      ref.start = -1;
+      ref.loopcount = 0;
+      ref.maxloop = 0;
+      ref.start = 0;
       ref.stop = -1;
 
       if( inref.has_key( "loop" ) )
       {
+        switch( inref[ "loop" ].which() )
+        {
+          case 2: /* bool */
+          {
+            if( JSON::as_boolean( inref[ "loop" ] ) == JSON::Bool( true ) )
+            {
+              ref.loopcount = INT_MAX;
+            }
+            break;
+          }
+          case 6: /* int */
+          {
+            ref.loopcount = JSON::as_int64( inref[ "loop" ] );
+          }
+        }
         ref.loopcount = JSON::as_int64( inref[ "loop" ] );
+        ref.maxloop = ref.loopcount;
       }
 
       if( inref.has_key( "start" ) )
@@ -247,6 +264,57 @@ void soundsoup::config( JSON::Object &json, int format )
       num++;
     }
   }
+
+  this->loopcount = 0;
+  if( json.has_key( "loop" ) )
+  {
+    switch( json[ "loop" ].which() )
+    {
+      case 2: /* bool */
+      {
+        if( JSON::as_boolean( json[ "loop" ] ) == JSON::Bool( true ) )
+        {
+          this->loopcount = INT_MAX;
+        }
+        break;
+      }
+      case 6: /* int */
+      {
+        this->loopcount = JSON::as_int64( json[ "loop" ] );
+      }
+    }
+  }
+}
+
+void soundsoup::plusone( soundsoupfile &playing )
+{
+  /* Do we loop this file? */
+  if( 0 != playing.loopcount )
+  {
+    playing.sf->setposition( playing.start );
+    playing.loopcount--;
+    return;
+  }
+
+  /* We have played the last file */
+  if( this->files.size() == this->currentfile + 1 )
+  {
+    if( 0 == this->loopcount ) return;
+    this->loopcount--;
+
+    for( auto it = this->files.begin(); it != this->files.end(); it++ )
+    {
+      it->loopcount = it->maxloop;
+      if( it->sf )
+      {
+        it->sf->setposition( it->start );
+      }
+    }
+    this->currentfile = 0;
+    return;
+  }
+
+  this->currentfile++;
 }
 
 rawsound soundsoup::read( void )
@@ -256,24 +324,16 @@ rawsound soundsoup::read( void )
     return rawsound();
   }
 
-  if( this->currentfile > this->files.size() )
-  {
-    this->currentfile = 0;
-  }
-
   soundsoupfile &playing = this->files[ this->currentfile ];
 
   if( !playing.sf )
   {
-    if( -1 == this->loopcount )
-    {
-      this->currentfile = 0;
-    }
-
+    this->plusone( playing );
     return rawsound();
   }
   else if ( playing.sf->complete() )
   {
+    this->plusone( playing );
     return rawsound();
   }
 
@@ -284,10 +344,19 @@ rawsound soundsoup::read( void )
 # c'stor
 */
 soundsoupfile::soundsoupfile() :
-  start( -1 ),
+  start( 0 ),
   stop( -1 ),
   loopcount( -1 ),
+  maxloop( -1 ),
   sf( nullptr )
 {
 
+}
+
+/*!md
+# d'stor
+*/
+soundsoupfile::~soundsoupfile()
+{
+  this->sf = nullptr;
 }

@@ -2,6 +2,20 @@
 
 const projectcontrol = require( "./projectcontrol/index.js" );
 
+projectcontrol.gw = {
+  from: {
+    user: "1001",
+    domain: "omniis.babblevoice.com",
+    authsecret: "thecatsatonthemat"
+  },
+  to: {
+    domain: "omniis.babblevoice.com", /*"sipgw.magrathea.net" */
+  }
+}
+
+// limit the codecs
+// projectcontrol.codecs = [ "pcmu" , "2833" ,"pcma" ];
+
 projectcontrol.onhangup = ( call ) =>
 {
   console.log( "global hangup" )
@@ -16,10 +30,21 @@ projectcontrol.onnewcall = ( call ) =>
 
   if( "3" == call.destination )
   {
-    call.newcall( "1003" );
+    console.log("calling 1001")
+    call.newcall( { to: { user: "1003" } } );
     return;
   }
 
+  if( "4" == call.destination )
+  {
+    call.newcall( { to: { user: "somecallrequireingforwarding" }, forward: true } );
+  }
+
+  if( "5" == call.destination )
+  {
+    call.ring();
+    setTimeout( () => { call.answer(); }, 2000 );
+  }
 
   call.onhangup = () =>
   {
@@ -29,59 +54,17 @@ projectcontrol.onnewcall = ( call ) =>
   call.onanswer = () =>
   {
     console.log( "Answered" );
-    setTimeout( () => { call.hangup(); }, 2000 );
-  }
 
-  call.ring();
-  setTimeout( () => { call.answer(); }, 2000 );
+    var soup = {}
+    soup.loop = true
+    soup.files = []
+    soup.files.push( { wav: "file://test.wav" } )
+
+    call.play( soup )
+    setTimeout( () => { call.hangup(); }, 60000 );
+  }
 }
 
-if(1) setTimeout( () =>
-{
-
-  var callobj = {
-    from: {
-      user: "1003",
-      domain: "bling.babblevoice.com"
-    },
-    to: {
-      user: "1003",
-      domain: "sipgw.magrathea.net"
-    },
-    cid: {
-      number: "1003",
-      name: "Nick Knight"
-    }
-  };
-
-  var call = projectcontrol.newcall( callobj )
-  call.onnewcall = ( call ) =>
-  {
-    if( call.haserror )
-    {
-      console.log( call.error )
-      return;
-    }
-
-    call.onringing = () =>
-    {
-      console.log( "Call is ringing Yaya" )
-    }
-
-    call.onanswer = () =>
-    {
-      console.log( "outbound call answered :)" )
-    }
-
-    call.onhangup = () =>
-    {
-      console.log( "yay - hung up" );
-    }
-  }
-
-  console.log( "Call originated" );
-
-}, 1000 );
 
 /* Our registration handlers */
 projectcontrol.onreg = ( reg ) =>
@@ -99,8 +82,9 @@ projectcontrol.ondereg = ( reg ) =>
 /* Register our user */
 projectcontrol.directory( "bling.babblevoice.com",
   [
-    { "username": "1003", "secret": "1123654789" },
-    { "username": "1000", "secret": "1123654789" }
+    { "username": "1003", "secret": "somepassword" },
+    { "username": "1000", "secret": "somepassword" },
+    { "username": "1001", "secret": "somepassword" }
   ] );
 
 /* Wait for requests */

@@ -16,9 +16,11 @@ class soundsoupfile
 {
 public:
   soundsoupfile();
+  ~soundsoupfile();
   int start;
   int stop;
   int loopcount;
+  int maxloop;
   soundfile::pointer sf;
 };
 
@@ -67,6 +69,7 @@ public:
 
 private:
   std::string *getpreferredfilename( JSON::Object &file, int format );
+  void plusone( soundsoupfile &playing );
 
   /* This is used to choose the best format file */
   int loopcount;

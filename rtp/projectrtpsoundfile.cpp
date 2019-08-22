@@ -24,7 +24,9 @@ soundfile::soundfile( std::string &url ) :
   file( -1 ),
   url( url ),
   readbuffercount( 2 ),
-  currentindex( 0 )
+  currentindex( 0 ),
+  opened (false ),
+  badheader( false )
 {
 
   httpuri uriparts( substring( url.c_str() ) );
@@ -132,6 +134,14 @@ rawsound soundfile::read( void )
     return rawsound();
   }
 
+  this->opened = true;
+  if( 'W' != this->wavheader.wave_header[ 0 ] )
+  {
+    this->badheader = true;
+  }
+  this->badheader = false;
+
+
   int ploadtype = L16PAYLOADTYPE;
   int blocksize = L16WIDEBANDBYTES;
   switch( this->wavheader.audio_format )
@@ -227,6 +237,11 @@ Have we completed reading the file.
 */
 bool soundfile::complete( void )
 {
+  if( false == this->opened )
+  {
+    return false;
+  }
+
   return this->cbwavblock.aio_offset > this->wavheader.wav_size;
 }
 

@@ -472,6 +472,17 @@ TODO
   }
 
 /*!md
+### play
+Request the RTP server to play sound on the channel. Soup and structure documented elsewhere.
+*/
+  play( soup )
+  {
+    this.control.server( soup, "/channel/" + this.metadata.channel.uuid + "/play", "PUT", this.metadata.channel.control, ( response ) =>
+    {
+    } );
+  }
+
+/*!md
 ### postrequest
 Generic purpose fuction to post data to a SIP server.
 */
