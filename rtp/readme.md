@@ -45,6 +45,17 @@ This sets the remote address - where we transmit RTP UDP data to. It is not alwa
 
 Configures both channels to mix together.
 
+
+### Transcoding
+
+For some scenarios we may not need to transcode. However we may need to transcode to more than one or more other CODECs. For example, we receive PCMA, which is part of a conference which there are 2 other clients. One asking for G722 and the other PCMU. This may also be the case in the future if we handle video.
+
+As this is the case, the sender channel should always be responsible for transcoding. This way as the sender will know about it's multiple receivers it can transcode for all receivers. If there are 2 requiring the same CODEC we only need to transcode once. We can also keep the intermediate L16 for the different CODECs.
+
+### Measurement
+
+How are we going to measure it. It - the workload. Using any strategy it would be impossible to balance workload across all CPUs evenly. In fact - a multi thread application would probably be more successful at this than this strategy. We probably need to report back to our control server a number indicative of if we are at capacity or not.
+
 ## Control Server
 
 Each control server can farm out RTP sessions to any number of RTP servers it knows about. It should have control about which server it uses and also have the ability to spin up extra resources if required in cloud environments.
@@ -57,70 +68,44 @@ Some of the challenges which is bothering me at the moment:
 
 Each channel needs a control URL so it can send information back to the control server if required. For example, DTMF, or file finished playing and so on.
 
+## Utils
 
-### Transcoding
+### Tone generation
 
-For some scenarios we may not need to transcode. However we may need to transcode to more than one or more other CODECs. For example, we receive PCMA, which is part of a conference which there are 2 other clients. One asking for G722 and the other PCMU. This may also be the case in the future if we handle video.
+In order to make the RTP as scalable as possible, we will not support on the fly tone generation. Currently disk space is much cheaper than CPU resources. 1S of wav data sampled at 8K is 16K. Using soundsoup we can provide wav files for each supported codec and easily loop which requires very little CPU overhead.
 
-As this is the case, the sender channel should always be responsible for transcoding. This way as the sender will know about it's multiple receivers it can transcode for all receivers. If there are 2 requiring the same CODEC we only need to transcode once. We can also keep the intermediate L16 for the different CODECs.
+What we need to provide is a utility to generate wav files which will generate tones for use in telecoms (i.e. ringing, DTMF etc).
 
-### Mixers
+project-rtp --tone 350+440*0.75:1000 dialtone.wav
 
-I am not sure what to call these yet. So far we have channels. A channel is an RTP & RTCP stream. A Channel is bridged to another channel.
+The format attempts to closely follow the format in https://www.itu.int/dms_pub/itu-t/opb/sp/T-SP-E.180-2010-PDF-E.pdf - although that standard is not the clearest in some respects.
 
-A is a phone at one end, B a phone at the other. Within our RTP server we have 2 channels, channel 1 & 2.
+We currently support
 
-A ---> RTP --->  project channel 1 ---> project channel 2 ---> RTP ---> B
+* '+' adds 1 or more frequencies together
+* '*' reduces the amplitude (i.e. aptitude multiply by this value, 0.75 is 0.75 x max value)
+* ':' values after the colon are cadences, i.e. duration before the tone moves onto the next tone
+* '~' start~end, for example this can be used in frequency or amplitude, 350+440*0.5~0:100 would create a tone starting at amp 0.5 reducing to 0 through the course of the 1000mS period
 
-We may need transcoding so we may use another thread to take workload away from our main I/O thread.
+Examples
 
-We also have other scenarios, a conference room is one example.
+#### UK Dial tone:
+project-rtp --tone 350+440*0.75:1000 dialtone.wav
 
-A ---> RTP --->  project channel 1 ---> project channel 2 ---> RTP ---> B
-                                   ---> project channel 3 ---> RTP ---> C
+#### UK Ringing
+project-rtp --tone 400+450*0.5/0/400+450*0.5/0:400/200/400/2000 ringing.wav
 
-In both scenarios reverse paths may or may not exist. For example, we may have applications which can listen in on a channel (without sending). Or our conference may allow only 1 speaker at once.
+#### DTMF
 
-Putting this functionality into a channel seems inappropriate. Mixers all have slightly different functions so we need a base generic mixer with child mixers for different purposes (bridge/conference etc). Generic mixers should also be perhaps where transcoding happens.
+||1209Hz|1336Hz|1477Hz|1633Hz|
+|---|---|---|---|---|
+|697Hz|1|2|3|A|
+|770Hz|4|5|6|B|
+|852Hz|7|8|9|C|
+|941Hz|*|0|#|D|
 
-Call recording should perhaps happen in the base/generic mixer. All function will have the ability to record a call. Different mixer may want to do it differently. Although, we may want to record on the basis of an aleg though. There are a few challenges with call recording.
+Example, 1 would mix 1209Hz and 697Hz
+project-rtp --tone 697+1209*0.5:400 dtmf1.wav
+project-rtp --tone 697+1209*0.5/0/697+1336*0.5/0/697+1477*0.5/0/:400/100 dtmf1-3.wav
 
-The reason it should be in a mixer is transcoding may needs to have happened - i.e. if we receive SOMEBIZARECODECYETTOBESUPPORTED and store in a wav this my not be possible. So transcoding has to happen.
 
-#### Mix
-
-This is simple, a calls b: a is recorded.
-
-A problem arises a calls b, a transfers to c and hangs up. The recording should continue. In this scenario, both b and c are b legs. In terms of our RTP server this is simply the ability to re-open a file. Our control server will need to make the link. I need to verify how this works with both blind and attended xfer.
-
-#### Conference
-
-Arguably, the conference call should be recorded - which would suggest that as soon as there is 1 caller in a conference, the recording should start. When it drops back down to zero then it should stop. This presents problems like, when browsing from traditional call records and select the call the conference recording will span an entirely different timespan. It ill also be referenced by an identify for the conference rather than by a call which entered the conference.
-
-### Measurement
-
-How are we going to measure it. It - the workload. Using any strategy it would be impossible to balance workload across all CPUs evenly. In fact - a multi thread application would probably be more successful at this than this strategy. We probably need to report back to our control server a number indicative of if we are at capacity or not.
-
-### Automation
-
-It is probably wise to have some automation built into the RTP server. For example, we may decide that we need to play multiple audio files to the client. It would be prudent to have some form of macro (JSON?) to do this instead of having to revert back to the control server.
-
-i.e.
-
-```json
-{
-  "macro": [
-    { "play": "moh", "duration": 30 },
-    { "play": "file", "filename": "youare.mp3" },
-    { "play": "tts", "first" },
-    { "play": "file", "filename": "inthequeue.mp3" }
-  ],
-  "loop": true
-}
-```
-
-Then there is the question - should we support mp3 - this adds a stupid non-scalable workload to a CPU. If we enforce only working with appropriate files then encoding would only ever be one once.
-
-# TODO
-
- -[] If you use echo (or any other dumb mixing) the timestamp and the sequence number will need to be managed if the application switches.

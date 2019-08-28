@@ -28,56 +28,51 @@ soundfile::soundfile( std::string &url ) :
   opened (false ),
   badheader( false )
 {
+  int mode = O_RDONLY;
+  std::string filenfullpath = mediachroot + url;
 
-  httpuri uriparts( substring( url.c_str() ) );
-  if( uriparts.protocol == "file" ) 
+  this->file = open( filenfullpath.c_str(), mode | O_NONBLOCK, 0 );
+  if ( -1 == this->file )
   {
-    int mode = O_RDONLY;
-    std::string filenfullpath = mediachroot + uriparts.host.str();
+    /* Not much more we can do */
+    return;
+  }
 
-    this->file = open( filenfullpath.c_str(), mode | O_NONBLOCK, 0 );
-    if ( -1 == this->file )
-    {
-      /* Not much more we can do */
-      return;
-    }
+  /* 
+    Soundfile blindly reads the format and passes to the codec - so it must be in a format we support - or there will be silence.
 
-    /* 
-      Soundfile blindly reads the format and passes to the codec - so it must be in a format we support - or there will be silence.
+    Our macro player (to be written) will choose the most appropriate file to play based on the codec of the channel.
+  */
+  this->readbuffer = new uint8_t[ L16WIDEBANDBYTES * this->readbuffercount ];
 
-      Our macro player (to be written) will choose the most appropriate file to play based on the codec of the channel.
-    */
-    this->readbuffer = new uint8_t[ L16WIDEBANDBYTES * this->readbuffercount ];
+  /* As it is asynchronous - we read wav header + ahead */
+  memset( &this->cbwavheader, 0, sizeof( aiocb ) );
+  this->cbwavheader.aio_nbytes = sizeof( wav_header );
+  this->cbwavheader.aio_fildes = file;
+  this->cbwavheader.aio_offset = 0;
+  this->cbwavheader.aio_buf = &this->wavheader;
 
-    /* As it is asynchronous - we read wav header + ahead */
-    memset( &this->cbwavheader, 0, sizeof( aiocb ) );
-    this->cbwavheader.aio_nbytes = sizeof( wav_header );
-    this->cbwavheader.aio_fildes = file;
-    this->cbwavheader.aio_offset = 0;
-    this->cbwavheader.aio_buf = &this->wavheader;
+  memset( &this->cbwavblock, 0, sizeof( aiocb ) );
+  this->cbwavblock.aio_nbytes = L16WIDEBANDBYTES;
+  this->cbwavblock.aio_fildes = file;
+  this->cbwavblock.aio_offset = sizeof( wav_header );
+  this->cbwavblock.aio_buf = this->readbuffer;
 
-    memset( &this->cbwavblock, 0, sizeof( aiocb ) );
-    this->cbwavblock.aio_nbytes = L16WIDEBANDBYTES;
-    this->cbwavblock.aio_fildes = file;
-    this->cbwavblock.aio_offset = sizeof( wav_header );
-    this->cbwavblock.aio_buf = this->readbuffer;
+  /* read */
+  if ( aio_read( &this->cbwavheader ) == -1 )
+  {
+    /* report error somehow. */
+    close( this->file );
+    this->file = -1;
+    return;
+  }
 
-    /* read */
-    if ( aio_read( &this->cbwavheader ) == -1 )
-    {
-      /* report error somehow. */
-      close( this->file );
-      this->file = -1;
-      return;
-    }
-
-    if ( aio_read( &this->cbwavblock ) == -1 )
-    {
-      /* report error somehow. */
-      close( this->file );
-      this->file = -1;
-      return;
-    }
+  if ( aio_read( &this->cbwavblock ) == -1 )
+  {
+    /* report error somehow. */
+    close( this->file );
+    this->file = -1;
+    return;
   }
 
 	return;
@@ -301,10 +296,48 @@ void wavinfo( const char *file )
   std::cout << "Audio format: " << hd.audio_format << std::endl;
   std::cout << "Channel count: " << hd.num_channels << std::endl;
   std::cout << "Sample rate: " << hd.sample_rate << std::endl;
+  std::cout << "Sample alignment: " << hd.sample_alignment << std::endl;
   std::cout << "Byte rate: " << hd.byte_rate << std::endl;
   std::cout << "Bit depth: " << hd.bit_depth << std::endl;
   std::cout << "Wav size: " << hd.wav_size << std::endl;
 
 done:
   close( fd );
+}
+
+/*!md
+## initwav
+Configure header for basic usage
+*/
+void initwav( wav_header *w, int samplerate )
+{
+  w->riff_header[ 0 ] = 'R';
+  w->riff_header[ 1 ] = 'I';
+  w->riff_header[ 2 ] = 'F';
+  w->riff_header[ 3 ] = 'F';
+
+  w->wave_header[ 0 ] = 'W';
+  w->wave_header[ 1 ] = 'A';
+  w->wave_header[ 2 ] = 'V';
+  w->wave_header[ 3 ] = 'E';
+
+  w->fmt_header[ 0 ] = 'f';
+  w->fmt_header[ 1 ] = 'm';
+  w->fmt_header[ 2 ] = 't';
+  w->fmt_header[ 3 ] = ' ';
+
+  w->data_header[ 0 ] = 'd';
+  w->data_header[ 1 ] = 'a';
+  w->data_header[ 2 ] = 't';
+  w->data_header[ 3 ] = 'a';
+
+  w->audio_format = WAVE_FORMAT_PCM;
+  w->num_channels = 1;
+  w->sample_rate = samplerate;
+  w->sample_alignment = 2;
+  w->byte_rate = w->sample_rate * 2;
+  w->bit_depth = 16;
+  w->fmt_chunk_size = 16;
+  w->wav_size = 0;
+
 }

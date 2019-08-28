@@ -25,6 +25,7 @@
 #include "projectrtpchannel.h"
 #include "projectrtppacket.h"
 #include "projectrtpsoundfile.h"
+#include "projectrtptonegen.h"
 #include "projectrtpcodecx.h"
 
 #include "projectsipstring.h"
@@ -443,6 +444,7 @@ int main( int argc, const char* argv[] )
         std::cout << "--pa - the public address we tell the client to send RTP to." << std::endl;
         std::cout << "--maxworker - we launch a thread per core, if you wish to change this use this." << std::endl;
         std::cout << "--chroot - setup the root directory for where soundfiles are read and written to." << std::endl;
+        std::cout << "--tone tone file.wav - output tone generation to a wave file";
         exit( 0 );
       }
       else if ( "--fg" == argvstr )
@@ -519,6 +521,11 @@ int main( int argc, const char* argv[] )
       {
         i++;
         wavinfo( argv[ i ] );
+        return 0;
+      }
+      else if( "--tone" == argvstr )
+      {
+        gentone( argv[ i + 1 ], argv[ i + 2 ] );
         return 0;
       }
     }

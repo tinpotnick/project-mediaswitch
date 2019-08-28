@@ -195,25 +195,11 @@ void soundsoup::config( JSON::Object &json, int format )
       soundsoupfile &ref = this->files[ num ];
 
       std::string *newfilename = this->getpreferredfilename( inref, format );
-      if( num == this->currentfile )
+
+      /* recreate soundfile object if there was no sound or if the filename has changed */
+      if( !ref.sf || *newfilename != ref.sf->geturl() )
       {
-        /* If we are currently playing this one, then continue if it is the same */
-        if( !ref.sf || *newfilename != ref.sf->geturl() )
-        {
-          this->currentfile = 0;
-          if( newfilename )
-          {
-            ref.sf = soundfile::create( *newfilename );
-          }
-          else
-          {
-            ref.sf = nullptr;
-          }
-        }
-      }
-      else
-      {
-        /* re-create all others */
+        this->currentfile = 0;
         if( newfilename )
         {
           ref.sf = soundfile::create( *newfilename );
@@ -332,6 +318,11 @@ rawsound soundsoup::read( void )
     return rawsound();
   }
   else if ( playing.sf->complete() )
+  {
+    this->plusone( playing );
+    return rawsound();
+  }
+  else if ( -1 != playing.stop && playing.sf->getposition() > playing.stop )
   {
     this->plusone( playing );
     return rawsound();

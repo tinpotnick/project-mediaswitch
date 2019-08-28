@@ -87,6 +87,7 @@ private:
 
 
 void wavinfo( const char *file );
+void initwav( wav_header *, int samplerate = 8000 );
 
 
 #endif /* PROJECTRTPSOUNDFILE_H */
