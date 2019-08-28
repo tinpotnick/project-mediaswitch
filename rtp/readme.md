@@ -85,7 +85,7 @@ We currently support
 * '+' adds 1 or more frequencies together
 * '*' reduces the amplitude (i.e. aptitude multiply by this value, 0.75 is 0.75 x max value)
 * ':' values after the colon are cadences, i.e. duration before the tone moves onto the next tone
-* '\~' start~end, for example this can be used in frequency or amplitude, 350+440*0.5~0:100 would create a tone starting at amp 0.5 reducing to 0 through the course of the 1000mS period
+* '\~' start\~end, for example this can be used in frequency or amplitude, 350+440*0.5\~0:100 would create a tone starting at amp 0.5 reducing to 0 through the course of the 1000mS period
 
 Examples
 
