@@ -1,5 +1,7 @@
 
 
+#include <iostream>
+
 #include "projectrtpsoundsoup.h"
 
 
@@ -240,6 +242,7 @@ void soundsoup::config( JSON::Object &json, int format )
       if( inref.has_key( "start" ) )
       {
         ref.start = JSON::as_int64( inref[ "start" ] );
+        ref.sf->setposition( ref.start );
       }
 
       if( inref.has_key( "stop" ) )

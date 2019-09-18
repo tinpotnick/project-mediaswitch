@@ -25,6 +25,7 @@ soundfile::soundfile( std::string &url ) :
   url( url ),
   readbuffercount( 2 ),
   currentindex( 0 ),
+  blocksize( L16WIDEBANDBYTES ),
   opened (false ),
   badheader( false )
 {
@@ -138,39 +139,38 @@ rawsound soundfile::read( void )
 
 
   int ploadtype = L16PAYLOADTYPE;
-  int blocksize = L16WIDEBANDBYTES;
   switch( this->wavheader.audio_format )
   {
     case WAVE_FORMAT_PCM:
     {
       if( 8000 == this->wavheader.sample_rate )
       {
-        blocksize = L16NARROWBANDBYTES;
+        this->blocksize = L16NARROWBANDBYTES;
       }
       break;
     }
     case WAVE_FORMAT_ALAW:
     {
       ploadtype = PCMAPAYLOADTYPE;
-      blocksize = G711PAYLOADBYTES;
+      this->blocksize = G711PAYLOADBYTES;
       break;
     }
     case WAVE_FORMAT_MULAW:
     {
       ploadtype = PCMUPAYLOADTYPE;
-      blocksize = G711PAYLOADBYTES;
+      this->blocksize = G711PAYLOADBYTES;
       break;
     }
     case WAVE_FORMAT_POLYCOM_G722:
     {
       ploadtype = G722PAYLOADTYPE;
-      blocksize = G722PAYLOADBYTES;
+      this->blocksize = G722PAYLOADBYTES;
       break;
     }
     case WAVE_FORMAT_GLOBAL_IP_ILBC:
     {
       ploadtype = ILBCPAYLOADTYPE;
-      blocksize = ILBC20PAYLOADBYTES;
+      this->blocksize = ILBC20PAYLOADBYTES;
       break;
     }
   }
@@ -210,8 +210,12 @@ Gets and sets the position in terms of mS.
 */
 void soundfile::setposition( long mseconds )
 {
-  int newposition = sizeof( wav_header );
-  newposition += ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) * mseconds; /* bytes per sample */
+  int newposition;
+  newposition = ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) * mseconds; /* bytes per sample */
+  newposition = ( newposition / this->blocksize ) * this->blocksize; /* realign to the nearest block */
+
+  newposition += sizeof( wav_header );
+
   this->cbwavblock.aio_offset = newposition;
 
   if ( aio_read( &this->cbwavblock ) == -1 )
@@ -229,8 +233,8 @@ long soundfile::getposition( void )
     return 0;
   }
 
-  long position = this->cbwavblock.aio_offset -= sizeof( wav_header );
-  return position / ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 );
+  long position = this->cbwavblock.aio_offset - sizeof( wav_header );
+  return position / ( ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) );
 }
 
 /*!md

@@ -52,7 +52,7 @@ projectcontrol.onnewcall = ( call ) =>
       var soup = {}
       soup.loop = true
       soup.files = []
-      soup.files.push( { wav: "test.wav" } )
+      soup.files.push( { wav: "test.wav", start: 3000, stop: 5000 } )
   
       call.play( soup )
       setTimeout( () => { call.hangup(); }, 60000 );
