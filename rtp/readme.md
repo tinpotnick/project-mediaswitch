@@ -45,6 +45,82 @@ This sets the remote address - where we transmit RTP UDP data to. It is not alwa
 
 Configures both channels to mix together.
 
+### Play
+
+*PUT /channel/<uuid>/play*
+
+We have designed a format to try to be as flexible enough for different situations. As part of the principle is to fire and forget - i.e. send an instruction to the RTP server and let it run until something changes - at which point the RTP server will be updated.
+
+It currently only supports playing to an unmixed channel. Plays a soup of files to the connected channel. A soup is a recipe of files to play to the user:
+
+```json
+{
+  "loop": true,
+  "files": [
+    { "wav": "filename.wav", "start": 1000, "stop": 4000 }
+  ]
+}
+```
+
+* loop can either be true (continuous - well - INT_MAX) or a number
+* loop can be in the main soup (i.e loop through all files) or on a file (i.e. loop through this file 3 times)
+* The filename can be either in the param "wav", "pcma", "pcmu", "l168k", "l1616k", "ilbc", "g722". See note below on what they are used for, all contain the name of the file for that format.
+* start - number of mS to start playback from (optional)
+* stop - number of mS to stop playback (optional)
+
+The start and stop param allows lots of snippets to be included in the same file.
+
+The filename can be included in different param. If you supply the param, the RTP server will assume the file exists and the correct format. The goal with this param is to reduce CPU overhead of any transcoding when playing back a file. 
+
+#### Examples
+
+##### 1
+
+If you only allow connections which use pcma or pcmu then you have a few options
+
+1. Supply a wav file in l168k format. This can be supplied specifically in the l168k param or wav. Overhead for transcoding l168k to pcma or pcmu is not high.
+2. Supply 2 wav files, 1 containing pcma data and the other pcmu. Then provide "pcmu": "ourpcmu.wav" and "pcma": "ourpcma.wav"
+
+Notes, it would not be prudent to supply a l1616k formated file. As part of the transcoding the data has to be down-sampled which includes a low pass filter to remove high frequencies first - this has a higher CPU overhead.
+
+```json
+{
+  "loop": true,
+  "files": [
+    { "pcma": "ourpcma.wav", "pcmu": "ourpcmu.wav" }
+  ]
+}
+```
+
+##### 2
+
+Queue announcement
+
+```json
+{
+  "loop": true,
+  "files": [
+    { "wav": "ringing.wav", "loop": 6 },
+    { "wav": "youare.wav" },
+    { "wav": "first.wav" },
+    { "wav": "inline.wav" }
+  ]
+}
+```
+
+We may also have combined some wav files:
+
+```json
+{
+  "loop": true,
+  "files": [
+    { "wav": "ringing.wav", "loop": 6 },
+    { "wav": "youare.wav" },
+    { "wav": "ordinals.wav", "start": 3000, "stop": 4500 },
+    { "wav": "inline.wav" }
+  ]
+}
+
 
 ### Transcoding
 
