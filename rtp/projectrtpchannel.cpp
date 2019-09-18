@@ -38,7 +38,8 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsig
   targetconfirmed( false ),
   reader( true ),
   writer( true ),
-  receivedpkcount( 0 )
+  receivedpkcount( 0 ),
+  mixqueue( MIXQUEUESIZE )
 {
 }
 
@@ -312,6 +313,8 @@ void projectrtpchannel::processrtpdata( rtppacket *src, uint32_t skipcount )
     this->codecworker.restart();
   }
 
+  this->checkfornewmixes();
+
   /* only us */
   if( !this->others || 0 == this->others->size() )
   {
@@ -472,7 +475,7 @@ void projectrtpchannel::target( std::string &address, unsigned short port )
 
 /*!md
 ## mix
-Add the other to our list of others. n way relationship.
+Add the other to our list of others. n way relationship. Adds to queue for when our main thread calls into us.
 */
 bool projectrtpchannel::mix( projectrtpchannel::pointer other )
 {
@@ -487,36 +490,50 @@ bool projectrtpchannel::mix( projectrtpchannel::pointer other )
     this->others = projectrtpchannellistptr( new projectrtpchannellist  );
   }
 
-  /* ensure no duplicates */
-  bool usfound = false;
-  bool themfound = false;
-  projectrtpchannellist::iterator it;
-  for( it = this->others->begin(); it != this->others->end(); it++ )
-  {
-    if( it->get() == this )
-    {
-      usfound = true;
-    }
-
-    if( *it == other )
-    {
-      themfound = true;
-    }
-  }
-
-  if( !usfound )
-  {
-    this->others->push_back( other );
-  }
-
-  if( !themfound )
-  {
-    this->others->push_back( shared_from_this() );
-  }
-
-  other->others = this->others;
+  this->mixqueue.push( other );
 
   return true;
+}
+
+/*!md
+## checkfornewmixes
+This is the mechanism how we can use multiple threads and not screw u our data structures - without using mutexes.
+*/
+void projectrtpchannel::checkfornewmixes( void )
+{
+  projectrtpchannel::pointer other;
+
+  while( this->mixqueue.pop( other ) )
+  {
+    /* ensure no duplicates */
+    bool usfound = false;
+    bool themfound = false;
+    projectrtpchannellist::iterator it;
+    for( it = this->others->begin(); it != this->others->end(); it++ )
+    {
+      if( it->get() == this )
+      {
+        usfound = true;
+      }
+
+      if( *it == other )
+      {
+        themfound = true;
+      }
+    }
+
+    if( !usfound )
+    {
+      this->others->push_back( other );
+    }
+
+    if( !themfound )
+    {
+      this->others->push_back( shared_from_this() );
+    }
+
+    other->others = this->others;
+  }
 }
 
 /*!md

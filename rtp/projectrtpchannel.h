@@ -16,6 +16,8 @@
 #include <list>
 #include <vector>
 
+#include <boost/lockfree/stack.hpp>
+
 /* CODECs */
 #include <ilbc.h>
 #include <spandsp.h>
@@ -29,6 +31,7 @@
 /* The number of packets we will keep in a buffer */
 #define BUFFERPACKETCOUNT 20
 #define BUFFERDELAYCOUNT 10
+#define MIXQUEUESIZE 50
 
 /* 1 in ... packet loss */
 //#define SIMULATEDPACKETLOSSRATE 10
@@ -130,6 +133,7 @@ private:
               boost::asio::ip::udp::resolver::iterator it );
 
 
+  void checkfornewmixes( void );
   uint32_t timestampdiff;
   uint64_t receivedpkcount;
 
@@ -144,6 +148,8 @@ private:
   stringptr newplaydef;
 
   std::string control;
+
+  boost::lockfree::stack< projectrtpchannel::pointer > mixqueue;
 };
 
 

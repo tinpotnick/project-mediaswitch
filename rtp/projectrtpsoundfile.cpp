@@ -213,6 +213,13 @@ void soundfile::setposition( long mseconds )
   int newposition = sizeof( wav_header );
   newposition += ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) * mseconds; /* bytes per sample */
   this->cbwavblock.aio_offset = newposition;
+
+  if ( aio_read( &this->cbwavblock ) == -1 )
+  {
+    /* report error somehow. */
+    close( this->file );
+    this->file = -1;
+  }
 }
 
 long soundfile::getposition( void )

@@ -52,11 +52,29 @@ projectcontrol.onnewcall = ( call ) =>
       var soup = {}
       soup.loop = true
       soup.files = []
-      soup.files.push( { wav: "file://test.wav" } )
+      soup.files.push( { wav: "test.wav" } )
   
       call.play( soup )
       setTimeout( () => { call.hangup(); }, 60000 );
     }
+  }
+
+  if( "6" == call.destination )
+  {
+    call.onanswer = () =>
+    {
+      var soup = {}
+      soup.loop = true
+      soup.files = []
+      soup.files.push( { wav: "ringing.wav", loop: 3 } )
+      soup.files.push( { wav: "dtmf1-3.wav" } )
+      soup.loop = true
+  
+      call.play( soup )
+  
+      call.newcall( { to: { user: "1003" } } );
+    }
+    call.answer()
   }
 
   call.onhangup = () =>
