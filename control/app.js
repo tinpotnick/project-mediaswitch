@@ -1,6 +1,6 @@
 
 
-const projectcontrol = require( "./projectcontrol/index.js" )
+const projectcontrol = require( "projectcontrol" )
 
 projectcontrol.gw = {
   from: {
