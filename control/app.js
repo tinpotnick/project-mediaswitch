@@ -1,6 +1,6 @@
 
 
-const projectcontrol = require( "./projectcontrol/index.js" );
+const projectcontrol = require( "./projectcontrol/index.js" )
 
 projectcontrol.gw = {
   from: {
@@ -23,31 +23,31 @@ projectcontrol.onhangup = ( call ) =>
 
 projectcontrol.onnewcall = ( call ) =>
 {
-  if( call.originator ) return;
+  if( call.originator ) return
 
-  console.log( "new call inbound call" );
-  if( call.haserror ) console.log( call.error );
+  console.log( "new call inbound call" )
+  if( call.haserror ) console.log( call.error )
 
   if( "3" == call.destination )
   {
     console.log("calling 1001")
-    call.newcall( { to: { user: "1003" } } );
+    call.newcall( { to: { user: "1003" } } )
     return;
   }
 
   if( "4" == call.destination )
   {
-    call.newcall( { to: { user: "somecallrequireingforwarding" }, forward: true } );
+    call.newcall( { to: { user: "somecallrequireingforwarding" }, forward: true } )
   }
 
   if( "5" == call.destination )
   {
-    call.ring();
-    setTimeout( () => { call.answer(); }, 2000 );
+    call.ring()
+    setTimeout( () => { call.answer() }, 2000 )
 
     call.onanswer = () =>
     {
-      console.log( "Answered" );
+      console.log( "Answered" )
   
       var soup = {}
       soup.loop = true
@@ -55,7 +55,7 @@ projectcontrol.onnewcall = ( call ) =>
       soup.files.push( { wav: "test.wav", start: 3000, stop: 5000 } )
   
       call.play( soup )
-      setTimeout( () => { call.hangup(); }, 60000 );
+      setTimeout( () => { call.hangup(); }, 60000 )
     }
   }
 
@@ -72,14 +72,14 @@ projectcontrol.onnewcall = ( call ) =>
   
       call.play( soup )
   
-      call.newcall( { to: { user: "1003" } } );
+      call.newcall( { to: { user: "1003" } } )
     }
     call.answer()
   }
 
   call.onhangup = () =>
   {
-    console.log( "hung up" );
+    console.log( "hung up" )
   }
 }
 
@@ -87,14 +87,14 @@ projectcontrol.onnewcall = ( call ) =>
 /* Our registration handlers */
 projectcontrol.onreg = ( reg ) =>
 {
-  console.log( "onreg" );
-  console.log( reg );
+  console.log( "onreg" )
+  console.log( reg )
 }
 
 projectcontrol.ondereg = ( reg ) =>
 {
-  console.log( "ondereg" );
-  console.log( reg );
+  console.log( "ondereg" )
+  console.log( reg )
 }
 
 /* Register our user */
@@ -106,4 +106,4 @@ projectcontrol.directory( "bling.babblevoice.com",
   ] );
 
 /* Wait for requests */
-projectcontrol.run();
+projectcontrol.run()
