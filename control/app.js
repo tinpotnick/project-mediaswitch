@@ -13,6 +13,16 @@ projectcontrol.gw = {
   }
 }
 
+/* A soup */
+projectcontrol.moh = {
+  "loop": true,
+  "files":[
+    {
+      "wav": "test.wav"
+    }
+  ]
+}
+
 // limit the codecs
 // projectcontrol.codecs = [ "pcmu" , "2833" ,"pcma" ];
 
