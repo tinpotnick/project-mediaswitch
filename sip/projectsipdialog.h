@@ -14,6 +14,7 @@
 #include <boost/shared_ptr.hpp>
 #include <functional>
 
+#include <string>
 #include <ctime>
 
 #include "projectsipstring.h"
@@ -54,6 +55,9 @@ public:
   /* inbound invite */
   void invitestart( projectsippacket::pointer pk );
   void inviteauth( projectsippacket::pointer pk  );
+  void invite( projectsippacket::pointer pk  );
+  bool checkforhold( void );
+  bool checkforholdstatechange( bool newstate );
   void waitfornextinstruction( projectsippacket::pointer pk );
   void waitforack( projectsippacket::pointer pk );
   void waitforackanddie( projectsippacket::pointer pk );
@@ -93,9 +97,11 @@ private:
   void trying( void );
   void ringing( void );
   void answer( std::string body );
+  void ok( std::string body = "" );
   void hangup( void );
   void send200( std::string body = "", bool final = false );
   void send401( void );
+  void send403( void );
   void sendack( void );
   void sendcancel( void );
   void senderror( void );
@@ -129,6 +135,7 @@ private:
   bool callringing;
   bool callanswered;
   bool callhungup;
+  bool callhold;
 
   std::time_t startat;
   std::time_t ringingat;

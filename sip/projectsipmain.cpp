@@ -161,7 +161,6 @@ int main( int argc, const char* argv[] )
   srand( time( NULL ) );
 
   bool fg = false;
-  bool tests = false;
 
   for ( int i = 1; i < argc ; i++ )
   {
@@ -183,7 +182,8 @@ int main( int argc, const char* argv[] )
       }
       else if ( "--test" == argvstr )
       {
-        tests = true;
+        runtests();
+        return 0;
       }
       else if( "--cp" == argvstr )
       {
@@ -247,11 +247,6 @@ int main( int argc, const char* argv[] )
   core_limits.rlim_cur = core_limits.rlim_max = RLIM_INFINITY;
   setrlimit( RLIMIT_CORE, &core_limits );
 
-  if( tests )
-  {
-    runtests();
-    return 0;
-  }
 
   std::cout << "Starting Project SIP server." << std::endl;
   std::cout << "Control port listening on port " << port << std::endl;

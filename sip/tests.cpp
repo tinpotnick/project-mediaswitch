@@ -213,7 +213,7 @@ void testsippacket( void )
                   "REGISTER sip:registrar.biloxi.com SIP/2.0\r\n"
                   "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n"
                   "CSeq: 314159 INVITE\r\n"
-                  "Via: SIP/2.0/UDP myhost;branch=z9hG4bK4b43c2ff8.1\r\n"
+                  "Via: SIP/2.0/UDP myhost;rport;branch=z9hG4bK4b43c2ff8.1\r\n"
                   "\r\n"
                   "Some SDP",
                   "Unexpected SIP packet."
@@ -288,6 +288,13 @@ void testurl( void )
     projecttest( s.path, "/my/big/path", "Bad path." );
     projecttest( s.query, "myquerystring", "Bad query." );
     projecttest( s.port, "9000", "Bad Port." );
+  }
+
+  {
+    std::string testdata = readfile( "../testfiles/siptest1.txt" );
+    projectsippacket testpacket( gettestchunk( testdata, "AUTHREGISTER1" ) );
+
+    projecttest( testpacket.gethost(), "bling.babblevoice.com", "Bad host." );
   }
 
   {

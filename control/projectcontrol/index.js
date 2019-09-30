@@ -134,6 +134,8 @@ class call
     this.onringingcallback = [];
     this.onanswercallback = [];
     this.onhangupcallback = [];
+    this.onholdcallback = []
+    this.onoffholdcallback = []
 
 
     /* Some default handlers */
@@ -242,6 +244,16 @@ class call
         this.metadata.family.parent.ring();
       }
     }
+
+    this.onhold = () =>
+    {
+      console.log( "on hold" )
+    }
+
+    this.onoffhold = () =>
+    {
+      console.log( "off hold" )
+    }
   }
 
   set info( callinf )
@@ -270,6 +282,18 @@ class call
   {
     this.onanswercallback.push( cb );
     return this;
+  }
+
+  set onhold( cb )
+  {
+    this.onholdcallback.push( cb )
+    return this
+  }
+
+  set onoffhold( cb )
+  {
+    this.onoffholdcallback.push( cb )
+    return this
   }
 
   set onhangup( cb )
@@ -301,6 +325,15 @@ class call
     if( "hangup" in this.callinfo )
     {
       return true == this.callinfo.hangup;
+    }
+    return false;
+  }
+
+  get hold()
+  {
+    if( "hold" in this.callinfo )
+    {
+      return true == this.callinfo.hold;
     }
     return false;
   }
@@ -540,6 +573,8 @@ class projectcontrol
       {
         var callinfo = JSON.parse( body );
         var c;
+
+        var laststate = { "ring": false, "answered": false, "hold": false, "hangup": false }
         if( !( callinfo.callid in this.calls ) )
         {
           c = new call( this, callinfo );
@@ -553,6 +588,7 @@ class projectcontrol
         else
         {
           c = this.calls[ callinfo.callid ];
+          laststate = c.info
           c.info = callinfo;
         }
 
@@ -572,6 +608,35 @@ class projectcontrol
             cb.call( c, c );
           }
           c.onanswercallback = [];
+        }
+        else if( laststate.answered && c.answered && !c.hungup )
+        {
+          if( laststate.hold != c.hold )
+          {
+            if( c.hold )
+            {
+              for( let cb of c.onholdcallback )
+              {
+                cb.call( c, c )
+              }
+              c.info.sdp.us.m[ 0 ].direction = "inactive"
+              this.sipserver( { "callid": c.callinfo.callid, "sdp": c.info.sdp.us }, "/dialog/ok" )
+            }
+            if( !c.hold )
+            {
+              for( let cb of c.onoffholdcallback )
+              {
+                cb.call( c, c )
+              }
+              c.info.sdp.us.m[ 0 ].direction = "sendrecv"
+              this.sipserver( { "callid": c.callinfo.callid, "sdp": c.info.sdp.us }, "/dialog/ok" )
+            }
+            return
+          }
+
+          console.log( "re-invite" )
+
+          //this.sipserver( { "callid": c.callinfo.callid }, "/dialog/ok" )
         }
 
         if( c.hungup )

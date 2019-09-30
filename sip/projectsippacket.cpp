@@ -356,8 +356,9 @@ bool projectsippacket::addwwwauthenticateheader( projectsippacket::pointer ref )
   s.reserve( DEFAULTHEADERLINELENGTH );
 
   s = "Digest realm=\"";
-  sipuri suri( ref->getrequesturi() );
-  s += suri.host.str();
+  //sipuri suri( ref->getrequesturi() );
+  //s += suri.host.str();
+  s += ref->gethost().str();
 
   s += "\",algorithm=\"MD5\",nonce=\"";
 
@@ -512,6 +513,8 @@ bool projectsippacket::checkauth( projectsippacket::pointer ref, stringptr passw
   char h1[ 33 ];
   char h2[ 33 ];
   char response[ 33 ];
+
+  if( !ref ) return false;
 
   substring requestopaque = ref->getheaderparam( projectsippacket::WWW_Authenticate, "opaque" );
   substring receivedopaque = this->getheaderparam( projectsippacket::Authorization, "opaque" );
@@ -728,8 +731,20 @@ substring projectsippacket::gethost( int tofrom )
 }
 
 /*!md
+# gettohost
+Get the host addressed in the To header.
+
+*/
+substring projectsippacket::gettag( int tofrom )
+{
+  return sipuri( this->getheader( tofrom ) ).getparameter( "tag" );
+}
+
+
+
+/*!md
 # getdisplayname
-Returns the diaply name.
+Returns the display name.
 
 */
 substring projectsippacket::getdisplayname( int tofrom )

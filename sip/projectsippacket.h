@@ -83,6 +83,7 @@ public:
   substring getheaderparam( int header, const char *param );
   substring getuser( int tofrom = To );
   substring gethost( int tofrom = To );
+  substring gettag( int tofrom = To );
   substring getdisplayname( int tofrom = To );
   substring getuserhost( int tofrom = To );
   substring geturihost( void );
