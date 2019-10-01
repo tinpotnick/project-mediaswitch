@@ -39,7 +39,8 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsig
   reader( true ),
   writer( true ),
   receivedpkcount( 0 ),
-  mixqueue( MIXQUEUESIZE )
+  mixqueue( MIXQUEUESIZE ),
+  tick( io_service )
 {
 }
 
@@ -111,6 +112,11 @@ void projectrtpchannel::open( std::string &control )
   this->lastprocessed = nullptr;
 
   this->control = control;
+
+  this->tick.expires_after( std::chrono::milliseconds( 20 ) );
+  this->tick.async_wait( boost::bind( &projectrtpchannel::handletick,
+                                        shared_from_this(),
+                                        boost::asio::placeholders::error ) );
 }
 
 unsigned short projectrtpchannel::getport( void )
@@ -147,10 +153,69 @@ void projectrtpchannel::close( void )
     this->active = false;
     this->rtpsocket.close();
     this->rtcpsocket.close();
+    this->tick.cancel();
   }
   catch(...)
   {
 
+  }
+}
+
+/*!md
+## handletick
+Our timer to send data
+*/
+void projectrtpchannel::handletick( const boost::system::error_code& error )
+{
+  if ( error != boost::asio::error::operation_aborted )
+  {
+    this->checkfornewmixes();
+
+    /* only us */
+    if( !this->others || 0 == this->others->size() )
+    {
+      rtppacket *out = this->gettempoutbuf( 0 );
+      stringptr newplaydef = std::atomic_exchange( &this->newplaydef, stringptr( NULL ) );
+      if( newplaydef )
+      {
+        try
+        {
+          if( !this->player )
+          {
+            this->player = soundsoup::create();
+          }
+
+          JSON::Value ob = JSON::parse( *newplaydef );
+          this->player->config( JSON::as_object( ob ), out->getpayloadtype() );
+        }
+        catch(...)
+        {
+          std::cerr << "Bad sound soup: " << *newplaydef << std::endl;
+        }
+      }
+
+      if( this->player )
+      {
+        rawsound r = player->read();
+        if( 0 != r.size() )
+        {
+          this->codecworker << codecx::next;
+          this->codecworker << r;
+          *out << this->codecworker;
+          this->writepacket( out );
+        }
+      }
+    }
+    else
+    {
+      this->handlertpdata();
+    }
+
+    /* The last thing we do */
+    this->tick.expires_at( this->tick.expiry() + boost::asio::chrono::milliseconds( 20 ) );
+    this->tick.async_wait( boost::bind( &projectrtpchannel::handletick,
+                                        shared_from_this(),
+                                        boost::asio::placeholders::error ) );
   }
 }
 
@@ -187,19 +252,27 @@ void projectrtpchannel::readsomertp( void )
           }
 
           this->rtpdata[ this->rtpindexin ].length = bytes_recvd;
-          this->rtpindexin = ( this->rtpindexin + 1 ) % BUFFERPACKETCOUNT;
+          
+          /* Now order it */
+          rtppacket *src = &this->rtpdata[ this->rtpindexin ];
+          uint32_t sn = src->getsequencenumber();
 
-          /* if we catch up */
-          if( this->rtpindexin == this->rtpindexoldest )
+          this->orderedrtpdata[ sn % BUFFERPACKETCOUNT ] = src;
+#warning Detect wrap
+          if( sn > this->orderedinmaxsn ) this->orderedinmaxsn = sn;
+
+          /* Indicate where we start */
+          if( sn > ( this->orderedinminsn + BUFFERPACKETCOUNT ) )
           {
-            this->rtpindexoldest = ( this->rtpindexoldest + 1 ) % BUFFERPACKETCOUNT;
-          }
-          this->handlertpdata();
+            this->orderedinminsn = this->orderedinmaxsn = sn;
+            this->orderedinbottom = sn % BUFFERPACKETCOUNT;
+          } 
         }
 
         if( !ec && bytes_recvd && this->active )
         {
-           this->readsomertp();
+          this->rtpindexin = ( this->rtpindexin + 1 ) % BUFFERPACKETCOUNT;
+          this->readsomertp();
         }
       } );
 }
@@ -212,91 +285,52 @@ Buffer up RTP data to reorder and give time for packets to be received then proc
 */
 void projectrtpchannel::handlertpdata( void )
 {
-  rtppacket *src = &this->rtpdata[ this->rtpindexoldest ];
-  this->rtpindexoldest = ( this->rtpindexoldest + 1 ) % BUFFERPACKETCOUNT;
-
-  /* first task - reorder */
+  rtppacket *src = this->orderedrtpdata[ this->orderedinbottom ];
   uint32_t sn = src->getsequencenumber();
+  uint32 aheadby = this->orderedinmaxsn - sn;
 
-  if( 1 == this->receivedpkcount )
+  /* 
+    We ony process packets when we are more than BUFFERDELAYCOUNT behind - allow time for reordering
+  */
+  while( aheadby > BUFFERDELAYCOUNT )
   {
-    /* empty */
-    this->orderedrtpdata[ 0 ] = src;
-    this->orderedinminsn = sn;
-    this->orderedinmaxsn = this->orderedinminsn;
-    this->orderedinbottom = 0;
-    this->ssrcin = src->getssrc();
-    return;
-  }
-  else
-  {
-    if( this->ssrcin != src->getssrc() )
+    uint32_t workingonaheadby;
+    uint32_t workingonsn;
+    uint32_t lastworkedonsn;
+
+    if( nullptr == src )
     {
-      /* I think this should stay the same */
-      return;
+      goto whilecontinue;
     }
 
-    uint32_t aheadby = sn - this->orderedinminsn;
-
-    if( aheadby > ( 4294967296 / 2 ) )
+    if( nullptr != this->lastprocessed )
     {
-      /* Too old */
-      return;
+      lastworkedonsn = this->lastprocessed->getsequencenumber();
+    }
+    else
+    {
+      lastworkedonsn = src->getsequencenumber() - 1;
     }
 
-    if( aheadby > BUFFERPACKETCOUNT )
+    workingonsn = src->getsequencenumber();
+    workingonaheadby = workingonsn - lastworkedonsn;
+    
+    if( this->orderedinminsn != workingonsn )
     {
-      /* A bit ahead - so we probably suffered with silence - restart */
-      this->orderedrtpdata[ 0 ] = src;
-      this->orderedinminsn = sn;
-      this->orderedinmaxsn = this->orderedinminsn;
-      this->orderedinbottom = 0;
-      return;
+std::cout << "unexpected:" << this->orderedinminsn << ":" << workingonsn << std::endl;
+      /* Not a packet we are interested in */
+      goto whilecontinue;
     }
 
-    if( sn > this->orderedinmaxsn ) this->orderedinmaxsn = sn;
-    this->orderedrtpdata[ ( this->orderedinbottom + aheadby ) % BUFFERPACKETCOUNT ] = src;
-
-    while( aheadby > 10 )
-    {
-      uint32_t workingonaheadby;
-      uint32_t workingonsn;
-      uint32_t lastworkedonsn;
-
-      src = this->orderedrtpdata[ this->orderedinbottom ];
-      this->orderedinbottom = ( this->orderedinbottom + 1 ) % BUFFERPACKETCOUNT;
-
-      if( nullptr == src )
-      {
-        goto whilecontinue;
-      }
-
-      if( nullptr != this->lastprocessed )
-      {
-        lastworkedonsn = this->lastprocessed->getsequencenumber();
-      }
-      else
-      {
-        lastworkedonsn = src->getsequencenumber() - 1;
-      }
-
-      workingonsn = src->getsequencenumber();
-      workingonaheadby = workingonsn - lastworkedonsn;
-      
-      if( this->orderedinminsn != workingonsn )
-      {
-        /* Not a packet we are interested in */
-        goto whilecontinue;
-      }
-
-      /* At this point we should be in order - but may have breaks (missing chunks) */
-      this->processrtpdata( src, workingonaheadby - 1 );
-      this->lastprocessed = src;
+    /* At this point we should be in order - but may have breaks (missing chunks) */
+    this->processrtpdata( src, workingonaheadby - 1 );
+    this->lastprocessed = src;
+    this->orderedinminsn++;
 
 whilecontinue:
-      this->orderedinminsn++;
-      aheadby--;
-    }
+    aheadby--;
+    this->orderedinbottom = ( this->orderedinbottom + 1 ) % BUFFERPACKETCOUNT;
+    src = this->orderedrtpdata[ this->orderedinbottom ];
   }
 }
 
@@ -308,53 +342,6 @@ Mix and send the data somewhere.
 */
 void projectrtpchannel::processrtpdata( rtppacket *src, uint32_t skipcount )
 {
-  if( 0 != skipcount )
-  {
-    this->codecworker.restart();
-  }
-
-  this->checkfornewmixes();
-
-  /* only us */
-  if( !this->others || 0 == this->others->size() )
-  {
-    rtppacket *out = this->gettempoutbuf( skipcount );
-
-    stringptr newplaydef = std::atomic_exchange( &this->newplaydef, stringptr( NULL ) );
-    if( newplaydef )
-    {
-      try
-      {
-        if( !this->player )
-        {
-          this->player = soundsoup::create();
-        }
-
-        JSON::Value ob = JSON::parse( *newplaydef );
-        this->player->config( JSON::as_object( ob ), out->getpayloadtype() );
-      }
-      catch(...)
-      {
-        std::cerr << "Bad sound soup: " << *newplaydef << std::endl;
-      }
-    }
-
-    if( this->player )
-    {
-      rawsound r = player->read();
-      if( 0 != r.size() )
-      {
-        this->codecworker << codecx::next;
-        this->codecworker << r;
-        *out << this->codecworker;
-
-        this->writepacket( out );
-      }
-    }
-
-    return;
-  }
-
   /* The next section is sending to our recipient(s) */
   if( 2 == this->others->size() )
   {
@@ -479,12 +466,7 @@ Add the other to our list of others. n way relationship. Adds to queue for when 
 */
 bool projectrtpchannel::mix( projectrtpchannel::pointer other )
 {
-  /* We only mix us with others who are currently friendless */
-  if( other->others )
-  {
-    return false;
-  }
-
+  /* Create our others list */
   if( !this->others )
   {
     this->others = projectrtpchannellistptr( new projectrtpchannellist  );
@@ -493,6 +475,15 @@ bool projectrtpchannel::mix( projectrtpchannel::pointer other )
   this->mixqueue.push( other );
 
   return true;
+}
+
+/*!md
+## unmix
+As it says.
+*/
+void projectrtpchannel::unmix( void )
+{
+  this->mix( projectrtpchannel::pointer() );
 }
 
 /*!md
@@ -505,11 +496,21 @@ void projectrtpchannel::checkfornewmixes( void )
 
   while( this->mixqueue.pop( other ) )
   {
+    if( !other )
+    {
+      /* empty indicates unmix */
+      for( auto it = this->others->begin(); it != this->others->end(); it++ )
+      {
+        ( *it )->unmix();
+      }
+      this->others->clear();
+      return;
+    }
+
     /* ensure no duplicates */
     bool usfound = false;
     bool themfound = false;
-    projectrtpchannellist::iterator it;
-    for( it = this->others->begin(); it != this->others->end(); it++ )
+    for( auto it = this->others->begin(); it != this->others->end(); it++ )
     {
       if( it->get() == this )
       {

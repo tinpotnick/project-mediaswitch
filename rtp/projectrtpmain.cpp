@@ -207,6 +207,20 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
           }
         }
       }
+      /* PUT /channel/<uuid>/unmix */
+      else if( 3 == pathparts.size() &&
+                projectwebdocument::PUT == method &&
+                "unmix" == pathparts[ 2 ] )
+      {
+        activertpchannels::iterator chan = activechannels.find( pathparts[ 1 ] );
+        if ( activechannels.end() != chan )
+        {
+          chan->second->unmix();
+          response.setstatusline( 200, "Ok" );
+          response.addheader( projectwebdocument::Content_Length, "0" );
+          return;
+        }
+      }
     }
 
     response.setstatusline( 404, "Not found" );

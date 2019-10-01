@@ -73,6 +73,8 @@ public:
         const boost::system::error_code& error,
         std::size_t bytes_transferred);
 
+  void handletick( const boost::system::error_code& error );
+
   bool canread( void ) { return this->reader; };
   bool canwrite( void ) { return this->writer; };
 
@@ -80,6 +82,8 @@ public:
 
   bool mix( projectrtpchannel::pointer other );
   rtppacket *gettempoutbuf( uint32_t skipcount );
+
+  void unmix( void );
 
   codeclist codecs;
   int selectedcodec;
@@ -150,6 +154,7 @@ private:
   std::string control;
 
   boost::lockfree::stack< projectrtpchannel::pointer > mixqueue;
+  boost::asio::steady_timer tick;
 };
 
 

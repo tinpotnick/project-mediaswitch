@@ -1156,6 +1156,11 @@ void projectsipdialog::waitforinviteprogress( projectsippacket::pointer pk )
       sdptojson( pk->getbody(), this->remotesdp );
     }
 
+    this->nextstate = std::bind(
+      &projectsipdialog::waitfornextinstruction,
+      this,
+      std::placeholders::_1 );
+
     this->sendack();
     this->updatecontrol();
   }
