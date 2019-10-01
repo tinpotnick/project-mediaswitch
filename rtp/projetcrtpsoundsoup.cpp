@@ -249,7 +249,6 @@ void soundsoup::config( JSON::Object &json, int format )
       {
         ref.stop = JSON::as_int64( inref[ "stop" ] );
       }
-
       num++;
     }
   }

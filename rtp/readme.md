@@ -166,7 +166,7 @@ We currently support
 Examples
 
 #### UK Dial tone:
-project-rtp --tone 350+440*0.75:1000 dialtone.wav
+project-rtp --tone 350+440*0.5:1000 dialtone.wav
 
 #### UK Ringing
 project-rtp --tone 400+450*0.5/0/400+450*0.5/0:400/200/400/2000 ringing.wav
@@ -184,4 +184,4 @@ Example, 1 would mix 1209Hz and 697Hz
 
 project-rtp --tone 697+1209*0.5:400 dtmf1.wav
 
-project-rtp --tone 697+1209*0.5/0/697+1336*0.5/0/697+1477*0.5/0/:400/100 dtmf1-3.wav
+project-rtp --tone 697+1209*0.5/0/697+1336*0.5/0/697+1477*0.5/0:400/100 dtmf1-3.wav

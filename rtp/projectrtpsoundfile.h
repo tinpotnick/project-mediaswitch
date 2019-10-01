@@ -82,6 +82,9 @@ private:
 
   bool opened;
   bool badheader;
+
+  long newposition;
+  bool headerread;
 };
 
 

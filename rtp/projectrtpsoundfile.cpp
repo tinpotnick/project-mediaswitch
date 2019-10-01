@@ -23,11 +23,14 @@ We need to support
 soundfile::soundfile( std::string &url ) :
   file( -1 ),
   url( url ),
+  readbuffer( nullptr ),
   readbuffercount( 2 ),
   currentindex( 0 ),
   blocksize( L16WIDEBANDBYTES ),
   opened (false ),
-  badheader( false )
+  badheader( false ),
+  newposition( -1 ),
+  headerread( false )
 {
   int mode = O_RDONLY;
   std::string filenfullpath = mediachroot + url;
@@ -117,13 +120,21 @@ We only support 1 channel. Anything else we need to look at.
 */
 rawsound soundfile::read( void )
 {
+  if( false == this->headerread &&
+      aio_error( &this->cbwavheader ) == EINPROGRESS )
+  {
+    return rawsound();
+  }
+
+  this->headerread = true;
+
   if( aio_error( &this->cbwavblock ) == EINPROGRESS )
   {
     return rawsound();
   }
 
   /* success? */
-	int numbytes = aio_return( &this->cbwavblock );
+  int numbytes = aio_return( &this->cbwavblock );
 
   if( -1 == numbytes || 0 == numbytes )
   {
@@ -179,7 +190,17 @@ rawsound soundfile::read( void )
 
   this->currentindex = ( this->currentindex + 1 ) % readbuffercount;
   this->cbwavblock.aio_buf = this->readbuffer + ( blocksize * this->currentindex );
-  this->cbwavblock.aio_offset += blocksize;
+  if( -1 == this->newposition )
+  {
+    this->cbwavblock.aio_offset += blocksize;
+  }
+  else
+  {
+    this->cbwavblock.aio_offset = ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) * this->newposition; /* bytes per sample */
+    this->cbwavblock.aio_offset = ( this->cbwavblock.aio_offset / this->blocksize ) * this->blocksize; /* realign to the nearest block */
+    this->cbwavblock.aio_offset += sizeof( wav_header );
+  }
+  
   this->cbwavblock.aio_nbytes = blocksize;
 
   if( this->cbwavblock.aio_offset > ( __off_t ) ( this->wavheader.wav_size + sizeof( wav_header ) ) )
@@ -201,6 +222,12 @@ rawsound soundfile::read( void )
     return rawsound();
   }
 
+  if( -1 != this->newposition )
+  {
+    this->newposition = -1;
+    return rawsound();
+  }
+
   return rawsound( current, blocksize, ploadtype, this->wavheader.sample_rate );
 }
 
@@ -210,20 +237,7 @@ Gets and sets the position in terms of mS.
 */
 void soundfile::setposition( long mseconds )
 {
-  int newposition;
-  newposition = ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) * mseconds; /* bytes per sample */
-  newposition = ( newposition / this->blocksize ) * this->blocksize; /* realign to the nearest block */
-
-  newposition += sizeof( wav_header );
-
-  this->cbwavblock.aio_offset = newposition;
-
-  if ( aio_read( &this->cbwavblock ) == -1 )
-  {
-    /* report error somehow. */
-    close( this->file );
-    this->file = -1;
-  }
+  this->newposition = mseconds;
 }
 
 long soundfile::getposition( void )
@@ -233,7 +247,12 @@ long soundfile::getposition( void )
     return 0;
   }
 
-  long position = this->cbwavblock.aio_offset - sizeof( wav_header );
+  if( -1 != this->newposition )
+  {
+    return this->newposition;
+  }
+
+  __off_t position = this->cbwavblock.aio_offset - sizeof( wav_header );
   return position / ( ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) );
 }
 
@@ -247,7 +266,6 @@ bool soundfile::complete( void )
   {
     return false;
   }
-
   return this->cbwavblock.aio_offset > this->wavheader.wav_size;
 }
 

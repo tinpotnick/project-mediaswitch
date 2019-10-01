@@ -76,8 +76,8 @@ projectcontrol.onnewcall = ( call ) =>
       var soup = {}
       soup.loop = true
       soup.files = []
-      soup.files.push( { wav: "ringing.wav", loop: 3 } )
-      soup.files.push( { wav: "dtmf1-3.wav" } )
+      soup.files.push( { wav: "uksounds.wav", start: 1000, stop: 3999, loop: 3 } )
+      soup.files.push( { wav: "uksounds.wav", start: 4000, stop: 5499 } )
       soup.loop = true
   
       call.play( soup )

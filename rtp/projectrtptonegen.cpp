@@ -148,7 +148,7 @@ static void gen( std::string tone, std::string filename )
     cadencepos = ( cadencepos + 1 ) % cadences.size();
   }
 
-  std::cout << "Total tme is " << cadencetotal << "mS" << std::endl;
+  std::cout << "Total time is " << cadencetotal << "mS" << std::endl;
 
   /* 2. Allocate enough memory */
   wavheader.wav_size = cadencetotal * wavheader.sample_rate / 1000 * 2 /* 2 bytes per sample */;
@@ -226,9 +226,35 @@ continueloop:
 
 
   /* Write */
-  int file = open( filename.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR );
-  write( file, &wavheader, sizeof( wav_header ) );
-  write( file, readbuffer, wavheader.wav_size );
+  int file = open( filename.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR );
+  __off_t position = lseek( file, 0, SEEK_END );
+  if( 0 == position )
+  {
+    write( file, &wavheader, sizeof( wav_header ) );
+    write( file, readbuffer, wavheader.wav_size );
+  }
+  else
+  {
+    wav_header currentheader;
+    lseek( file, 0, SEEK_SET );
+    read( file, &currentheader, sizeof( wav_header ) );
+    lseek( file, 0, SEEK_END );
+
+    if( currentheader.audio_format == wavheader.audio_format &&
+          currentheader.sample_rate == wavheader.sample_rate )
+    {
+      /* Ok, good enough! */
+      currentheader.wav_size += wavheader.wav_size;
+      lseek( file, 0, SEEK_SET );
+      write( file, &currentheader, sizeof( wav_header ) );
+      lseek( file, 0, SEEK_END );
+      write( file, readbuffer, wavheader.wav_size );
+    }
+    else
+    {
+      std::cerr << "File format to append should be the same" << std::endl;
+    }
+  }
 
   /* Clean up */
   if( nullptr != readbuffer )
@@ -236,6 +262,7 @@ continueloop:
     delete[] readbuffer;
   }
 
+  close( file );
 }
 
 /*!md
