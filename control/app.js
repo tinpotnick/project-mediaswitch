@@ -33,8 +33,6 @@ projectcontrol.onhangup = ( call ) =>
 
 projectcontrol.onnewcall = ( call ) =>
 {
-  if( call.originator ) return
-
   console.log( "new call inbound call" )
   if( call.haserror ) console.log( call.error )
 
@@ -52,6 +50,7 @@ projectcontrol.onnewcall = ( call ) =>
 
   if( "5" == call.destination )
   {
+console.log("5")
     call.ring()
     setTimeout( () => { call.answer() }, 2000 )
 
@@ -71,8 +70,10 @@ projectcontrol.onnewcall = ( call ) =>
 
   if( "6" == call.destination )
   {
+console.log("6")
     call.onanswer = () =>
     {
+console.log("6.onanswer")
       var soup = {}
       soup.loop = true
       soup.files = []

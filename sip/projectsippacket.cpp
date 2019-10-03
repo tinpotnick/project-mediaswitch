@@ -839,6 +839,14 @@ int projectsippacket::getmethodfromcrc( int crc )
     {
       return REGISTER;
     }
+    case 0x217bedc8:   /* notify */
+    {
+      return NOTIFY;
+    }
+    case 0xa3137be3:   /* refer */
+    {
+      return REFER;
+    }
     case 0xc7e210d7:   /* invite */
     {
       return INVITE;
@@ -874,6 +882,10 @@ const char *projectsippacket::getmethodstr( int method )
   {
     case REGISTER:
       return "REGISTER";
+    case REFER:
+      return "REFER";
+    case NOTIFY:
+      return "NOTIFY";
     case INVITE:
       return "INVITE";
     case ACK:
@@ -972,6 +984,10 @@ int projectsippacket::getheaderfromcrc( int crc )
     {
       return Reason;
     }
+    case 0x1f417f42:   /* subscription-state */
+    {
+      return Subscription_State;
+    }
     case 0xf724db04:   /* supported */
     {
       return Supported;
@@ -979,6 +995,10 @@ int projectsippacket::getheaderfromcrc( int crc )
     case 0xd787d2c4:   /* to */
     {
       return To;
+    }
+    case 0xba5b4323:   /* refer-to */
+    {
+      return Refer_To;
     }
     case 0x21b74cd0:   /* via */
     {
@@ -1049,10 +1069,14 @@ const char *projectsippacket::getheaderstr( int header )
       return "Retry-After";
     case Reason:
       return "Reason";
+    case Subscription_State:
+      return "Subscription-State";
     case Supported:
       return "Supported";
     case To:
       return "To";
+    case Refer_To:
+      return "Refer-To";
     case Via:
       return "Via";
     case User_Agent:

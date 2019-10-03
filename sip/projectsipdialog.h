@@ -54,13 +54,17 @@ public:
 
   /* inbound invite */
   void invitestart( projectsippacket::pointer pk );
+  void handlerefer( projectsippacket::pointer pk );
   void inviteauth( projectsippacket::pointer pk  );
+  void referauth( projectsippacket::pointer pk  );
   void invite( projectsippacket::pointer pk  );
+  void refer( projectsippacket::pointer pk  );
   bool checkforhold( void );
   bool checkforholdstatechange( bool newstate );
   void waitfornextinstruction( projectsippacket::pointer pk );
   void waitforack( projectsippacket::pointer pk );
   void waitforackanddie( projectsippacket::pointer pk );
+  void waitfor200( projectsippacket::pointer pk );
   void waitfor200anddie( projectsippacket::pointer pk );
   void waitfor200thenackanddie( projectsippacket::pointer pk );
   void waitforacktheninviteauth( projectsippacket::pointer pk );
@@ -89,6 +93,7 @@ public:
   void resenderror( const boost::system::error_code& error );
   void resendbye( const boost::system::error_code& error );
   void resendcancel( const boost::system::error_code& error );
+  void resendnotify( const boost::system::error_code& error );
 
 private:
 
@@ -98,8 +103,10 @@ private:
   void ringing( void );
   void answer( std::string body );
   void ok( std::string body = "" );
+  void notify( void );
   void hangup( void );
   void send200( std::string body = "", bool final = false );
+  void send202( void );
   void send401( void );
   void send403( void );
   void sendack( void );
@@ -109,6 +116,7 @@ private:
   /* Verbs */
   bool sendinvite( void );
   void sendbye( void );
+  void sendnotify( void );
 
   /* clean up */
   void untrack( void );
@@ -116,6 +124,7 @@ private:
   projecthttpclient::pointer controlrequest;
 
   projectsippacket::pointer invitepk;
+  projectsippacket::pointer referpk;
   projectsippacket::pointer ackpk;
 
   projectsippacket::pointer authrequest;

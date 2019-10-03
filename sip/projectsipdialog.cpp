@@ -24,6 +24,9 @@ projectsipdialog::projectsipdialog() :
   cseq( rand() ),
   nextstate( std::bind( &projectsipdialog::invitestart, this, std::placeholders::_1 ) ),
   controlrequest( projecthttpclient::create( io_service ) ),
+  invitepk( nullptr ),
+  referpk( nullptr ),
+  ackpk( nullptr ),
   timer( io_service ),
   retries( 3 ),
   authenticated( false ),
@@ -421,6 +424,23 @@ void projectsipdialog::waitfor200anddie( projectsippacket::pointer pk )
 }
 
 /*!md
+# waitfor200
+The next ack we receive will end this dialog.
+*/
+void projectsipdialog::waitfor200( projectsippacket::pointer pk )
+{
+  int code = pk->getstatuscode();
+  if( 200 == code || 481 == code )
+  {
+    this->nextstate = std::bind(
+      &projectsipdialog::waitfornextinstruction,
+      this,
+      std::placeholders::_1 );
+    this->canceltimer();
+  }
+}
+
+/*!md
 # waitfor200thenackanddie
 The next 200 we recieve will end this dialog.
 */
@@ -457,6 +477,11 @@ void projectsipdialog::waitfornextinstruction( projectsippacket::pointer pk )
         this->trying();
       }
       
+      break;
+    }
+    case projectsippacket::REFER:
+    {
+      this->handlerefer( pk );
       break;
     }
   }
@@ -621,6 +646,44 @@ void projectsipdialog::send200( std::string body, bool final )
       std::bind( &projectsipdialog::resend200, this, std::placeholders::_1 ) );
 }
 
+/*!md
+# send200
+Send a 200
+*/
+void projectsipdialog::send202( void )
+{
+  projectsippacket::pointer ok = projectsippacket::create();
+
+  ok->setstatusline( 202, "Accepted" );
+  ok->addcommonheaders();
+  ok->addviaheader( projectsipconfig::gethostipsipport(), this->lastreceivedpk );
+
+  sipuri tu( this->lastreceivedpk->getheader( projectsippacket::To ) );
+  substring stu = tu.uri;
+  if( 0 != stu.end() )
+  {
+    stu.start( stu.start() - 1 );
+    stu.end( stu.end() + 1 );
+  }
+  ok->addheader( projectsippacket::To,
+                stu.str() + ";tag=" + *this->ourtag );
+
+  ok->addheader( projectsippacket::From,
+              this->lastreceivedpk->getheader( projectsippacket::From ) );
+  ok->addheader( projectsippacket::Call_ID,
+              this->lastreceivedpk->getheader( projectsippacket::Call_ID ) );
+  ok->addheader( projectsippacket::CSeq,
+              this->lastreceivedpk->getheader( projectsippacket::CSeq ) );
+
+  ok->addheader( projectsippacket::Contact,
+              projectsippacket::contact( this->lastreceivedpk->getuser().strptr(),
+              stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
+
+  ok->addheader( projectsippacket::Content_Length,
+                      "0" );
+
+  this->sendpk( ok );
+}
 
 /*!md
 # resend200
@@ -1280,6 +1343,17 @@ bool projectsipdialog::updatecontrol( void )
     v[ "contact" ] = this->invitepk->getheader( projectsippacket::Contact ).str();
     v[ "maxforwards" ] = ( JSON::Integer ) this->invitepk->getheader( projectsippacket::Max_Forwards ).toint();
   }
+  if( this->referpk )
+  {
+    JSON::Object refer;
+    sipuri refs( this->referpk->getheader( projectsippacket::Refer_To ) );
+
+    refer[ "to" ] = refs.user.str();
+    refer[ "replaces" ] = refs.headers.str();
+
+    v[ "refer" ] = refer;
+  }
+
   v[ "authenticated" ] = ( JSON::Bool ) this->authenticated;
   v[ "ring" ] = ( JSON::Bool ) this->callringing;
   v[ "answered" ] = ( JSON::Bool ) this->callanswered;
@@ -1538,6 +1612,11 @@ void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwe
     }
 
     ( *it )->ok( sdp );
+  }
+  else if( action == "notify" )
+  {
+    response.setstatusline( 200, "Ok" );
+    (*it)->notify();
   }
   else if( action == "hangup" )
   {

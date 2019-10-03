@@ -48,7 +48,7 @@ call.ring();
 The library can be included with
 
 ```js
-const projectcontrol = require( "./projectcontrol/index.js" );
+const projectcontrol = require( "projectcontrol" )
 ```
 
 (note this will change when released!).
@@ -56,12 +56,12 @@ const projectcontrol = require( "./projectcontrol/index.js" );
 The SIP server requires user information to be uploaded to it.
 
 ```js
-projectcontrol.directory( "bling.babblevoice.com", [ { "username": "1003", "secret": "1123654789" } ] );
+projectcontrol.directory( "bling.babblevoice.com", [ { "username": "1003", "secret": "1123654789" } ] )
 ```
 
 We can control which CODECs we allow. Suported: pcma, pcmu, 722, ilbc@20, 2833. (note ilbc and 2833 TODO).
 ```js
-projectcontrol.codecs = [ "722", "pcma", "pcmu", "ilbc", "2833" ];
+projectcontrol.codecs = [ "722", "pcma", "pcmu", "ilbc", "2833" ]
 ```
 
 We would like to be informed about new calls
@@ -69,7 +69,7 @@ We would like to be informed about new calls
 ```js
 projectcontrol.onnewcall = ( call ) =>
 {
-  console.log( "new call" );
+  console.log( "new call" )
 }
 ```
 
@@ -78,20 +78,20 @@ The 'call' object which is passed in contains internal information to track the 
 ```js
 projectcontrol.onnewcall = ( call ) =>
 {
-  console.log( "new call" );
+  console.log( "new call" )
 
   call.onhangup = () =>
   {
-    console.log( "hung up" );
+    console.log( "hung up" )
   }
 
   /* Indicate ringing to the caller - not needed as the second leg ringing signal will be passed back */
-  call.ring();
+  call.ring()
 
   /* Make a call */
   if( "3" == call.destination )
   {
-    call.newcall( { to: { user: "1003" } } );
+    call.newcall( { to: { user: "1003" } } )
   }
 }
 ```
@@ -99,7 +99,7 @@ projectcontrol.onnewcall = ( call ) =>
 Once projectcontrol has been configured run needs calling which places it all in its event loop.
 
 ```js
-projectcontrol.run();
+projectcontrol.run()
 ```
 
 List of setters for call backs in projectcontrol:
@@ -308,6 +308,8 @@ The server will return a JSON document. Including stats regarding the workload o
 * [RFC 2617](https://tools.ietf.org/html/rfc2617): HTTP Authentication: Basic and Digest Access Authentication
 * [RFC 3261](https://tools.ietf.org/html/rfc3261): SIP: Session Initiation Protocol
 * [RFC 3881](https://tools.ietf.org/html/rfc3881): An Extension to the Session Initiation Protocol (SIP) for Symmetric Response Routing
+* [RFC 3514](https://tools.ietf.org/html/rfc3515): The Session Initiation Protocol (SIP) Refer Method
+* [RFC 3891](https://tools.ietf.org/html/rfc3891): The Session Initiation Protocol (SIP) "Replaces" Header
 * [RFC 4028](https://tools.ietf.org/html/rfc4028): Session Timers in the Session Initiation Protocol (SIP)
 * [RFC 4566](https://tools.ietf.org/html/rfc4566): SDP: Session Description Protocol
 * [RFC 4317](https://tools.ietf.org/html/rfc4317): Session Description Protocol (SDP) Offer/Answer Examples

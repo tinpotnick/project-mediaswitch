@@ -35,6 +35,7 @@ void projectsipsm::handlesippacket( projectsippacket::pointer pk )
     }
     case projectsippacket::CANCEL:
     case projectsippacket::INVITE:
+    case projectsippacket::REFER:
     {
       sipsm.handleinvite( pk );
       break;

@@ -106,7 +106,7 @@ public:
     RESPONSE indicates it found a status code - so is a response
     not a request.
   */
-  enum { REGISTER = projectwebdocument::METHODUNKNOWN + 1, INVITE, ACK, CANCEL, BYE, OPTIONS };
+  enum { REGISTER = projectwebdocument::METHODUNKNOWN + 1, REFER, NOTIFY, INVITE, ACK, CANCEL, BYE, OPTIONS };
 
   enum { Authorization,
         Allow,
@@ -126,8 +126,10 @@ public:
         Route,
         Retry_After,
         Reason,
+        Subscription_State,
         Supported,
         To,
+        Refer_To,
         Via,
         User_Agent,
         Min_Expires,
