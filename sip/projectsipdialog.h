@@ -60,7 +60,6 @@ public:
   void invite( projectsippacket::pointer pk  );
   void refer( projectsippacket::pointer pk  );
   bool checkforhold( void );
-  bool checkforholdstatechange( bool newstate );
   void waitfornextinstruction( projectsippacket::pointer pk );
   void waitforack( projectsippacket::pointer pk );
   void waitforackanddie( projectsippacket::pointer pk );

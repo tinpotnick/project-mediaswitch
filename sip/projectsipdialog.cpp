@@ -1346,10 +1346,14 @@ bool projectsipdialog::updatecontrol( void )
   if( this->referpk )
   {
     JSON::Object refer;
-    sipuri refs( this->referpk->getheader( projectsippacket::Refer_To ) );
+    refer[ "to" ] = this->referpk->getuser( projectsippacket::Refer_To ).str();
 
-    refer[ "to" ] = refs.user.str();
-    refer[ "replaces" ] = refs.headers.str();
+    substring replaces = this->referpk->getreplaces();
+    if( 0 != replaces.end() )
+    {
+std::cout << "Found replaces" << std::endl;
+      refer[ "replaces" ] = replaces.str();
+    }
 
     v[ "refer" ] = refer;
   }

@@ -129,13 +129,12 @@ void projectsipdialog::invite( projectsippacket::pointer pk )
 
   if( 0 != pk->gettag().end() )
   {
-    if( this->checkforhold() )
-    {
-      this->invitepk = pk;
-      this->lastauthenticatedpk = pk;
-      this->updatecontrol();
-      return;
-    }
+    this->checkforhold();
+
+    this->invitepk = pk;
+    this->lastauthenticatedpk = pk;
+    this->updatecontrol();
+    return;
   }
 
   this->invitepk = pk;
@@ -167,7 +166,8 @@ bool projectsipdialog::checkforhold( void )
               5 == m_i[ "direction" ].which() && // String
                "inactive" == JSON::as_string( m_i[ "direction" ] ) )
           {
-            return this->checkforholdstatechange( true );;
+            this->callhold = true;
+            return true;
           }
         }
       }
@@ -184,25 +184,11 @@ bool projectsipdialog::checkforhold( void )
           5 == o[ "address" ].which() && // String
           "0.0.0.0" == JSON::as_string( o[ "address" ] ) )
       {
-        return this->checkforholdstatechange( true );
+        this->callhold = true;
+        return true;
       }
     }
   }
-
-  return this->checkforholdstatechange( false );
-}
-
-/*!md
-# checkforholdstatechange
-Has the hold state changed - if yes this is what this invite was for.
-*/
-bool projectsipdialog::checkforholdstatechange( bool newstate )
-{
-  if( this->callhold == newstate )
-  {
-    return false;
-  }
-
-  this->callhold = newstate;
+  this->callhold = false;
   return true;
 }
