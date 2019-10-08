@@ -88,6 +88,9 @@ public:
   substring getuserhost( int tofrom = To );
   substring geturihost( void );
   int getexpires( void );
+  substring getreplaces( void );
+  substring getreplacestotag( void );
+  substring getreplacesfromtag( void );
   int getcseq( void );
 
   /* specific headers */
@@ -130,6 +133,7 @@ public:
         Supported,
         To,
         Refer_To,
+        Replaces,
         Via,
         User_Agent,
         Min_Expires,

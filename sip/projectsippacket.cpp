@@ -159,14 +159,9 @@ Via: SIP/2.0/UDP server10.biloxi.com;branch=z9hG4bK4b43c2ff8.1
 */
 substring projectsippacket::getheaderparam( int header, const char *param )
 {
-  substring retval( document );
-  substring h( this->getheader( header ) );
-  retval.start( h.end() );
+  substring retval = this->getheader( header );
 
-  if( 0 == h.end() )
-  {
-    return h;
-  }
+  if( 0 == retval.end() ) return retval;
 
   size_t l = strlen( param );
 
@@ -176,32 +171,38 @@ substring projectsippacket::getheaderparam( int header, const char *param )
   searchfor[ l + 1 ] = '=';
   searchfor[ l + 2 ] = 0;
 
-  substring ppos = h.rfind( searchfor );
-
+  retval.cs( false );
+  substring ppos = retval.find( searchfor );
   if( 0 == ppos.end() )
   {
     searchfor[ 0 ] = ' ';
-    ppos = h.rfind( searchfor );
+    ppos = retval.find( searchfor );
     if( 0 == ppos.end() )
     {
       searchfor[ 0 ] = ',';
-      ppos = h.rfind( searchfor );
+      ppos = retval.find( searchfor );
       if( 0 == ppos.end() )
       {
-        ppos = h.rfind( &searchfor[ 1 ] );
+        searchfor[ 0 ] = '?';
+        ppos = retval.find( searchfor );
         if( 0 == ppos.end() )
         {
-          return substring( document, 0, 0 );
+          ppos = retval.find( &searchfor[ 1 ] );
+          if( 0 == ppos.end() )
+          {
+            return substring( document, 0, 0 );
+          }
         }
       }
     }
   }
+
   retval.start( ppos.end() );
 
-  /* Check for a quoted string TODO - these are case sensative
-  unquoted strings should be insensative */
+  /* Check for a quoted string TODO - these are case sensitive
+  unquoted strings should be insensitive */
   substring pposquoted = ppos;
-  pposquoted.end( h.end() );
+  pposquoted.end( retval.end() );
   pposquoted = pposquoted.findsubstr( '"', '"' );
 
   if( pposquoted.start() == ppos.start() + l + 3 )
@@ -209,7 +210,7 @@ substring projectsippacket::getheaderparam( int header, const char *param )
     return pposquoted;
   }
 
-  retval = retval.mvend_first_of( ";\r," );
+  retval = retval.mvend_first_of( ";\r&, >" );
 
   return retval;
 }
@@ -800,6 +801,65 @@ int projectsippacket::getexpires( void )
 }
 
 /*!md
+# getreplaces
+Return the call id of in the replaces header (or subheader in refer-to)
+*/
+substring projectsippacket::getreplaces( void )
+{
+  substring header = this->getheader( projectsippacket::Replaces );
+  if( 0 != header.end() )
+  {
+    return header.mvend_first_of( ';' ).trim();
+  }
+  else
+  {
+    stringptr referto = urldecode( this->getheaderparam( projectsippacket::Refer_To, "replaces" ) );
+    substring header( referto );
+    return header.mvend_first_of( ';' ).trim();
+  }
+}
+
+/*!md
+# getreplacestotag
+As above but get the to-tag
+*/
+substring projectsippacket::getreplacestotag( void )
+{
+  if( this->hasheader( projectsippacket::Replaces ) )
+  {
+    substring header;
+    header = this->getheader( projectsippacket::Replaces );
+    return header.findsubstr( "to-tag=", ';' ).trim();
+  }
+  else
+  {
+    stringptr referto = urldecode( this->getheaderparam( projectsippacket::Refer_To, "replaces" ) );
+    substring header( referto );
+    return header.findsubstr( "to-tag=", ';' ).trim();
+  }
+}
+
+/*!md
+# getreplacesfromtag
+As above but get the from-tag
+*/
+substring projectsippacket::getreplacesfromtag( void )
+{
+  if( this->hasheader( projectsippacket::Replaces ) )
+  {
+    substring header;
+    header = this->getheader( projectsippacket::Replaces );
+    return header.findsubstr( "from-tag=", ';' ).trim();
+  }
+  else
+  {
+    stringptr referto = urldecode( this->getheaderparam( projectsippacket::Refer_To, "replaces" ) );
+    substring header( referto );
+    return header.findsubstr( "from-tag=", ';' ).trim();
+  }
+}
+
+/*!md
 # getcseq
 Get the cseq value from teh cseq header (the number value)
 
@@ -1000,6 +1060,10 @@ int projectsippacket::getheaderfromcrc( int crc )
     {
       return Refer_To;
     }
+    case 0x1db4e730:   /* replaces */
+    {
+      return Replaces;
+    }
     case 0x21b74cd0:   /* via */
     {
       return Via;
@@ -1077,6 +1141,8 @@ const char *projectsippacket::getheaderstr( int header )
       return "To";
     case Refer_To:
       return "Refer-To";
+    case Replaces:
+      return "Replaces";
     case Via:
       return "Via";
     case User_Agent:
@@ -1158,7 +1224,11 @@ sipuri::sipuri( substring s ) :
   }
 
   this->headers = s.findsubstr( '?', ';' );
+  // It may have been provided inside the <...>
+  this->headers.findend( '>' );
+
   this->parameters = s.findsubstr( ';', '?' );
+  this->parameters.findend( '>' );
 
   if( 0 != this->headers.end() )
   {
