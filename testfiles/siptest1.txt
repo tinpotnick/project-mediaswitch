@@ -158,3 +158,28 @@ t=0 0
 m=audio 6000 RTP/AVP 0
 a=rtpmap:0 PCMU/8000
 ==END==
+==REFER1==
+REFER sip:5@192.168.0.141:9997 SIP/2.0
+Via: SIP/2.0/UDP 192.168.0.141:64638;branch=z9hG4bK-524287-1---db6a29af0df6d34d;rport
+Max-Forwards: 70
+Contact: <sip:1003@192.168.0.141:64638;transport=UDP>
+To: <sip:5@bling.babblevoice.com;transport=UDP>;tag=KctrOrtZ
+From: <sip:1003@bling.babblevoice.com;transport=UDP>;tag=84dfc815
+Call-ID: L7ET2Bg7U1X5tmXd76muPw..
+CSeq: 4 REFER
+User-Agent: Z 5.2.28 rv2.8.114
+Refer-To: "1000"<sip:1000@bling.babblevoice.com?Replaces=773901b0-89a9-4c1a-9254-a03325066431%3Bto-tag%3DUBUkt5cE%3Bfrom-tag%3D8cb96940>
+Referred-By: <sip:1003@bling.babblevoice.com;transport=UDP>
+Authorization: Digest username="1003",realm="bling.babblevoice.com",nonce="a206639d-50b7-4a07-80f1-f2f9b7f6c0f0",uri="sip:5@192.168.0.141:9997",response="844e0f99874ed1516db6821e15019ac5",cnonce="26072b430c9684447950b096f5867199",nc=00000003,qop=auth,algorithm=MD5,opaque="3493955b-a8e7-4f14-a60e-4aa52bfb837d"
+Content-Length: 0
+==END==
+==REPLACES1==
+INVITE sip:alice@phone.example.org SIP/2.0
+To: <sip:alice@example.org>
+From: <sip:bob@example.org>;tag=8983
+Call-ID: 09870@labpc.example.org
+CSeq: 1 INVITE
+Contact: <sip:bob@labpc.example.org>
+Replaces: 425928@phone.example.org
+ ;to-tag=7743;from-tag=6472;early-only
+==END==
