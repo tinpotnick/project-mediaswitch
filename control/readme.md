@@ -22,7 +22,7 @@ projectcontrol.onnewcall = ( call ) =>
 }
 ```
 
-The cal object is now available.
+The call object is now available.
 
 ```JSON
 {
