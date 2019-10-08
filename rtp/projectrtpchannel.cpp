@@ -255,7 +255,7 @@ void projectrtpchannel::readsomertp( void )
           
           /* Now order it */
           rtppacket *src = &this->rtpdata[ this->rtpindexin ];
-          uint32_t sn = src->getsequencenumber();
+          uint16_t sn = src->getsequencenumber();
 
           this->orderedrtpdata[ sn % BUFFERPACKETCOUNT ] = src;
 #warning Detect wrap

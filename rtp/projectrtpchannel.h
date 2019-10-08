@@ -95,9 +95,9 @@ public:
   rtppacket rtpdata[ BUFFERPACKETCOUNT ];
   rtppacket *orderedrtpdata[ BUFFERPACKETCOUNT ];
   rtppacket *lastprocessed;
-  uint32_t orderedinminsn; /* sn = sequence number, min smallest we hold which is unprocessed - when it is processed we can forget about it */
-  uint32_t orderedinmaxsn;
-  int orderedinbottom; /* points to our min sn packet */
+  std::atomic_uint16_t orderedinminsn; /* sn = sequence number, min smallest we hold which is unprocessed - when it is processed we can forget about it */
+  std::atomic_uint16_t orderedinmaxsn;
+  std::atomic_uint16_t orderedinbottom; /* points to our min sn packet */
 
   unsigned char rtcpdata[ RTCPMAXLENGTH ];
   int rtpindexoldest;
