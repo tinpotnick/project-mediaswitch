@@ -298,6 +298,36 @@ void testurl( void )
   }
 
   {
+    std::string testdata = readfile( "../testfiles/siptest1.txt" );
+    projectsippacket testpacket( gettestchunk( testdata, "REFER1" ) );
+
+    stringptr referto = urldecode( testpacket.getheaderparam( projectsippacket::Refer_To, "replaces" ) );
+
+    substring callid = substring( referto ).mvend_first_of( ';' ).trim();
+    substring totag = substring( referto ).findsubstr( "to-tag=", ';' ).trim();
+    substring fromtag = substring( referto ).findsubstr( "from-tag=", ';' ).trim();
+
+    projecttest( testpacket.getheaderparam( projectsippacket::Refer_To, "replaces" ), "773901b0-89a9-4c1a-9254-a03325066431%3Bto-tag%3DUBUkt5cE%3Bfrom-tag%3D8cb96940", "Bad replaces." );
+    projecttest( callid, "773901b0-89a9-4c1a-9254-a03325066431", "Bad replaces callid." );
+    projecttest( totag, "UBUkt5cE", "Bad replaces to-tag." );
+    projecttest( fromtag, "8cb96940", "Bad replaces from-tag." );
+
+    projecttest( testpacket.getreplaces(), "773901b0-89a9-4c1a-9254-a03325066431", "Bad replaces callid." );
+    projecttest( testpacket.getreplacestotag(), "UBUkt5cE", "Bad replaces to-tag." );
+    projecttest( testpacket.getreplacesfromtag(), "8cb96940", "Bad replaces from-tag." );
+  }
+
+  {
+    std::string testdata = readfile( "../testfiles/siptest1.txt" );
+    stringptr s = gettestchunk( testdata, "REPLACES1" );
+    projectsippacket testpacket2( s );
+
+    projecttest( testpacket2.getreplaces(), "425928@phone.example.org", "Bad replaces callid." );
+    projecttest( testpacket2.getreplacestotag(), "7743", "Bad replaces to-tag." );
+    projecttest( testpacket2.getreplacesfromtag(), "6472", "Bad replaces to-tag." );
+  }
+
+  {
     stringptr u( new std::string( "\"Bob\" <sips:bob@biloxi.com> ;tag=a48s" ) );
     sipuri s( u );
 
