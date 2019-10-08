@@ -37,3 +37,4 @@ default: ../Debug/libproject.a
 clean:
 	rm $(ALLOBJS) -f
 	rm ../Debug/libproject.a
+	ccache -C

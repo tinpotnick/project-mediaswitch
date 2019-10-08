@@ -35,6 +35,7 @@ ALLOBJS=$(CPPSOURCES:%.cpp=../Debug/%.o)
 clean:
 	rm $(ALLOBJS) -f
 	rm ../Debug/project-sip
+	ccache -C
 
 debug:
 	mkdir -p ../Debug
