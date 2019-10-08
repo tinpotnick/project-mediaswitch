@@ -53,6 +53,7 @@ class substring
 {
 public:
   substring();
+  substring( substring *s );
   substring( const char * s );
   substring( substring ss, size_t start, size_t end );
   substring( stringptr s );
@@ -77,12 +78,14 @@ public:
   substring mvend_first_of( const char ch );
 
   substring findsubstr( const char, const char end = 0 );
+  substring findsubstr( const char *str, const char stop = 0 );
   substring findend( const char );
   substring aftertoken( const char * );
   substring aftertoken( const char );
   substring rtrim( void );
   substring ltrim( void );
   substring trim( void );
+  void cs( bool cs ) { this->casesensative = cs; }
 
   size_t operator++( int );
 
@@ -96,9 +99,11 @@ public:
   friend bool operator != ( const substring& lhs, const substring &rhs );
 
 private:
-  size_t startpos;
-  size_t endpos;
+  /* In order for length = endpos - startpos = 0 to be correct the inclusve and exclusive has to be: */
+  size_t startpos; /* index into the string s inclusive */
+  size_t endpos;  /* index into the string s exclusve */
   stringptr s;
+  bool casesensative;
 };
 
 bool operator == ( const substring& lhs, const char *rhs );
@@ -142,5 +147,3 @@ char fromhex( char ch );
 char tohex( char code );
 
 #endif /* PROJECTSIPSTRING_H */
-
-

@@ -1,6 +1,10 @@
 
+#include <iostream>
+
 #include <cstring>
 #include <boost/lexical_cast.hpp>
+#include <algorithm>
+#include <string>
 
 #include "projectsipstring.h"
 
@@ -258,7 +262,7 @@ bool operator==( const substring& lhs, const char *rhs )
 {
   if( !lhs.s )
   {
-    if(  0 == *rhs )
+    if( 0 == *rhs )
     {
       return false;
     }
@@ -267,6 +271,8 @@ bool operator==( const substring& lhs, const char *rhs )
 
   const char *c = rhs;
   size_t index = lhs.startpos;
+
+  bool casesensative = lhs.casesensative;
 
   if( 0 == ( lhs.endpos - lhs.startpos ) && 0 == *rhs )
   {
@@ -282,10 +288,21 @@ bool operator==( const substring& lhs, const char *rhs )
       break;
     }
 
-    if( *it != *c )
+    if( casesensative )
     {
-      return false;
+      if( *it != *c )
+      {
+        return false;
+      }
     }
+    else
+    {
+      if( std::tolower( *it ) != std::tolower( *c ) )
+      {
+        return false;
+      }
+    }
+
 
     index++;
     c++;
@@ -320,6 +337,9 @@ bool operator==( const substring& lhs, const substring& rhs )
     return false;
   }
 
+  bool casesensative = lhs.casesensative;
+  if( !rhs.casesensative ) casesensative = false;
+
   std::string::iterator rit = moveonbyn( rhs.s, rhs.startpos );
 
   for( std::string::iterator it = moveonbyn( lhs.s, lhs.startpos );
@@ -330,9 +350,20 @@ bool operator==( const substring& lhs, const substring& rhs )
     {
       break;
     }
-    if( *it != *rit )
+
+    if( casesensative )
     {
-      return false;
+      if( *it != *rit )
+      {
+        return false;
+      }
+    }
+    else
+    {
+      if( std::tolower( *it ) != std::tolower( *rit ) )
+      {
+        return false;
+      }
     }
 
     rit++;
@@ -362,6 +393,15 @@ substring::substring()
 {
   this->startpos = 0;
   this->endpos = 0;
+  this->casesensative = true;
+}
+
+substring::substring( substring *s )
+{
+  this->s = s->s;
+  this->startpos = s->startpos;
+  this->endpos = s->endpos;
+  this->casesensative = s->casesensative;
 }
 
 /*******************************************************************************
@@ -374,6 +414,7 @@ substring::substring( const char * s )
   this->s = stringptr( new std::string( s ) );
   this->startpos = 0;
   this->endpos = this->s->length();
+  this->casesensative = true;
 }
 
 /*******************************************************************************
@@ -386,6 +427,7 @@ substring::substring( stringptr s )
   this->s = s;
   this->startpos = 0;
   this->endpos = s->length();
+  this->casesensative = true;
 }
 
 /*******************************************************************************
@@ -398,6 +440,7 @@ substring::substring( substring s, size_t start, size_t end )
   this->s = s.s;
   this->startpos = start;
   this->endpos = end;
+  this->casesensative = true;
 }
 
 /*******************************************************************************
@@ -410,6 +453,7 @@ substring::substring( stringptr s, size_t start, size_t end )
   this->s = s;
   this->startpos = start;
   this->endpos = end;
+  this->casesensative = true;
 }
 
 
@@ -544,9 +588,9 @@ Function: length
 Purpose: Returns the length of the substring
 Updated: 08.01.2019
 *******************************************************************************/
-size_t substring::length( void ) 
-{ 
-  return this->endpos - this->startpos; 
+size_t substring::length( void )
+{
+  return this->endpos - this->startpos;
 }
 
 /*******************************************************************************
@@ -627,7 +671,25 @@ Updated: 08.01.2019
 *******************************************************************************/
 substring substring::find( const char *s )
 {
-  size_t rfindpos = this->s->find( s, this->startpos );
+  size_t rfindpos;
+
+  if( this->casesensative )
+  {
+    rfindpos = this->s->find( s, this->startpos );
+  }
+  else
+  {
+    const char *charstartpos = this->s->c_str() + this->startpos;
+    char *pos = strcasestr( ( char * ) charstartpos, s );
+    if( NULL == pos )
+    {
+      rfindpos = std::string::npos;
+    }
+    else
+    {
+      rfindpos = pos - charstartpos + this->startpos;
+    }
+  }
 
   if( std::string::npos == rfindpos ||
         rfindpos > this->endpos )
@@ -660,7 +722,10 @@ substring substring::find( const char s, size_t offset )
 /*******************************************************************************
 Function: find_first_of
 Purpose: Similar to the std::string::find_first_of - finds the first character
-in the str provided. Moves the end to that location.
+in the str provided. Moves the end to that location to excluding that char.
+1001@bling.babblevoice.com
+mvend_first_of( '@' )
+returns 1001
 Updated: 15.01.2019
 *******************************************************************************/
 substring substring::mvend_first_of( const char *str )
@@ -690,7 +755,7 @@ substring substring::mvend_first_of( const char ch )
 Function: findsubstr
 Purpose: Finds a substring in a string surounded by start and stop. For example
 s = " Test <1002@bling.babblevoice.com>"
-r = findsubstr( '<'.'>' );
+r = findsubstr( '<', '>' );
 Wounld return a substring == "1002@bling.babblevoice.com"
 Updated: 13.01.2019
 *******************************************************************************/
@@ -720,16 +785,43 @@ substring substring::findsubstr( const char start, const char stop )
   return substring( this->s, startpos + 1, endpos );
 }
 
+substring substring::findsubstr( const char *str, const char stop )
+{
+  size_t startpos = this->s->find( str, this->startpos );
+
+  if( std::string::npos == startpos ||
+        startpos > this->endpos )
+  {
+    return substring( this->s, 0, 0 );
+  }
+
+  size_t strlength = strlen( str );
+  if( 0 == stop )
+  {
+    return substring( this->s, startpos + strlength, this->endpos );
+  }
+
+  size_t endpos = this->s->find( stop, startpos + strlength );
+
+  if( std::string::npos == endpos ||
+        endpos > this->endpos )
+  {
+    return substring( this->s, startpos + strlength, this->endpos );
+  }
+
+  return substring( this->s, startpos + strlength, endpos );
+}
+
 /*******************************************************************************
 Function: findend
-Purpose: Changes the end position based on searching for a character. It starts 
+Purpose: Changes the end position based on searching for a character. It starts
 at the current start position and will set the end at character found (leaving
 that character out). For example
 s = " Test <1002@bling.babblevoice.com>"
-r = findsubstr( '<'.'>' );
+r = findsubstr( '<', '>' );
 t = r.findend( '@' );
 It it fails to find a new end, the current end is maintained.
-Wounld return a substring == "1002"
+Would return a substring == "1002"
 Updated: 13.01.2019
 *******************************************************************************/
 substring substring::findend( const char ch )
@@ -772,7 +864,7 @@ Function: aftertoken
 Purpose: Looks for the string after a token, for example:
 s = "1002@bling.babblevoice.com"
 r = aftertoken( "1002@" );
-Wounld return a substring == "bling.babblevoice.com"
+Would return a substring == "bling.babblevoice.com"
 Updated: 13.01.2019
 *******************************************************************************/
 substring substring::aftertoken( const char token )
@@ -796,28 +888,27 @@ Updated: 14.01.2019
 *******************************************************************************/
 substring substring::ltrim( void )
 {
-  const char *c = this->s->c_str();
-  size_t newstartpos = this->startpos;
-  for( size_t i = this->startpos; i < this->endpos; i++ )
+  const char *c = this->s->c_str() + this->startpos;
+  size_t i;
+  for( i = this->startpos; i < this->endpos; )
   {
     switch( *c )
     {
+      default:
+      {
+        return substring( this->s, i, this->endpos );
+      }
       case ' ':
       case '\t':
       case '\r':
       case '\n':
       {
-        newstartpos++;
-        break;
-      }
-      default:
-      {
-        return substring( this->s, newstartpos, this->endpos );
+        c++;
+        i++;
       }
     }
-    c++;
   }
-  return substring( this->s, newstartpos, this->endpos );
+  return substring( this->s, i, this->endpos );
 }
 
 /*******************************************************************************
@@ -827,29 +918,36 @@ Updated: 14.01.2019
 *******************************************************************************/
 substring substring::rtrim( void )
 {
-  const char *c = this->s->c_str() + this->endpos;
+  if( 0 == this->endpos ) return substring( this );
 
-  size_t newendpos = this->endpos;
-  for( size_t i = this->endpos; i > this->startpos; i-- )
+  const char *c = this->s->c_str() + this->endpos - 1;
+  size_t i;
+  for( i = this->endpos; i > this->startpos; )
   {
     switch( *c )
     {
+      default:
+      {
+        return substring( this->s, this->startpos, i );
+      }
+      case 0:
+      {
+        c--;
+        break;
+      }
       case ' ':
       case '\t':
       case '\r':
       case '\n':
       {
-        newendpos--;
+        c--;
+        i--;
         break;
       }
-      default:
-      {
-        return substring( this->s, this->startpos, newendpos );
-      }
     }
-    c--;
+
   }
-  return substring( this->s, this->startpos, newendpos );
+  return substring( this->s, this->startpos, i );
 }
 
 /*******************************************************************************
@@ -864,7 +962,7 @@ substring substring::trim( void )
 
 /*******************************************************************************
 Function: joinstring
-Purpose: Join a list of strings together delimitered with delim. This pair of 
+Purpose: Join a list of strings together delimitered with delim. This pair of
 functions are designed to be used with small strings/lists.
 Updated: 22.01.2019
 *******************************************************************************/
