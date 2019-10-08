@@ -29,6 +29,7 @@ sipheaders = [ # SIP Headers
           "Supported",
           "To",
           "Refer-To",
+          "Replaces",
           "Via",
           "User-Agent",
           "Min-Expires",
@@ -51,7 +52,7 @@ for header in sipheaders:
 
   lowerheader = header.lower()
   c = hex(zlib.crc32(lowerheader) & 0xffffffff )
-
+  
   print "    case " + c + ":   /* " + lowerheader + " */"
   print "    {"
   print "      return " + string.replace( header, '-', '_') + ";"
