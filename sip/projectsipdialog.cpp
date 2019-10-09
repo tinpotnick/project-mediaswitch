@@ -41,7 +41,8 @@ projectsipdialog::projectsipdialog() :
   ringingat( 0 ),
   answerat( 0 ),
   endat( 0 ),
-  ourtag( projectsippacket::tag() )
+  ourtag( projectsippacket::tag() ),
+  theirtag( nullptr )
 {
   projectsipdialogcounter++;
 }
@@ -1120,6 +1121,13 @@ bool projectsipdialog::sendinvite( void )
   touri += this->todomain;
   touri += ">";
 
+  /* re-invite */
+  if( this->theirtag )
+  {
+    touri += ";tag=";
+    touri += *this->theirtag;
+  }
+
   invite->addheader( projectsippacket::To, touri ); /* only gets a tag on a re-invite */
 
   std::string fromuri;
@@ -1132,7 +1140,6 @@ bool projectsipdialog::sendinvite( void )
   fromuri += *this->ourtag;
 
   invite->addheader( projectsippacket::From, fromuri ); /* always needs a tag */
-
 
   /* after all headers have been added */
   invite->setbody( sdp.c_str() );
@@ -1356,6 +1363,7 @@ std::cout << "Found replaces" << std::endl;
     }
 
     v[ "refer" ] = refer;
+    this->referpk = nullptr;
   }
 
   v[ "authenticated" ] = ( JSON::Bool ) this->authenticated;
@@ -1569,23 +1577,7 @@ void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwe
     return;
   }
 
-  if( action == "invite" )
-  {
-    /* this will be a re-invite */
-    return;
-  }
-
-  if( action == "ring" )
-  {
-    response.setstatusline( 200, "Ok" );
-    (*it)->alertinfo = "";
-    if ( b.has_key( "alertinfo" ) )
-    {
-      (*it)->alertinfo = JSON::as_string( b[ "alertinfo" ] );
-    }
-    (*it)->ringing();
-  }
-  else if( action == "answer" )
+  if( action == "answer" )
   {
     response.setstatusline( 200, "Ok" );
 
@@ -1600,6 +1592,31 @@ void projectsipdialog::httpput( stringvector &path, JSON::Value &body, projectwe
     }
 
     ( *it )->answer( sdp );
+  }
+  else if( action == "invite" )
+  {
+    /* this will be a re-invite */
+    std::string sdp = "";
+    if ( b.has_key( "sdp" ) )
+    {
+      ( *it )->oursdp = b[ "sdp" ];
+      sdp = *( jsontosdp( JSON::as_object( b[ "sdp" ] ) ) );
+    }
+
+    if( !(*it)->sendinvite() )
+    {
+    }
+    return;
+  }
+  else if( action == "ring" )
+  {
+    response.setstatusline( 200, "Ok" );
+    (*it)->alertinfo = "";
+    if ( b.has_key( "alertinfo" ) )
+    {
+      (*it)->alertinfo = JSON::as_string( b[ "alertinfo" ] );
+    }
+    (*it)->ringing();
   }
   else if( action == "ok" )
   {

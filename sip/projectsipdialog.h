@@ -151,6 +151,7 @@ private:
   std::time_t endat;
 
   stringptr ourtag;
+  stringptr theirtag;
 
   /* outbound values */
   std::string authsecret;

@@ -18,7 +18,7 @@ projectcontrol.moh = {
   "loop": true,
   "files":[
     {
-      "wav": "test.wav"
+      "wav": "uksounds.wav"
     }
   ]
 }
@@ -70,10 +70,8 @@ console.log("5")
 
   if( "6" == call.destination )
   {
-console.log("6")
     call.onanswer = () =>
     {
-console.log("6.onanswer")
       var soup = {}
       soup.loop = true
       soup.files = []
@@ -82,7 +80,6 @@ console.log("6.onanswer")
       soup.loop = true
   
       call.play( soup )
-  
       call.newcall( { to: { user: "1003" } } )
     }
     call.answer()

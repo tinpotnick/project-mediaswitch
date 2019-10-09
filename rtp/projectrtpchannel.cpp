@@ -499,6 +499,11 @@ void projectrtpchannel::checkfornewmixes( void )
     if( !other )
     {
       /* empty indicates unmix */
+
+      /* Allow us to remix with another */
+      this->receivedrtp = false;
+
+      /* Clear others */
       for( auto it = this->others->begin(); it != this->others->end(); it++ )
       {
         ( *it )->unmix();

@@ -110,6 +110,10 @@ void projectsipdialog::inviteauth( projectsippacket::pointer pk )
 
     return;
   }
+  this->theirtag = pk->gettag( projectsippacket::From ).strptr();
+  this->touser = pk->getuser().str();
+  this->fromuser = pk->getuser( projectsippacket::From ).str();
+  this->todomain = pk->gethost().str();
   this->domain = pk->geturihost().str();
   this->authenticated = true;
   this->invite( pk );

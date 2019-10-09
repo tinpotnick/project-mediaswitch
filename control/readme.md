@@ -44,7 +44,7 @@ The call object is now available.
     "hangup": false,
     "error": { "code": 0, "status": "" },
     "remote": { "host": "192.168.0.114", "port": 62001 },
-    "refer": { "to": [ String ], "referedby": [ Object ] },  /* referedby is a reference to the call object which performed the xfer */
+    "refer": { "to": [ String ], "referedby": [ Object ], "replaces", "callid" },  /* referedby is a reference to the call object which performed the xfer */
     "sdp":
     {
       "them":
