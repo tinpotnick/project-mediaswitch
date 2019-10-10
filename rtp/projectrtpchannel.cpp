@@ -292,6 +292,8 @@ Buffer up RTP data to reorder and give time for packets to be received then proc
 void projectrtpchannel::handlertpdata( void )
 {
   rtppacket *src = this->orderedrtpdata[ this->orderedinbottom ];
+  if( nullptr == src ) return;
+
   uint32_t sn = src->getsequencenumber();
   uint32 aheadby = this->orderedinmaxsn - sn;
 
@@ -337,6 +339,7 @@ whilecontinue:
     aheadby--;
     this->orderedinbottom = ( this->orderedinbottom + 1 ) % BUFFERPACKETCOUNT;
     src = this->orderedrtpdata[ this->orderedinbottom ];
+    if( nullptr == src ) return;
   }
 }
 
