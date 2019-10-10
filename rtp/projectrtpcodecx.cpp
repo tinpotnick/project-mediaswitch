@@ -226,7 +226,7 @@ bool codecx::g711tol16( void )
 */
 void codecx::l16topcma( void )
 {
-  uint8_t *out = this->pcmaref.c_str();;
+  uint8_t *out = this->pcmaref.c_str();
 
   int16_t *in;
   size_t l168klength = this->l168kref.size() / 2;
