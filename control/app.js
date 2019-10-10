@@ -85,6 +85,36 @@ console.log("5")
     call.answer()
   }
 
+  if( "7" == call.destination )
+  {
+    call.onanswer = () =>
+    {
+      setTimeout( () => { call.hangup(); }, 2000 )
+    }
+    call.answer()
+  }
+
+  if( "8" == call.destination )
+  {
+    call.onanswer = () =>
+    {
+      var soup = {}
+      soup.loop = true
+      soup.files = []
+      soup.files.push( { wav: "uksounds.wav", start: 1000, stop: 3999, loop: 3 } )
+      soup.files.push( { wav: "uksounds.wav", start: 4000, stop: 5499 } )
+      soup.loop = true
+  
+      call.play( soup )
+      var newcall = call.newcall( { to: { user: "1003" } } )
+      newcall.onanswer = () =>
+      {
+        setTimeout( () => { newcall.hangup(); }, 2000 )
+      }
+    }
+    call.answer()
+  }
+
   call.onhangup = () =>
   {
     console.log( "hung up" )

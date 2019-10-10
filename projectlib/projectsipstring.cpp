@@ -583,6 +583,13 @@ size_t substring::operator--( int )
   return this->endpos;
 }
 
+bool substring::valid( void )
+{
+  if( !this->s ) return false;
+  if( 0 == this->endpos ) return false;
+  return true;
+}
+
 /*******************************************************************************
 Function: length
 Purpose: Returns the length of the substring

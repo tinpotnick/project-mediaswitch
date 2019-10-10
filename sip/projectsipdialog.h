@@ -150,8 +150,8 @@ private:
   std::time_t answerat;
   std::time_t endat;
 
-  stringptr ourtag;
-  stringptr theirtag;
+  substring ourtag;
+  substring theirtag;
 
   /* outbound values */
   std::string authsecret;

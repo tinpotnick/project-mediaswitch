@@ -86,6 +86,7 @@ public:
   substring ltrim( void );
   substring trim( void );
   void cs( bool cs ) { this->casesensative = cs; }
+  bool valid( void );
 
   size_t operator++( int );
 

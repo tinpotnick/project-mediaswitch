@@ -251,6 +251,12 @@ void projectrtpchannel::readsomertp( void )
             this->receivedrtp = true;
           }
 
+          /* After the first packet - we only accept data from the verified source */
+          if( this->confirmedrtpsenderendpoint != this->rtpsenderendpoint )
+          {
+            return;
+          }
+
           this->rtpdata[ this->rtpindexin ].length = bytes_recvd;
           
           /* Now order it */
@@ -289,7 +295,7 @@ void projectrtpchannel::handlertpdata( void )
   uint32_t sn = src->getsequencenumber();
   uint32 aheadby = this->orderedinmaxsn - sn;
 
-  /* 
+  /*
     We ony process packets when we are more than BUFFERDELAYCOUNT behind - allow time for reordering
   */
   while( aheadby > BUFFERDELAYCOUNT )

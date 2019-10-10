@@ -472,6 +472,19 @@ void stringtest( void )
     substring t( u, 5, 10 );
     substring t2( u, 0, 5 );
     substring t3( u, 0, 5 );
+    substring t4;
+
+    if( t4.valid() )
+    {
+      std::cout << __FILE__ << ":" << __LINE__ << ": We should not get here..." << std::endl;
+      return;
+    }
+
+    if( !t.valid() )
+    {
+      std::cout << __FILE__ << ":" << __LINE__ << ": We should not get here..." << std::endl;
+      return;
+    }
 
     projecttest( t, "hello", "Uh oh, I was expecting hello" );
     projecttest( t2, "12345", "Uh oh, I was expecting 12345" );

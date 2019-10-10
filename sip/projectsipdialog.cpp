@@ -41,8 +41,7 @@ projectsipdialog::projectsipdialog() :
   ringingat( 0 ),
   answerat( 0 ),
   endat( 0 ),
-  ourtag( projectsippacket::tag() ),
-  theirtag( nullptr )
+  ourtag( projectsippacket::tag() )
 {
   projectsipdialogcounter++;
 }
@@ -389,6 +388,7 @@ void projectsipdialog::waitforack( projectsippacket::pointer pk )
       this,
       std::placeholders::_1 );
 
+    if( !this->theirtag.valid() ) this->theirtag = pk->gettag( projectsippacket::From ).strptr();
     this->ackpk = pk;
     this->canceltimer();
     this->updatecontrol();
@@ -438,6 +438,8 @@ void projectsipdialog::waitfor200( projectsippacket::pointer pk )
       this,
       std::placeholders::_1 );
     this->canceltimer();
+
+    if( !this->theirtag.valid() ) this->theirtag = pk->gettag( projectsippacket::To ).strptr();
   }
 }
 
@@ -518,7 +520,7 @@ void projectsipdialog::ringing( void )
     }
 
     ringing->addheader( projectsippacket::To,
-                uri.str() + ";tag=" + *this->ourtag );
+                uri.str() + ";tag=" + this->ourtag.str() );
     ringing->addheader( projectsippacket::From,
                 this->invitepk->getheader( projectsippacket::From ) );
     ringing->addheader( projectsippacket::Call_ID,
@@ -610,7 +612,7 @@ void projectsipdialog::send200( std::string body, bool final )
     stu.end( stu.end() + 1 );
   }
   ok->addheader( projectsippacket::To,
-                stu.str() + ";tag=" + *this->ourtag );
+                stu.str() + ";tag=" + this->ourtag.str() );
 
   ok->addheader( projectsippacket::From,
               this->lastreceivedpk->getheader( projectsippacket::From ) );
@@ -667,7 +669,7 @@ void projectsipdialog::send202( void )
     stu.end( stu.end() + 1 );
   }
   ok->addheader( projectsippacket::To,
-                stu.str() + ";tag=" + *this->ourtag );
+                stu.str() + ";tag=" + this->ourtag.str() );
 
   ok->addheader( projectsippacket::From,
               this->lastreceivedpk->getheader( projectsippacket::From ) );
@@ -805,48 +807,36 @@ Send a BYE. Direction matters!
 */
 void projectsipdialog::sendbye( void )
 {
-  if( !this->lastreceivedpk )
-  {
-    return;
-  }
+  /* We can only send a by on an established dialog */
+  if( !this->theirtag.valid() ) return;
+  if( !this->ackpk ) return;
 
-  if( this->originator )
-  {
-    if( !this->invitepk )
-    {
-      return;
-    }
-  }
-  else
-  {
-    if( !this->ackpk )
-    {
-      return;
-    }
-  }
-
-  this->cseq = this->lastreceivedpk->getcseq() + 1;
+  this->cseq = this->ackpk->getcseq() + 1;
 
   projectsippacket::pointer bye = projectsippacket::create();
 
-  if( this->originator )
-  {
-    bye->setrequestline( projectsippacket::BYE, this->ackpk->getrequesturi().str() );
-    bye->addheader( projectsippacket::To,
-                  this->lastreceivedpk->getheader( projectsippacket::To ) );
+  bye->setrequestline( projectsippacket::BYE, this->ackpk->getrequesturi().str() );
 
-    bye->addheader( projectsippacket::From,
-                this->lastreceivedpk->getheader( projectsippacket::From ) );
-  }
-  else
-  {
-    bye->setrequestline( projectsippacket::BYE, this->ackpk->getrequesturi().str() );
-    bye->addheader( projectsippacket::To,
-                  this->lastreceivedpk->getheader( projectsippacket::From ) );
+  std::string touri;
+  touri.reserve( 200 );
+  touri = "<sip:";
+  touri += this->touser;
+  touri += "@";
+  touri += this->todomain;
+  touri += ">;tag=";
+  touri += this->theirtag.str();
 
-    bye->addheader( projectsippacket::From,
-                this->lastreceivedpk->getheader( projectsippacket::To ) );
-  }
+  std::string fromuri;
+  fromuri.reserve( 200 );
+  fromuri = "<sip:";
+  fromuri += this->fromuser;
+  fromuri += "@";
+  fromuri += this->domain;
+  fromuri += ">;tag=";
+  fromuri += this->ourtag.str();
+
+  bye->addheader( projectsippacket::To, touri );
+  bye->addheader( projectsippacket::From, fromuri );
 
   // New transaction, new branch.
   bye->addviaheader( projectsipconfig::gethostipsipport() );
@@ -1094,7 +1084,7 @@ bool projectsipdialog::sendinvite( void )
 
   invite->addheader( projectsippacket::Call_ID, this->callid );
 
-  invite->addheader( projectsippacket::CSeq, std::to_string( this->cseq ) + " INVITE" );
+  invite->addheader( projectsippacket::CSeq, std::to_string( ++this->cseq ) + " INVITE" );
   invite->addheader( projectsippacket::Max_Forwards, maxforwards );
 
   std::string sdp = *( jsontosdp( JSON::as_object( this->oursdp ) ) );
@@ -1122,10 +1112,10 @@ bool projectsipdialog::sendinvite( void )
   touri += ">";
 
   /* re-invite */
-  if( this->theirtag )
+  if( this->theirtag.valid() )
   {
     touri += ";tag=";
-    touri += *this->theirtag;
+    touri += this->theirtag.str();
   }
 
   invite->addheader( projectsippacket::To, touri ); /* only gets a tag on a re-invite */
@@ -1137,7 +1127,7 @@ bool projectsipdialog::sendinvite( void )
   fromuri += "@";
   fromuri += this->domain;
   fromuri += ">;tag=";
-  fromuri += *this->ourtag;
+  fromuri += this->ourtag.str();
 
   invite->addheader( projectsippacket::From, fromuri ); /* always needs a tag */
 
@@ -1226,6 +1216,8 @@ void projectsipdialog::waitforinviteprogress( projectsippacket::pointer pk )
       sdptojson( pk->getbody(), this->remotesdp );
     }
 
+    if( !this->theirtag.valid() ) this->theirtag = pk->gettag( projectsippacket::To ).strptr();
+
     this->nextstate = std::bind(
       &projectsipdialog::waitfornextinstruction,
       this,
@@ -1273,6 +1265,8 @@ void projectsipdialog::waitforinviteprogressafterauth( projectsippacket::pointer
     {
       sdptojson( pk->getbody(), this->remotesdp );
     }
+
+    if( !this->theirtag.valid() ) this->theirtag = pk->gettag( projectsippacket::To ).strptr();
 
     this->sendack();
     this->updatecontrol();
