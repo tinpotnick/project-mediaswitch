@@ -368,6 +368,7 @@ void projectsipregistration::expire( void )
 {
   this->isregistered = false;
   /* update control */
+  if( !this->authacceptpacket ) return;
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->authacceptpacket->geturihost() );
   if( !ptr ) return;
   
