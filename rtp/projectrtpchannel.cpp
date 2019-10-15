@@ -310,12 +310,7 @@ bool projectrtpchannel::handlertpdata( void )
   /* Only process if it is the expected sn */
   if( this->orderedinminsn == sn )
   {
-std::cout << "processing:" << workingonaheadby << std::endl;
     this->processrtpdata( src, workingonaheadby - 1 );
-  }
-  else
-  {
-    std::cout << "unexpected sn: " << sn << ":" << this->orderedinminsn << std::endl;
   }
 
   this->lastworkedonsn = sn;
