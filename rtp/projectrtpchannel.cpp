@@ -109,7 +109,7 @@ void projectrtpchannel::open( std::string &control )
   this->orderedinminsn = 0;
   this->orderedinmaxsn = 0;
   this->orderedinbottom = 0;
-  this->lastprocessed = nullptr;
+  this->lastworkedonsn = 0;
 
   this->control = control;
 
@@ -208,7 +208,7 @@ void projectrtpchannel::handletick( const boost::system::error_code& error )
     }
     else
     {
-      this->handlertpdata();
+      while( this->handlertpdata() );
     }
 
     /* The last thing we do */
@@ -249,6 +249,7 @@ void projectrtpchannel::readsomertp( void )
           {
             this->confirmedrtpsenderendpoint = this->rtpsenderendpoint;
             this->receivedrtp = true;
+            this->lastworkedonsn = this->rtpdata[ this->rtpindexin ].getsequencenumber() - 1;
           }
 
           /* After the first packet - we only accept data from the verified source */
@@ -288,59 +289,41 @@ void projectrtpchannel::readsomertp( void )
 ## handlertpdata
 
 Buffer up RTP data to reorder and give time for packets to be received then process.
+
+Return false to indicate complete - no further work to do, return true to indicate there may be more work to do.
 */
-void projectrtpchannel::handlertpdata( void )
+bool projectrtpchannel::handlertpdata( void )
 {
+  if( !this->receivedrtp ) return false;
+
   rtppacket *src = this->orderedrtpdata[ this->orderedinbottom ];
-  if( nullptr == src ) return;
+  if( nullptr == src ) return false;
 
-  uint32_t sn = src->getsequencenumber();
-  uint32 aheadby = this->orderedinmaxsn - sn;
+  uint16_t sn = src->getsequencenumber();
+  uint16_t aheadby = this->orderedinmaxsn - sn;
 
-  /*
-    We ony process packets when we are more than BUFFERDELAYCOUNT behind - allow time for reordering
-  */
-  while( aheadby > BUFFERDELAYCOUNT )
+  /* We allow BUFFERDELAYCOUNT to accumulate in our buffer before we work on them */
+  if( aheadby < BUFFERDELAYCOUNT ) return false;
+
+  uint16_t workingonaheadby = sn - this->lastworkedonsn;
+  
+  /* Only process if it is the expected sn */
+  if( this->orderedinminsn == sn )
   {
-    uint32_t workingonaheadby;
-    uint32_t workingonsn;
-    uint32_t lastworkedonsn;
-
-    if( nullptr == src )
-    {
-      goto whilecontinue;
-    }
-
-    if( nullptr != this->lastprocessed )
-    {
-      lastworkedonsn = this->lastprocessed->getsequencenumber();
-    }
-    else
-    {
-      lastworkedonsn = src->getsequencenumber() - 1;
-    }
-
-    workingonsn = src->getsequencenumber();
-    workingonaheadby = workingonsn - lastworkedonsn;
-    
-    if( this->orderedinminsn != workingonsn )
-    {
-std::cout << "unexpected:" << this->orderedinminsn << ":" << workingonsn << std::endl;
-      /* Not a packet we are interested in */
-      goto whilecontinue;
-    }
-
-    /* At this point we should be in order - but may have breaks (missing chunks) */
+std::cout << "processing:" << workingonaheadby << std::endl;
     this->processrtpdata( src, workingonaheadby - 1 );
-    this->lastprocessed = src;
-    this->orderedinminsn++;
-
-whilecontinue:
-    aheadby--;
-    this->orderedinbottom = ( this->orderedinbottom + 1 ) % BUFFERPACKETCOUNT;
-    src = this->orderedrtpdata[ this->orderedinbottom ];
-    if( nullptr == src ) return;
   }
+  else
+  {
+    std::cout << "unexpected sn: " << sn << ":" << this->orderedinminsn << std::endl;
+  }
+
+  this->lastworkedonsn = sn;
+  this->orderedrtpdata[ this->orderedinbottom ] = nullptr;
+  this->orderedinminsn++;
+  this->orderedinbottom = ( this->orderedinbottom + 1 ) % BUFFERPACKETCOUNT;
+
+  return true;
 }
 
 

@@ -94,10 +94,10 @@ public:
 
   rtppacket rtpdata[ BUFFERPACKETCOUNT ];
   rtppacket *orderedrtpdata[ BUFFERPACKETCOUNT ];
-  rtppacket *lastprocessed;
   std::atomic_uint16_t orderedinminsn; /* sn = sequence number, min smallest we hold which is unprocessed - when it is processed we can forget about it */
   std::atomic_uint16_t orderedinmaxsn;
   std::atomic_uint16_t orderedinbottom; /* points to our min sn packet */
+  std::atomic_uint16_t lastworkedonsn;
 
   unsigned char rtcpdata[ RTCPMAXLENGTH ];
   int rtpindexoldest;
@@ -121,7 +121,7 @@ private:
   boost::asio::ip::udp::endpoint rtcpsenderendpoint;
 
   /* confirmation of where the other end of the RTP stream is */
-  bool receivedrtp;
+  std::atomic_bool receivedrtp;
   bool targetconfirmed;
 
   bool reader;
@@ -129,7 +129,7 @@ private:
   void readsomertp( void );
   void readsomertcp( void );
 
-  void handlertpdata( void );
+  bool handlertpdata( void );
   void processrtpdata( rtppacket *src, uint32_t skipcount );
   void handlertcpdata( void );
   void handletargetresolve (
