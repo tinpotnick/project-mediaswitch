@@ -45,8 +45,6 @@ typedef std::unordered_map<std::string, projectrtpchannel::pointer> activertpcha
 rtpchannels dormantchannels;
 activertpchannels activechannels;
 
-#warning TODO
-// We probably need a config class
 short port;
 std::string publicaddress;
 unsigned maxworker;
