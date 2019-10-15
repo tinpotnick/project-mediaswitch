@@ -1352,7 +1352,6 @@ bool projectsipdialog::updatecontrol( void )
     substring replaces = this->referpk->getreplaces();
     if( 0 != replaces.end() )
     {
-std::cout << "Found replaces" << std::endl;
       refer[ "replaces" ] = replaces.str();
     }
 
