@@ -49,7 +49,42 @@ void projectsipregistration::regstart( projectsippacket::pointer pk )
     expires = DEFAULTSIPEXPIRES;
   }
 
-  if( 0 == expires || DEFAULTSIPEXPIRES > expires )
+  if( 0 == expires )
+  {
+    projectsippacket ok;
+
+    ok.setstatusline( 200, "Ok" );
+    std::string via = projectsipconfig::gethostip() +
+                    std::string( ":" ) +
+                    std::to_string( projectsipconfig::getsipport() );
+
+    ok.addviaheader( via.c_str(), pk );
+
+    ok.addheader( projectsippacket::Min_Expires,
+                DEFAULTSIPEXPIRES );
+
+    ok.addheader( projectsippacket::To,
+                pk->getheader( projectsippacket::To ) );
+    ok.addheader( projectsippacket::From,
+                pk->getheader( projectsippacket::From ) );
+    ok.addheader( projectsippacket::Call_ID,
+                pk->getheader( projectsippacket::Call_ID ) );
+    ok.addheader( projectsippacket::CSeq,
+                pk->getheader( projectsippacket::CSeq ) );
+    ok.addheader( projectsippacket::Contact,
+                projectsippacket::contact( pk->getuser().strptr(),
+                stringptr( new std::string( projectsipconfig::gethostipsipport() ) ) ) );
+    ok.addheader( projectsippacket::Content_Type,
+                "application/sdp" );
+    ok.addheader( projectsippacket::Content_Length,
+                        "0" );
+
+    pk->respond( ok.strptr() );
+    this->expire();
+    return;
+  }
+
+  if( DEFAULTSIPEXPIRES > expires )
   {
     /*
      If a UA receives a 423 (Interval Too Brief) response, it MAY retry
@@ -334,6 +369,8 @@ void projectsipregistration::expire( void )
   this->isregistered = false;
   /* update control */
   projectsipdirdomain::pointer ptr = projectsipdirdomain::lookupdomain( this->authacceptpacket->geturihost() );
+  if( !ptr ) return;
+  
   std::string controluri = *ptr->controlhost;
   controluri += "/reg/" + this->authacceptpacket->geturihost().str() + '/' + this->authacceptpacket->getuser().str();
 
