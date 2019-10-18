@@ -268,6 +268,8 @@ As it says.
 */
 bool codecx::ilbctol16( void )
 {
+  if( 0 == this->ilbcref.size() ) return false;
+
   /* roughly compression size with some leg room. */
   this->l168kref.malloc( this->ilbcref.size() * 5 );
 
@@ -399,12 +401,12 @@ void codecx::l16lowtowideband( void )
     return;
   }
 
-  this->l1616kref.malloc( this->l168kref.size() * 2 );
+  this->l1616kref.malloc( l168klength * 2 );
 
   int16_t *in = ( int16_t * ) this->l168kref.c_str();
   int16_t *out = ( int16_t * ) this->l1616kref.c_str();
 
-  for( size_t i = 0; i < l168klength; i++ )
+  for( size_t i = 0; i < l168klength/2; i++ )
   {
     *out = ( ( *in - this->resamplelastsample ) / 2 ) + this->resamplelastsample;
     this->resamplelastsample = *in;
@@ -427,7 +429,7 @@ void codecx::requirewideband( void )
   if( this->g722tol16() ) return;
   if( !this->g711tol16() )
   {
-    if( !this->ilbctol16() )
+    if( this->ilbctol16() )
     {
       return;
     }
@@ -563,7 +565,7 @@ codecx& operator << ( codecx& c, const char& a )
 Take the data out and transcode if necessary. Keep reference to any packet we have transcoded as we may need to use it again.
 */
 rtppacket& operator << ( rtppacket& pk, codecx& c )
-{ 
+{
   int outpayloadtype = pk.getpayloadtype();
 
   /* If we have already have or converted this packet... */

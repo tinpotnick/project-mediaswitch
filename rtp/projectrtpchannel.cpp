@@ -535,23 +535,19 @@ The CODECs on the other end which are acceptable. The first one should be the pr
 */
 void projectrtpchannel::audio( codeclist codecs )
 {
-#warning Flip this - we just need to ignore codecs like 2833 which is not really a codec
-  if( codecs.size() > 0 )
+  this->codecs = codecs;
+  codeclist::iterator it;
+  for( it = codecs.begin(); it != codecs.end(); it++ )
   {
-    this->codecs = codecs;
-    codeclist::iterator it;
-    for( it = codecs.begin(); it != codecs.end(); it++ )
+    switch( *it )
     {
-      switch( *it )
+      case PCMAPAYLOADTYPE:
+      case PCMUPAYLOADTYPE:
+      case G722PAYLOADTYPE:
+      case ILBCPAYLOADTYPE:
       {
-        case PCMAPAYLOADTYPE:
-        case PCMUPAYLOADTYPE:
-        case G722PAYLOADTYPE:
-        case ILBCPAYLOADTYPE:
-        {
-          this->selectedcodec = *it;
-          return;
-        }
+        this->selectedcodec = *it;
+        return;
       }
     }
   }

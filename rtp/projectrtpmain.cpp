@@ -116,8 +116,8 @@ static void handlewebrequest( projectwebdocument &request, projectwebdocument &r
         if ( activechannels.end() != chan )
         {
           chan->second->close();
-          activechannels.erase( chan );
           dormantchannels.push_back( chan->second );
+          activechannels.erase( chan );
 
           JSON::Object v;
           JSON::Object c;
