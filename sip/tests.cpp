@@ -687,6 +687,21 @@ void sdptest( void )
     std::cout << *generated << std::endl;
     std::cout << "===========================================================" << std::endl;
   }
+
+  {
+    /*
+    stringptr sdp = gettestchunk( testdata, "SDP4" );
+    projectsippacket p( sdp );
+    substring s( p.getbody() );
+
+    JSON::Value val;
+    sdptojson( s, val );
+
+    std::cout << JSON::to_string( val ) << std::endl;
+
+    {"v":0,"o":{"username":"Z","sessionid":0,"sessionversion":3,"nettype":"IN","ipver":4,"address":"192.168.0.141"},"s":"Z","c":[{"nettype":"IN","ipver":4,"address":"192.168.0.141"}],"t":{"start":0,"stop":0},"m":[{"media":"audio","port":8000,"proto":"RTP/AVP","payloads":[8,106,9,0,18,3,111,97,110,112,102,101,98,100,99],"rtpmap":{"106":{"encoding":"opus","clock":48000},"18":{"encoding":"G729","clock":8000},"111":{"encoding":"speex","clock":16000},"97":{"encoding":"iLBC","clock":8000},"110":{"encoding":"speex","clock":8000},"112":{"encoding":"speex","clock":32000},"102":{"encoding":"G726-32","clock":8000},"101":{"encoding":"telephone-event","clock":8000},"98":{"encoding":"telephone-event","clock":48000},"100":{"encoding":"telephone-event","clock":16000},"99":{"encoding":"telephone-event","clock":32000}},"fmtp":{"106":"minptime=20; cbr=1; maxaveragebitrate=40000; useinbandfec=1","18":"annexb=no","97":"mode=20","101":"0-16","98":"0-16","100":"0-16","99":"0-16"},"direction":"inactive"}]}
+    */
+  }
 }
 
 /*******************************************************************************
