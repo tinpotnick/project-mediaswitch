@@ -36,9 +36,16 @@ projectcontrol.onnewcall = ( call ) =>
   console.log( "new call inbound call" )
   if( call.haserror ) console.log( call.error )
 
-  if( "3" == call.destination )
+  if( "2" == call.destination )
   {
     console.log("calling 1001")
+    call.newcall( { to: { user: "1001" } } )
+    return;
+  }
+
+  if( "3" == call.destination )
+  {
+    console.log("calling 1003")
     call.newcall( { to: { user: "1003" } } )
     return;
   }
@@ -62,7 +69,7 @@ console.log("5")
       soup.loop = true
       soup.files = []
       soup.files.push( { wav: "test.wav", start: 3000, stop: 5000 } )
-  
+
       call.play( soup )
       setTimeout( () => { call.hangup(); }, 60000 )
     }
