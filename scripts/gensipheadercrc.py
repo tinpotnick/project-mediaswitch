@@ -42,7 +42,9 @@ sipheaders = [ # SIP Headers
           "ACK",
           "OPTIONS",
           "CANCEL",
-          "BYE"
+          "BYE",
+          "SUBSCRIBE",
+          "PUBLISH"
         ]
 
 
