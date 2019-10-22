@@ -927,6 +927,14 @@ int projectsippacket::getmethodfromcrc( int crc )
     {
       return BYE;
     }
+    case 0x68b95f3e:   /* subscribe */
+    {
+      return SUBSCRIBE;
+    }
+    case 0xb894cc41:   /* publish */
+    {
+      return PUBLISH;
+    }
   }
   return -1;
 }
@@ -956,6 +964,10 @@ const char *projectsippacket::getmethodstr( int method )
       return "CANCEL";
     case BYE:
       return "BYE";
+    case SUBSCRIBE:
+      return "SUBSCRIBE";
+    case PUBLISH:
+      return "PUBLISH";
     default:
       return "";
   }

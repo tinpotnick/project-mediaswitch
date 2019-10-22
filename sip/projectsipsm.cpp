@@ -5,6 +5,7 @@
 #include "projectsipregistrar.h"
 #include "projectsipdialog.h"
 #include "projectsipdirectory.h"
+#include "projectsipeventstate.h"
 
 /* Our one instalce. */
 static projectsipsm sipsm;
@@ -43,6 +44,13 @@ void projectsipsm::handlesippacket( projectsippacket::pointer pk )
     case projectsippacket::OPTIONS:
     {
       sipsm.handleoptions( pk );
+      break;
+    }
+    case projectsippacket::SUBSCRIBE:
+    case projectsippacket::NOTIFY:
+    case projectsippacket::PUBLISH:
+    {
+      projectsipeventsubscription::handlesippacket( pk );
       break;
     }
     case projectsippacket::BYE:
