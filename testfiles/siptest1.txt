@@ -183,3 +183,45 @@ Contact: <sip:bob@labpc.example.org>
 Replaces: 425928@phone.example.org
  ;to-tag=7743;from-tag=6472;early-only
 ==END==
+==SDP4==
+INVITE sip:1000@192.168.0.141:9997 SIP/2.0
+Via: SIP/2.0/UDP 192.168.0.141:51537;branch=z9hG4bK-524287-1---0d3d1b5f013351fe;rport
+Max-Forwards: 70
+Contact: <sip:1003@192.168.0.141:51537>
+To: <sip:1000@bling.babblevoice.com>;tag=ulaNqHk8
+From: <sip:1003@bling.babblevoice.com>;tag=7adf3665
+Call-ID: 98a35458-04c0-4d02-8111-5e4b79bba5fd
+CSeq: 3 INVITE
+Allow: INVITE, ACK, CANCEL, BYE, NOTIFY, REFER, MESSAGE, OPTIONS, INFO, SUBSCRIBE
+Content-Type: application/sdp
+User-Agent: Z 5.2.28 rv2.8.114
+Authorization: Digest username="1003",realm="bling.babblevoice.com",nonce="e287f6db-99a7-4f68-a6c9-fef69c783084",uri="sip:1000@192.168.0.141:9997",response="1a71634282a19f94ba742f536bd37fe0",cnonce="fcbb1eb6671b6eb0f736b53ba2488308",nc=00000001,qop=auth,algorithm=MD5,opaque="1bc0718c-6f71-4b73-af4e-fa8a53bb9615"
+Allow-Events: presence, kpml, talk
+Content-Length: 649
+
+v=0
+o=Z 0 3 IN IP4 192.168.0.141
+s=Z
+c=IN IP4 192.168.0.141
+t=0 0
+m=audio 8000 RTP/AVP 8 106 9 0 18 3 111 97 110 112 102 101 98 100 99
+a=rtpmap:106 opus/48000/2
+a=fmtp:106 minptime=20; cbr=1; maxaveragebitrate=40000; useinbandfec=1
+a=rtpmap:18 G729/8000
+a=fmtp:18 annexb=no
+a=rtpmap:111 speex/16000
+a=rtpmap:97 iLBC/8000
+a=fmtp:97 mode=20
+a=rtpmap:110 speex/8000
+a=rtpmap:112 speex/32000
+a=rtpmap:102 G726-32/8000
+a=rtpmap:101 telephone-event/8000
+a=fmtp:101 0-16
+a=rtpmap:98 telephone-event/48000
+a=fmtp:98 0-16
+a=rtpmap:100 telephone-event/16000
+a=fmtp:100 0-16
+a=rtpmap:99 telephone-event/32000
+a=fmtp:99 0-16
+a=inactive
+==END==
