@@ -138,7 +138,6 @@ private:
 
 
   void checkfornewmixes( void );
-  uint32_t timestampdiff;
   uint64_t receivedpkcount;
 
   typedef std::list< projectrtpchannel::pointer > projectrtpchannellist;
