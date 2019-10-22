@@ -9,6 +9,8 @@
 
 #include "projectsippacket.h"
 
+#define MAXUDPPACKET 2000
+
 
 /*!md
 # projectsipserver
@@ -27,7 +29,7 @@ public:
 private:
   boost::asio::ip::udp::socket socket;
   boost::asio::ip::udp::endpoint sender_endpoint;
-  enum { max_length = 1500 };
+  enum { max_length = MAXUDPPACKET };
   char data[ max_length ];
   int bytesreceived;
 

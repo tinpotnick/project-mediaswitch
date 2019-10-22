@@ -41,7 +41,7 @@ void projectsipserver::handlereadsome( void )
     boost::asio::buffer( this->data, max_length ), sender_endpoint,
       [ this ]( boost::system::error_code ec, std::size_t bytes_recvd )
       {
-        if ( !ec && bytes_recvd > 0 && bytes_recvd <= 1500 )
+        if ( !ec && bytes_recvd > 0 && bytes_recvd <= MAXUDPPACKET )
         {
           this->bytesreceived = bytes_recvd;
           this->handledata();
