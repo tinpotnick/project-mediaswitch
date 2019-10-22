@@ -26,7 +26,17 @@ Create the socket then wait for data
 echo "This is my data" > /dev/udp/127.0.0.1/10000
 */
 projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsigned short port )
-  : rtpindexoldest( 0 ),
+  : 
+  selectedcodec( 0 ),
+  ssrcout( 0 ),
+  ssrcin( 0 ),
+  tsout( 0 ),
+  seqout( 0 ),
+  orderedinminsn( 0 ),
+  orderedinmaxsn( 0 ),
+  orderedinbottom( 0 ),
+  lastworkedonsn( 0 ),
+  rtpindexoldest( 0 ),
   rtpindexin( 0 ),
   rtpoutindex( 0 ),
   active( false ),
@@ -39,9 +49,12 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsig
   reader( true ),
   writer( true ),
   receivedpkcount( 0 ),
+  others( nullptr ),
+  player( nullptr ),
   mixqueue( MIXQUEUESIZE ),
   tick( io_service )
 {
+  memset( this->orderedrtpdata, 0, sizeof( this->orderedrtpdata ) );
 }
 
 /*!md
@@ -417,6 +430,8 @@ Send a [RTP] packet to our endpoint.
 */
 void projectrtpchannel::writepacket( rtppacket *pk )
 {
+  if( 0 == pk->length ) return;
+
   if( this->receivedrtp || this->targetconfirmed )
   {
     this->tsout = pk->getnexttimestamp();

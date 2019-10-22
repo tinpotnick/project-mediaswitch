@@ -206,7 +206,7 @@ bool codecx::g711tol16( void )
     return false;
   }
 
-  this->l168kref.malloc( insize );
+  this->l168kref.malloc( insize * 2 );
   
   int16_t *out = ( int16_t * ) this->l168kref.c_str();
   
@@ -648,6 +648,10 @@ rtppacket& operator << ( rtppacket& pk, codecx& c )
       c.l16topcmu();
       pk.setpayloadlength( c.pcmuref.size() );
       break;
+    }
+    default:
+    {
+      pk.length = 0;
     }
   }
 

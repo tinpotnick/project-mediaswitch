@@ -11,7 +11,7 @@
 rtppacket::rtppacket() :
   length( 0 )
 {
-
+  memset( this->pk, 0, RTPMAXLENGTH );
 }
 
 /*!md
