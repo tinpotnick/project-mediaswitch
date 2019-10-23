@@ -29,6 +29,7 @@ projectcontrol.moh = {
 projectcontrol.onhangup = ( call ) =>
 {
   console.log( "global hangup" )
+  console.log( call.history )
 }
 
 projectcontrol.onnewcall = ( call ) =>
