@@ -1,6 +1,7 @@
 
 
 const projectcontrol = require( "projectcontrol" )
+const projectqueue = require( "projectqueue" )
 
 projectcontrol.gw = {
   from: {
@@ -26,16 +27,41 @@ projectcontrol.moh = {
 // limit the codecs
 // projectcontrol.codecs = [ "pcmu" , "2833" ,"pcma" ];
 
-projectcontrol.onhangup = ( call ) =>
+projectcontrol.onreporting = ( call ) =>
 {
   console.log( "global hangup" )
   console.log( call.history )
+}
+
+projectqueue.onpositionchange = ( call ) =>
+{
+  console.log( "callposchanged" )
+  console.log( call.metadata.queue )
 }
 
 projectcontrol.onnewcall = ( call ) =>
 {
   console.log( "new call inbound call" )
   if( call.haserror ) console.log( call.error )
+
+  if( "1" == call.destination )
+  {
+    call.onanswer = () =>
+    {
+      var soup = {}
+      soup.loop = true
+      soup.files = []
+      soup.files.push( { wav: "test.wav", start: 3000, stop: 5000 } )
+
+      call.play( soup )
+
+      var q = projectqueue.find( "blah" )
+      q.queue( call )
+    }
+    call.answer()
+
+    return;
+  }
 
   if( "2" == call.destination )
   {
