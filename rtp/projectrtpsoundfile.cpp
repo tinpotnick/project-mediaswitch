@@ -188,11 +188,12 @@ rawsound soundfile::read( void )
   
   uint8_t *current = ( uint8_t * ) this->cbwavblock.aio_buf;
 
-  this->currentindex = ( this->currentindex + 1 ) % readbuffercount;
-  this->cbwavblock.aio_buf = this->readbuffer + ( blocksize * this->currentindex );
+  this->currentindex = ( this->currentindex + 1 ) % this->readbuffercount;
+  this->cbwavblock.aio_buf = this->readbuffer + ( this->blocksize * this->currentindex );
+  
   if( -1 == this->newposition )
   {
-    this->cbwavblock.aio_offset += blocksize;
+    this->cbwavblock.aio_offset += this->blocksize;
   }
   else
   {
@@ -201,7 +202,7 @@ rawsound soundfile::read( void )
     this->cbwavblock.aio_offset += sizeof( wav_header );
   }
   
-  this->cbwavblock.aio_nbytes = blocksize;
+  this->cbwavblock.aio_nbytes = this->blocksize;
 
   if( this->cbwavblock.aio_offset > ( __off_t ) ( this->wavheader.wav_size + sizeof( wav_header ) ) )
   {
@@ -228,7 +229,7 @@ rawsound soundfile::read( void )
     return rawsound();
   }
 
-  return rawsound( current, blocksize, ploadtype, this->wavheader.sample_rate );
+  return rawsound( current, this->blocksize, ploadtype, this->wavheader.sample_rate );
 }
 
 /*!md
@@ -238,6 +239,12 @@ Gets and sets the position in terms of mS.
 void soundfile::setposition( long mseconds )
 {
   this->newposition = mseconds;
+}
+
+long soundfile::offtomsecs( void )
+{
+  __off_t position = this->cbwavblock.aio_offset - sizeof( wav_header );
+  return position / ( ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) );
 }
 
 long soundfile::getposition( void )
@@ -252,8 +259,7 @@ long soundfile::getposition( void )
     return this->newposition;
   }
 
-  __off_t position = this->cbwavblock.aio_offset - sizeof( wav_header );
-  return position / ( ( this->wavheader.bit_depth / 8 ) * ( this->wavheader.sample_rate / 1000 ) );
+  return this->offtomsecs();
 }
 
 /*!md

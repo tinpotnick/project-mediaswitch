@@ -70,6 +70,7 @@ public:
   bool complete( void );
 
 private:
+  long offtomsecs( void );
   int file;
   std::string url;
   uint8_t *readbuffer;
