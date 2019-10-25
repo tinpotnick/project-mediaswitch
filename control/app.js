@@ -33,8 +33,29 @@ projectcontrol.onreporting = ( call ) =>
   console.log( call.history )
 }
 
+queuewav = {}
+queuewav.youare = { wav: "queue.wav", start: 400, stop: 1100 }
+queuewav.inline = { wav: "queue.wav", start: 1300, stop: 2200 }
+queuewav[ "1" ]= { wav: "queue.wav", start: 2600, stop: 3100 }
+queuewav[ "2" ]= { wav: "queue.wav", start: 3500, stop: 4100 }
+queuewav[ "3" ]= { wav: "queue.wav", start: 4500, stop: 4800 }
+queuewav[ "4" ]= { wav: "queue.wav", start: 5400, stop: 5800 }
+queuewav[ "5" ]= { wav: "queue.wav", start: 6300, stop: 6600 }
+queuewav[ "6" ]= { wav: "queue.wav", start: 7400, stop: 7600 }
+
+
 projectqueue.onpositionchange = ( call ) =>
 {
+  var soup = {}
+  soup.loop = true
+  soup.files = [
+    queuewav.youare,
+    queuewav[ call.metadata.queue.position ],
+    queuewav.inline,
+     { wav: "test.wav", start: 3000, stop: 5000 },
+  ]
+
+  call.play( soup )
   console.log( "callposchanged" )
   console.log( call.metadata.queue )
 }
@@ -48,13 +69,6 @@ projectcontrol.onnewcall = ( call ) =>
   {
     call.onanswer = () =>
     {
-      var soup = {}
-      soup.loop = true
-      soup.files = []
-      soup.files.push( { wav: "test.wav", start: 3000, stop: 5000 } )
-
-      call.play( soup )
-
       var q = projectqueue.find( "blah" )
       q.queue( call )
     }
