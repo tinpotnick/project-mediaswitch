@@ -408,7 +408,8 @@ void initchannels( unsigned short startport, unsigned short endport )
   rtpchannels::iterator it;
   for( it = dormantchannels.begin(); it != dormantchannels.end(); it++ )
   {
-    (*it)->close();
+    // This closes the channel in this thread
+    (* it )->handletick( boost::asio::error::operation_aborted );
   }
 }
 

@@ -143,35 +143,7 @@ Closes the channel.
 */
 void projectrtpchannel::close( void )
 {
-  try
-  {
-    this->player = nullptr;
-
-    /* remove oursevelse from our list of mixers */
-    if( this->others )
-    {
-      projectrtpchannellist::iterator it;
-      for( it = this->others->begin(); it != this->others->end(); it++ )
-      {
-        if( it->get() == this )
-        {
-          this->others->erase( it );
-          break;
-        }
-      }
-      /* release the shared pointer */
-      this->others = nullptr;
-    }
-
-    this->active = false;
-    this->rtpsocket.close();
-    this->rtcpsocket.close();
-    this->tick.cancel();
-  }
-  catch(...)
-  {
-
-  }
+  this->tick.cancel();
 }
 
 /*!md
@@ -180,7 +152,38 @@ Our timer to send data
 */
 void projectrtpchannel::handletick( const boost::system::error_code& error )
 {
-  if ( error != boost::asio::error::operation_aborted )
+  if ( error == boost::asio::error::operation_aborted )
+  {
+    try
+    {
+      this->player = nullptr;
+
+      /* remove oursevelse from our list of mixers */
+      if( this->others )
+      {
+        projectrtpchannellist::iterator it;
+        for( it = this->others->begin(); it != this->others->end(); it++ )
+        {
+          if( it->get() == this )
+          {
+            this->others->erase( it );
+            break;
+          }
+        }
+        /* release the shared pointer */
+        this->others = nullptr;
+      }
+
+      this->active = false;
+      this->rtpsocket.close();
+      this->rtcpsocket.close();
+    }
+    catch(...)
+    {
+
+    }
+  }
+  else
   {
     this->checkfornewmixes();
 
