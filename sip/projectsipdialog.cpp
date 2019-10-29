@@ -453,6 +453,7 @@ void projectsipdialog::waitfor200thenackanddie( projectsippacket::pointer pk )
   if( 200 == code || 481 == code )
   {
     this->sendack();
+    this->updatecontrol();
     this->untrack();
   }
 }
