@@ -29,7 +29,8 @@
 # projectsipregistration
 Class to hold details about a specific registration.
 */
-class projectsipregistration
+class projectsipregistration :
+  public boost::enable_shared_from_this< projectsipregistration >
 {
 public:
   projectsipregistration( std::string u );

@@ -290,7 +290,7 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
                       boost::posix_time::seconds( expires );
 
   this->timer.expires_after( std::chrono::seconds( OPTIONSPINGFREQUENCY ) );
-  this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, this, std::placeholders::_1 ) );
+  this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, shared_from_this(), std::placeholders::_1 ) );
 
   if( false == this->isregistered )
   {
@@ -328,7 +328,7 @@ void projectsipregistration::regwaitauth( projectsippacket::pointer pk )
   d->addheader( projectwebdocument::Content_Type, "text/json" );
   d->setbody( t.c_str() );
 
-  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, this, std::placeholders::_1 ) );
+  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, shared_from_this(), std::placeholders::_1 ) );
 
   this->authrequest.reset();
 }
@@ -381,7 +381,7 @@ void projectsipregistration::expire( void )
   d->addheader( projectwebdocument::Content_Length, 0 );
   d->addheader( projectwebdocument::Content_Type, "text/json" );
 
-  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallbackanddie, this, std::placeholders::_1 ) );
+  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallbackanddie, shared_from_this(), std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
@@ -405,7 +405,7 @@ void projectsipregistration::unavailable( void )
   d->addheader( projectwebdocument::Content_Length, 0 );
   d->addheader( projectwebdocument::Content_Type, "text/json" );
 
-  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, this, std::placeholders::_1 ) );
+  this->controlrequest->asyncrequest( d, std::bind( &projectsipregistration::httpcallback, shared_from_this(), std::placeholders::_1 ) );
 }
 
 /*******************************************************************************
@@ -431,7 +431,7 @@ void projectsipregistration::timerhandler( const boost::system::error_code& erro
     this->sendoptions();
 
     this->timer.expires_after( std::chrono::seconds( OPTIONSPINGFREQUENCY ) );
-    this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, this, std::placeholders::_1 ) );
+    this->timer.async_wait( std::bind( &projectsipregistration::timerhandler, shared_from_this(), std::placeholders::_1 ) );
   }
 }
 
