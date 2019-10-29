@@ -163,6 +163,11 @@ console.log("5")
     call.answer()
   }
 
+  if( "9" == call.destination )
+  {
+    var newcall = call.newcall( [ { to: { user: "1003" } }, { to: { user: "1001" } } ] )
+  }
+
   call.onhangup = () =>
   {
     console.log( "hung up" )
