@@ -58,6 +58,7 @@ public:
 
   void open( std::string &control );
   void close( void );
+  void testclose( void );
 
   unsigned short getport( void );
 
@@ -154,6 +155,8 @@ private:
 
   boost::lockfree::stack< projectrtpchannel::pointer > mixqueue;
   boost::asio::steady_timer tick;
+
+  std::atomic_bool isopened;
 };
 
 

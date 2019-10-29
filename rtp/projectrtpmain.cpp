@@ -409,7 +409,7 @@ void initchannels( unsigned short startport, unsigned short endport )
   for( it = dormantchannels.begin(); it != dormantchannels.end(); it++ )
   {
     // This closes the channel in this thread
-    (* it )->handletick( boost::asio::error::operation_aborted );
+    (* it )->testclose();
   }
 }
 

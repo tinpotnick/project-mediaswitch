@@ -52,7 +52,8 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsig
   others( nullptr ),
   player( nullptr ),
   mixqueue( MIXQUEUESIZE ),
-  tick( io_service )
+  tick( io_service ),
+  isopened( false )
 {
   memset( this->orderedrtpdata, 0, sizeof( this->orderedrtpdata ) );
 }
@@ -126,6 +127,8 @@ void projectrtpchannel::open( std::string &control )
 
   this->control = control;
 
+  this->isopened = true;
+
   this->tick.expires_after( std::chrono::milliseconds( 20 ) );
   this->tick.async_wait( boost::bind( &projectrtpchannel::handletick,
                                         shared_from_this(),
@@ -143,7 +146,18 @@ Closes the channel.
 */
 void projectrtpchannel::close( void )
 {
+  this->isopened = false;
   this->tick.cancel();
+}
+
+/*!md
+## testclose
+In our startup we test how many files we can open and warn. This closes us when we are in this state.
+*/
+void projectrtpchannel::testclose( void )
+{
+  this->isopened = false;
+  this->handletick( boost::asio::error::operation_aborted );
 }
 
 /*!md
@@ -156,27 +170,30 @@ void projectrtpchannel::handletick( const boost::system::error_code& error )
   {
     try
     {
-      this->player = nullptr;
-
-      /* remove oursevelse from our list of mixers */
-      if( this->others )
+      if( !this->isopened )
       {
-        projectrtpchannellist::iterator it;
-        for( it = this->others->begin(); it != this->others->end(); it++ )
-        {
-          if( it->get() == this )
-          {
-            this->others->erase( it );
-            break;
-          }
-        }
-        /* release the shared pointer */
-        this->others = nullptr;
-      }
+        this->player = nullptr;
 
-      this->active = false;
-      this->rtpsocket.close();
-      this->rtcpsocket.close();
+        /* remove oursevelse from our list of mixers */
+        if( this->others )
+        {
+          projectrtpchannellist::iterator it;
+          for( it = this->others->begin(); it != this->others->end(); it++ )
+          {
+            if( it->get() == this )
+            {
+              this->others->erase( it );
+              break;
+            }
+          }
+          /* release the shared pointer */
+          this->others = nullptr;
+        }
+
+        this->active = false;
+        this->rtpsocket.close();
+        this->rtcpsocket.close();
+      }
     }
     catch(...)
     {
