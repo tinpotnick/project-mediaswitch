@@ -15,7 +15,8 @@ Updated: 22.01.2019
 projecthttpserver::projecthttpserver( boost::asio::io_service& io_service,
                                         short port,
                                         std::function<void ( projectwebdocument &request, projectwebdocument &response )> callback ) :
-  httpacceptor( io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port ) ),
+  _io_service( io_service ), 
+    httpacceptor( io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port ) ),
     callback( callback )
 {
   this->waitaccept();
@@ -29,7 +30,7 @@ Updated: 22.01.2019
 void projecthttpserver::waitaccept( void )
 {
   projecthttpconnection::pointer newconnection =
-    projecthttpconnection::create( httpacceptor.get_io_service() );
+    projecthttpconnection::create( _io_service );
 
   httpacceptor.async_accept( newconnection->socket(),
     boost::bind( &projecthttpserver::handleaccept, this, newconnection,
