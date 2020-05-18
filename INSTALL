@@ -11,3 +11,14 @@ You'll need to build the following libraries from source
 1. boost ( https://www.boost.org/ )
 2. libilbc ( https://github.com/TimothyGu/libilbc )
 3. spandsp ( https://github.com/jart/spandsp )
+
+## How to build
+
+Note: cmake will also need to be installed
+
+```
+mkdir build
+cd build
+cmake ..
+make
+```
