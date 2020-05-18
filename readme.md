@@ -371,9 +371,3 @@ sipp 127.0.0.1 -sf uaclateoffer.xml -m 1 -l 1
 
 - [ ] Impliment session timers (RFC 4028)
 - [ ] Research https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html in more detail to get the best performance out of a host CPU (i.e. SSE for filter and maybe CODECs)
-
-# Requirements for building
-
-## Fedora / Redhat
-
-dnf install ccache @development-tools g++ boost-devel ilbc-devel spandsp-devel openssl-devel nodejs

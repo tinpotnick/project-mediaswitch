@@ -1,0 +1,13 @@
+# Installation Instructions
+
+## Fedora / Redhat
+dnf install ccache @development-tools g++ boost-devel ilbc-devel spandsp-devel openssl-devel nodejs
+
+## Ubuntu
+apt install g++ openssl nodejs
+
+### From source
+You'll need to build the following libraries from source
+1. boost ( https://www.boost.org/ )
+2. libilbc ( https://github.com/TimothyGu/libilbc )
+3. spandsp ( https://github.com/jart/spandsp )
