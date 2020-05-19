@@ -61,6 +61,7 @@ private:
 	void handleaccept( projecthttpconnection::pointer new_connection,
 		      const boost::system::error_code& error);
 
+  boost::asio::io_service& _io_service;
 	boost::asio::ip::tcp::acceptor httpacceptor;
   std::function<void ( projectwebdocument &request, projectwebdocument &response )> callback;
 };
