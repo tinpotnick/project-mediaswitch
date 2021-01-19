@@ -28,6 +28,7 @@ projectsipdialog::projectsipdialog() :
   referpk( nullptr ),
   ackpk( nullptr ),
   timer( io_service ),
+  setimer( io_service ),
   retries( 3 ),
   authenticated( false ),
   originator( false ),

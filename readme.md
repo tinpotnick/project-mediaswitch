@@ -1,6 +1,15 @@
 # project mediaswitch
 
-**This project is work in progress - there is nothing to use yet unless you wish to get involved with the ongoing development of this project - we would love to include some collaborators.**
+**This project is now discontinued.**
+
+This is because I came across the Drachtio project which shares the same vision and structure I had in mind for this project. Drachtio is only one component of this project - so this projected has morphed into other projects which will eventually off all the components required for a soft PBX.
+
+* https://github.com/tinpotnick/babble-drachtio-callmanager
+* https://github.com/tinpotnick/babble-drachtio-registrar
+
+There is more to do, including presence.
+
+# Old write up
 
 Project mediaswitch is designed to be a scalable VOIP switch. Forget a Swiss-army knife supporting 20 protocols bridging old ISDN routes with H323 or SIP. This project is designed to be slim, efficient and fast using an event-driven, asynchronous architecture. SIP, call control and RTP.
 

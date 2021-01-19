@@ -203,7 +203,7 @@ Purpose: Converts crc to method value. Switch statement comes from
 gensipheadercrc.py. We only store references to the supported headers.
 Updated: 03.01.2019
 *******************************************************************************/
-int projectwebdocument::getmethodfromcrc( int crc )
+int projectwebdocument::getmethodfromcrc( unsigned int crc )
 {
   switch( crc )
   {
@@ -254,7 +254,7 @@ Purpose: Converts crc to header value. Switch statement comes from
 gensipheadercrc.py. We only store references to the supported headers.
 Updated: 03.01.2019
 *******************************************************************************/
-int projectwebdocument::getheaderfromcrc( int crc )
+int projectwebdocument::getheaderfromcrc( unsigned int crc )
 {
   switch( crc )
   {

@@ -2,7 +2,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "projectsipstring.h"
 #include "projectwebdocument.h"
@@ -66,4 +66,3 @@ private:
 };
 
 #endif /* PROJECTHTTPSERVER_H */
-

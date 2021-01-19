@@ -2,13 +2,14 @@
 
 #include <iostream>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/chrono.hpp>
 #include <iomanip>
 
 
 #include "projectrtpchannel.h"
 
+using namespace boost::placeholders;
 
 /*!md
 # Project RTP Channel
@@ -25,8 +26,8 @@ Create the socket then wait for data
 
 echo "This is my data" > /dev/udp/127.0.0.1/10000
 */
-projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsigned short port )
-  : 
+projectrtpchannel::projectrtpchannel( boost::asio::io_context &iocontext, unsigned short port )
+  :
   selectedcodec( 0 ),
   ssrcout( 0 ),
   ssrcin( 0 ),
@@ -41,9 +42,10 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsig
   rtpoutindex( 0 ),
   active( false ),
   port( port ),
-  resolver( io_service ),
-  rtpsocket( io_service ),
-  rtcpsocket( io_service ),
+  iocontext( iocontext ),
+  resolver( iocontext ),
+  rtpsocket( iocontext ),
+  rtcpsocket( iocontext ),
   receivedrtp( false ),
   targetconfirmed( false ),
   reader( true ),
@@ -52,8 +54,7 @@ projectrtpchannel::projectrtpchannel( boost::asio::io_service &io_service, unsig
   others( nullptr ),
   player( nullptr ),
   mixqueue( MIXQUEUESIZE ),
-  tick( io_service ),
-  isopened( false )
+  tick( iocontext )
 {
   memset( this->orderedrtpdata, 0, sizeof( this->orderedrtpdata ) );
 }
@@ -72,22 +73,25 @@ projectrtpchannel::~projectrtpchannel( void )
 # create
 
 */
-projectrtpchannel::pointer projectrtpchannel::create( boost::asio::io_service &io_service, unsigned short port )
+projectrtpchannel::pointer projectrtpchannel::create( boost::asio::io_context &iocontext, unsigned short port )
 {
-  return pointer( new projectrtpchannel( io_service, port ) );
+  return pointer( new projectrtpchannel( iocontext, port ) );
 }
 
 /*!md
 ## open
 Open the channel to read network data. Setup memory and pointers.
 */
-void projectrtpchannel::open( std::string &control )
+void projectrtpchannel::open( std::string &id, std::string &uuid )
 {
+  this->id = id;
+  this->uuid = uuid;
+
   /* indexes into our circular rtp array */
   this->rtpindexin = 0;
   this->rtpindexoldest = 0;
 
-  
+
   this->receivedpkcount = 0;
 
   this->rtpoutindex = 0;
@@ -125,10 +129,6 @@ void projectrtpchannel::open( std::string &control )
   this->orderedinbottom = 0;
   this->lastworkedonsn = 0;
 
-  this->control = control;
-
-  this->isopened = true;
-
   this->tick.expires_after( std::chrono::milliseconds( 20 ) );
   this->tick.async_wait( boost::bind( &projectrtpchannel::handletick,
                                         shared_from_this(),
@@ -146,18 +146,35 @@ Closes the channel.
 */
 void projectrtpchannel::close( void )
 {
-  this->isopened = false;
-  this->tick.cancel();
+  this->active = false;
+  boost::asio::post( this->iocontext,
+        boost::bind( &projectrtpchannel::doclose, this ) );
 }
 
-/*!md
-## testclose
-In our startup we test how many files we can open and warn. This closes us when we are in this state.
-*/
-void projectrtpchannel::testclose( void )
+void projectrtpchannel::doclose( void )
 {
-  this->isopened = false;
-  this->handletick( boost::asio::error::operation_aborted );
+  this->active = false;
+  this->tick.cancel();
+  this->player = nullptr;
+
+  /* remove oursevelse from our list of mixers */
+  if( this->others )
+  {
+    projectrtpchannellist::iterator it;
+    for( it = this->others->begin(); it != this->others->end(); it++ )
+    {
+      if( it->get() == this )
+      {
+        this->others->erase( it );
+        break;
+      }
+    }
+    /* release the shared pointer */
+    this->others = nullptr;
+  }
+
+  this->rtpsocket.close();
+  this->rtcpsocket.close();
 }
 
 /*!md
@@ -166,41 +183,7 @@ Our timer to send data
 */
 void projectrtpchannel::handletick( const boost::system::error_code& error )
 {
-  if ( error == boost::asio::error::operation_aborted )
-  {
-    try
-    {
-      if( !this->isopened )
-      {
-        this->player = nullptr;
-
-        /* remove oursevelse from our list of mixers */
-        if( this->others )
-        {
-          projectrtpchannellist::iterator it;
-          for( it = this->others->begin(); it != this->others->end(); it++ )
-          {
-            if( it->get() == this )
-            {
-              this->others->erase( it );
-              break;
-            }
-          }
-          /* release the shared pointer */
-          this->others = nullptr;
-        }
-
-        this->active = false;
-        this->rtpsocket.close();
-        this->rtcpsocket.close();
-      }
-    }
-    catch(...)
-    {
-
-    }
-  }
-  else
+  if ( error != boost::asio::error::operation_aborted )
   {
     this->checkfornewmixes();
 
@@ -292,7 +275,7 @@ void projectrtpchannel::readsomertp( void )
           }
 
           this->rtpdata[ this->rtpindexin ].length = bytes_recvd;
-          
+
           /* Now order it */
           rtppacket *src = &this->rtpdata[ this->rtpindexin ];
           uint16_t sn = src->getsequencenumber();
@@ -306,7 +289,7 @@ void projectrtpchannel::readsomertp( void )
           {
             this->orderedinminsn = this->orderedinmaxsn = sn;
             this->orderedinbottom = sn % BUFFERPACKETCOUNT;
-          } 
+          }
         }
 
         if( !ec && bytes_recvd && this->active )
@@ -339,7 +322,7 @@ bool projectrtpchannel::handlertpdata( void )
   if( aheadby < BUFFERDELAYCOUNT ) return false;
 
   uint16_t workingonaheadby = sn - this->lastworkedonsn;
-  
+
   /* Only process if it is the expected sn */
   if( this->orderedinminsn == sn )
   {
@@ -633,4 +616,3 @@ void projectrtpchannel::handlertcpdata( void )
 {
 
 }
-

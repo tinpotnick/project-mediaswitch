@@ -3,6 +3,7 @@
 
 #include <boost/asio.hpp>
 #include <string>
+#include <memory>
 
 /* The number of bytes in a packet ( these figure are less some overhead G711 = 172*/
 #define G711PAYLOADBYTES 160
@@ -26,11 +27,8 @@
 #define RTCPMAXLENGTH 200
 
 
-/* Try not to use too many globals. Keep track of ones we do here */
-/* ioservice is our main control thread - used for http control information, workerservice is the workload - rtp service */
-extern boost::asio::io_service ioservice;
-extern boost::asio::io_service workerservice;
-
 extern std::string mediachroot;
+
+typedef std::shared_ptr< std::string > stringptr;
 
 #endif /* PROJECTRTPGLOBALS_H */

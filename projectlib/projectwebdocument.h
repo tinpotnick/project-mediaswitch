@@ -137,8 +137,8 @@ public:
   virtual stringptr strptr() { return this->document; };
 
 protected:
-  virtual int getheaderfromcrc( int crc );
-  virtual int getmethodfromcrc( int crc );
+  virtual int getheaderfromcrc( unsigned int crc );
+  virtual int getmethodfromcrc( unsigned int crc );
   virtual const char *getheaderstr( int header );
   virtual const char *getmethodstr( int method );
 

@@ -1,5 +1,5 @@
-CCOPTS:=-Wall -g -O0 -fstack-protector-all -I../projectlib/ -std=c++17
-LL:=-lboost_system -lpthread -lrt -L../Debug/ -lproject -lspandsp -lilbc
+CCOPTS:=-Wall -g -O0 -fstack-protector-all -std=c++17
+LL:=-lboost_system -lpthread -lrt -L../Debug/ -lspandsp -lilbc
 
 COMPILER:=g++
 LINKER:=g++
@@ -65,6 +65,3 @@ uk-sounds: ../Debug/project-rtp
 	../Debug/project-rtp --tone 440/0:375/375 ../Debug/uksounds.wav
 	../Debug/project-rtp --tone 440/0:400/350/225/525 ../Debug/uksounds.wav
 	../Debug/project-rtp --tone 440/0:125/125 ../Debug/uksounds.wav
-	
-
-	 

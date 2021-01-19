@@ -26,7 +26,6 @@
 #include "projectrtpcodecx.h"
 #include "projectrtppacket.h"
 #include "projectrtpsoundsoup.h"
-#include "projectsipstring.h"
 
 /* The number of packets we will keep in a buffer */
 #define BUFFERPACKETCOUNT 20
@@ -50,20 +49,19 @@ class projectrtpchannel :
 {
 
 public:
-  projectrtpchannel( boost::asio::io_service &io_service, unsigned short port );
+  projectrtpchannel( boost::asio::io_context &iocontext, unsigned short port );
   ~projectrtpchannel( void );
 
   typedef std::shared_ptr< projectrtpchannel > pointer;
-  static pointer create( boost::asio::io_service &io_service, unsigned short port );
+  static pointer create( boost::asio::io_context &iocontext, unsigned short port );
 
-  void open( std::string &control );
+  void open( std::string &id, std::string &uuid );
   void close( void );
-  void testclose( void );
+  void doclose( void );
 
   unsigned short getport( void );
 
   void target( std::string &address, unsigned short port );
-  void setcontrol( std::string &address ) { this->control = address; };
   void play( stringptr newdef ) { std::atomic_store( &this->newplaydef, newdef ); };
 
   typedef std::vector< int > codeclist;
@@ -109,9 +107,16 @@ public:
   int rtpoutindex;
 
 private:
-  bool active;
+  std::atomic_bool active;
   unsigned short port;
 
+  /* id provided to us */
+  std::string id;
+
+  /* uuid we generate for this channel */
+  std::string uuid;
+
+  boost::asio::io_context &iocontext;
   boost::asio::ip::udp::resolver resolver;
 
   boost::asio::ip::udp::socket rtpsocket;
@@ -151,13 +156,13 @@ private:
   soundsoup::pointer player;
   stringptr newplaydef;
 
-  std::string control;
-
   boost::lockfree::stack< projectrtpchannel::pointer > mixqueue;
   boost::asio::steady_timer tick;
 
-  std::atomic_bool isopened;
 };
+
+typedef std::deque<projectrtpchannel::pointer> rtpchannels;
+typedef std::unordered_map<std::string, projectrtpchannel::pointer> activertpchannels;
 
 
 #endif

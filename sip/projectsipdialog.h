@@ -25,6 +25,7 @@
 
 #define DIALOGSETUPTIMEOUT 180000  /* 3 minutes */
 #define DIALOGACKTIMEOUT 3000  /* 3 seconds */
+#define DIALOGSE 3600000 /* 1 hour */
 
 /*!md
 # projectsipdialog
@@ -130,6 +131,7 @@ private:
   projectsippacket::pointer lastackpacket;
 
   boost::asio::steady_timer timer;
+  boost::asio::steady_timer setimer;
 
   int retries;
   bool authenticated;
